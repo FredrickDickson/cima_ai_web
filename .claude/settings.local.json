@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase db:*)",
+      "Bash(supabase link:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npx vite:*)"
+    ]
+  }
+}

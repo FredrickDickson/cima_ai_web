@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  textarea {
+    field-sizing: content;
+  }
+}
+
+@layer utilities {
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* AI assistant markdown responses */
+.prose-ai {
+  color: #cbd5e1;
+}
+.prose-ai h1,
+.prose-ai h2,
+.prose-ai h3,
+.prose-ai h4 {
+  color: #f1f5f9;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  line-height: 1.4;
+}
+.prose-ai h1 { font-size: 1.15em; }
+.prose-ai h2 { font-size: 1.05em; }
+.prose-ai h3 { font-size: 1em; }
+.prose-ai h4 { font-size: 0.95em; }
+.prose-ai p {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+.prose-ai ul,
+.prose-ai ol {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  padding-left: 1.4em;
+}
+.prose-ai ul { list-style-type: disc; }
+.prose-ai ol { list-style-type: decimal; }
+.prose-ai li {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+.prose-ai li > ul,
+.prose-ai li > ol {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+.prose-ai strong {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+.prose-ai em {
+  font-style: italic;
+}
+.prose-ai code {
+  background: rgba(148, 163, 184, 0.15);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: ui-monospace, monospace;
+  color: #e2e8f0;
+}
+.prose-ai pre {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+.prose-ai pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+}
+.prose-ai blockquote {
+  border-left: 3px solid #c9a227;
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+.prose-ai hr {
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  margin: 0.8em 0;
+}
+.prose-ai table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.85em;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.prose-ai thead tr {
+  background: rgba(148, 163, 184, 0.12);
+}
+.prose-ai th {
+  color: #e2e8f0;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5em 0.75em;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  white-space: nowrap;
+}
+.prose-ai th:last-child {
+  border-right: none;
+}
+.prose-ai td {
+  padding: 0.5em 0.75em;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  border-right: 1px solid rgba(148, 163, 184, 0.08);
+  vertical-align: top;
+}
+.prose-ai td:last-child {
+  border-right: none;
+}
+.prose-ai tbody tr:last-child td {
+  border-bottom: none;
+}
+.prose-ai tbody tr:hover {
+  background: rgba(148, 163, 184, 0.05);
+}
+.prose-ai a {
+  color: #c9a227;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-ai a:hover {
+  color: #d4af37;
+}
+.prose-ai > *:first-child {
+  margin-top: 0;
+}
+.prose-ai > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Light-theme markdown (Documents, Research, Drafting pages) */
+.prose-doc {
+  color: #334155;
+}
+.prose-doc h1,
+.prose-doc h2,
+.prose-doc h3,
+.prose-doc h4 {
+  color: #0f172a;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  line-height: 1.4;
+}
+.prose-doc h1 { font-size: 1.15em; }
+.prose-doc h2 { font-size: 1.05em; }
+.prose-doc h3 { font-size: 1em; }
+.prose-doc h4 { font-size: 0.95em; }
+.prose-doc p {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+.prose-doc ul,
+.prose-doc ol {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  padding-left: 1.4em;
+}
+.prose-doc ul { list-style-type: disc; }
+.prose-doc ol { list-style-type: decimal; }
+.prose-doc li {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+.prose-doc li > ul,
+.prose-doc li > ol {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+.prose-doc strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+.prose-doc em {
+  font-style: italic;
+}
+.prose-doc code {
+  background: #f1f5f9;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: ui-monospace, monospace;
+  color: #1e293b;
+}
+.prose-doc pre {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+.prose-doc pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+}
+.prose-doc blockquote {
+  border-left: 3px solid #c9a227;
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  color: #64748b;
+  font-style: italic;
+}
+.prose-doc hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 0.8em 0;
+}
+.prose-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.85em;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.prose-doc thead tr {
+  background: #f8fafc;
+}
+.prose-doc th {
+  color: #0f172a;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5em 0.75em;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #f1f5f9;
+  white-space: nowrap;
+}
+.prose-doc th:last-child {
+  border-right: none;
+}
+.prose-doc td {
+  padding: 0.5em 0.75em;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+.prose-doc td:last-child {
+  border-right: none;
+}
+.prose-doc tbody tr:last-child td {
+  border-bottom: none;
+}
+.prose-doc tbody tr:hover {
+  background: #f8fafc;
+}
+.prose-doc a {
+  color: #1e40af;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-doc a:hover {
+  color: #1e3a8a;
+}
+.prose-doc > *:first-child {
+  margin-top: 0;
+}
+.prose-doc > *:last-child {
+  margin-bottom: 0;
+}

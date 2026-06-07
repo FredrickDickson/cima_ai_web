@@ -1,0 +1,139 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import type { User, Session } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+import type { Profile } from "../types/database";
+
+interface AuthContextValue {
+  user: User | null;
+  session: Session | null;
+  profile: Profile | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    role: string
+  ) => Promise<{ error: string | null }>;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function fetchProfile(userId: string) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (data) {
+      setProfile(data);
+    } else {
+      // Profile missing (e.g. created before migration or insert failed during sign-up).
+      // Auto-create a default profile so FK constraints on other tables don't break.
+      const email = user?.email ?? "";
+      const fallbackName = email.split("@")[0].replace(/[._-]/g, " ");
+      const { data: created } = await supabase
+        .from("profiles")
+        .upsert({ id: userId, full_name: fallbackName, role: "lawyer" })
+        .select()
+        .maybeSingle();
+      setProfile(created);
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      setLoading(false);
+    }).catch(() => {
+      if (mounted) setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function signIn(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error?.message ?? null };
+  }
+
+  async function signUp(
+    email: string,
+    password: string,
+    fullName: string,
+    role: string
+  ) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message };
+    if (data.user) {
+      const { error: profileErr } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        full_name: fullName,
+        role,
+      });
+      if (profileErr) {
+        console.error("Failed to create profile:", profileErr.message);
+      }
+    }
+    return { error: null };
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+  }
+
+  async function refreshProfile() {
+    if (user) await fetchProfile(user.id);
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+}
