@@ -390,7 +390,7 @@ export default function Research() {
               </div>
             ) : (
               savedSessions.map((s) => (
-                <button key={s.id} onClick={() => setQuery(s.query)} className="w-full text-left p-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group">
+                <button key={s.id} onClick={() => loadSession(s.id)} className={`w-full text-left p-2.5 rounded-lg border transition-all group ${activeSessionId === s.id ? "bg-navy-50 border-navy-200" : "hover:bg-slate-50 border-transparent hover:border-slate-200"}`}>
                   <p className="text-xs font-medium text-navy-900 line-clamp-2 group-hover:text-navy-700">{s.query}</p>
                   <div className="flex items-center gap-1 mt-1.5">
                     <Clock size={10} className="text-slate-400" />
