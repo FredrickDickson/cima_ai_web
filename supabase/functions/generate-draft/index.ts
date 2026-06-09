@@ -162,7 +162,18 @@ ${variableList ? `Variable values provided:\n${variableList}\n` : ""}
 ${matterContext ? `Use the following matter details to populate the document with accurate party names, dates, and case specifics:\n\n${matterContext}\n` : ""}
 ${custom_instructions ? `Special instructions: ${custom_instructions}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
-Produce the complete final document in professional legal format. At the end, add a section titled "LEGAL NOTES" with 3-5 key points the parties should know about this document, citing any relevant legislation from the sources above.`;
+Produce the complete final document in professional legal format.
+
+After the main document, add the following three sections exactly as labelled:
+
+---SHORT FORM---
+A condensed version of the document (maximum 30% of the main document length) preserving the core obligations, key dates, payment terms, and enforcement provisions. Suitable for quick reference.
+
+---PLAIN ENGLISH---
+A plain-language explanation of this document written for a non-lawyer. Explain: what this document does, what each party has agreed to, what happens if someone breaks the agreement, and the 3 most important things to know. Use simple sentences. No legal jargon.
+
+---LEGAL NOTES---
+3-5 key legal observations for the parties, citing any relevant legislation from the sources above.`;
 
     } else if (prompt) {
       // Path 2: Natural language drafting
@@ -195,7 +206,16 @@ Produce a complete, professionally formatted legal document in markdown. Include
 - Signature blocks
 - Professional legal language and structure appropriate for ${jurisdiction ?? "Ghana"}
 
-At the end, add a section titled "LEGAL NOTES" with 3-5 key legal points the parties should know about this specific document, citing any relevant legislation from the sources above.`;
+After the main document, add the following three sections exactly as labelled:
+
+---SHORT FORM---
+A condensed version of the document (maximum 30% of the main document length) preserving the core obligations, key dates, payment terms, and enforcement provisions. Suitable for quick reference.
+
+---PLAIN ENGLISH---
+A plain-language explanation of this document written for a non-lawyer. Explain: what this document does, what each party has agreed to, what happens if someone breaks the agreement, and the 3 most important things to know. Use simple sentences. No legal jargon.
+
+---LEGAL NOTES---
+3-5 key legal observations, citing any relevant legislation from the sources above.`;
 
     } else {
       // Path 3: Freeform (existing fallback)
@@ -208,7 +228,18 @@ Jurisdiction: ${jurisdiction ?? "Ghana"}
 ${matterContext ? `Matter context:\n${matterContext}\n` : ""}
 ${custom_instructions ? `Special instructions: ${custom_instructions}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
-Produce a complete document with all standard provisions, properly structured and formatted. At the end, add a section titled "LEGAL NOTES" with 3-5 key points the parties should know about this document, citing any relevant legislation from the sources above.`;
+Produce a complete document with all standard provisions, properly structured and formatted.
+
+After the main document, add the following three sections exactly as labelled:
+
+---SHORT FORM---
+A condensed version of the document (maximum 30% of the main document length) preserving core obligations, key dates, and enforcement provisions. Suitable for quick reference.
+
+---PLAIN ENGLISH---
+A plain-language explanation written for a non-lawyer. Cover: what this document does, what each party agreed to, what happens if someone breaks the agreement, and the 3 most important things to know.
+
+---LEGAL NOTES---
+3-5 key legal observations, citing any relevant legislation from the sources above.`;
     }
 
     const res = await fetch("https://api.deepseek.com/chat/completions", {
@@ -226,9 +257,18 @@ Produce a complete document with all standard provisions, properly structured an
     const data = await res.json();
     const fullContent = data.choices?.[0]?.message?.content ?? "";
 
-    const legalNotesMatch = fullContent.match(/LEGAL NOTES[:\s]*\n([\s\S]+)$/i);
+    // Parse the structured output: main doc | short form | plain english | legal notes
+    const shortFormMatch = fullContent.match(/---SHORT FORM---\s*\n([\s\S]+?)(?=---PLAIN ENGLISH---|---LEGAL NOTES---|$)/i);
+    const plainEnglishMatch = fullContent.match(/---PLAIN ENGLISH---\s*\n([\s\S]+?)(?=---SHORT FORM---|---LEGAL NOTES---|$)/i);
+    const legalNotesMatch = fullContent.match(/---LEGAL NOTES---\s*\n([\s\S]+?)(?=---SHORT FORM---|---PLAIN ENGLISH---|$)/i);
+
+    const shortForm = shortFormMatch ? shortFormMatch[1].trim() : "";
+    const plainEnglish = plainEnglishMatch ? plainEnglishMatch[1].trim() : "";
     const legalNotes = legalNotesMatch ? legalNotesMatch[1].trim() : "";
-    const mainContent = legalNotesMatch ? fullContent.slice(0, legalNotesMatch.index).trim() : fullContent;
+
+    // Main content is everything before the first separator
+    const firstSepIdx = fullContent.search(/---SHORT FORM---|---PLAIN ENGLISH---|---LEGAL NOTES---/i);
+    const mainContent = (firstSepIdx > 0 ? fullContent.slice(0, firstSepIdx) : fullContent).trim();
 
     const wordCount = mainContent.split(/\s+/).filter(Boolean).length;
 
@@ -248,6 +288,8 @@ Produce a complete document with all standard provisions, properly structured an
         content: mainContent,
         full_content: fullContent,
         legal_notes: legalNotes,
+        short_form: shortForm,
+        plain_english: plainEnglish,
         word_count: wordCount,
         template_title: templateTitle,
         jurisdiction: jurisdiction ?? "ghana",

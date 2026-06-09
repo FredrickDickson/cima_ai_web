@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   Users, BookOpen, Calendar, FileText, ShieldAlert,
   AlertTriangle, Loader2, Sparkles, PenTool, Search, Scale,
+  Clock, Download, Handshake,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { callCaseAI, type CaseContext } from "../caseAI";
 
@@ -19,6 +21,7 @@ interface OverviewTabProps {
 }
 
 export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps) {
+  const navigate = useNavigate();
   const parties: { name: string; role: string }[] = Array.isArray(caseData.parties) ? caseData.parties : [];
 
   const [deadlines, setDeadlines] = useState<{ id: string; title: string; due_date: string; status?: string }[]>([]);
@@ -28,6 +31,9 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
   const [aiRisks, setAiRisks] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingRisks, setLoadingRisks] = useState(false);
+  const [chronology, setChronology] = useState("");
+  const [loadingChronology, setLoadingChronology] = useState(false);
+  const [exportingCase, setExportingCase] = useState(false);
 
   useEffect(() => {
     supabase.from("deadlines").select("id, title, due_date, status").eq("case_id", caseData.id)
@@ -62,6 +68,73 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
     setLoadingRisks(false);
   }
 
+  async function generateChronology() {
+    setLoadingChronology(true);
+    setChronology("");
+    // Fetch hearings, orders, and documents with extracted text
+    const [{ data: hearings }, { data: orders }, { data: allDocs }] = await Promise.all([
+      supabase.from("hearings").select("title, scheduled_at, notes").eq("case_id", caseData.id).order("scheduled_at"),
+      supabase.from("orders").select("title, order_date, content").eq("case_id", caseData.id).order("order_date"),
+      supabase.from("documents").select("name, created_at, extracted_text").eq("case_id", caseData.id).not("extracted_text", "is", null).order("created_at").limit(5),
+    ]);
+    const parts: string[] = [];
+    if ((hearings ?? []).length > 0) {
+      parts.push("HEARINGS:\n" + (hearings ?? []).map(h => `${h.scheduled_at?.slice(0, 10) ?? "?"}: ${h.title}${h.notes ? ` — ${h.notes}` : ""}`).join("\n"));
+    }
+    if ((orders ?? []).length > 0) {
+      parts.push("PROCEDURAL ORDERS:\n" + (orders ?? []).map(o => `${o.order_date?.slice(0, 10) ?? "?"}: ${o.title}`).join("\n"));
+    }
+    if ((allDocs ?? []).length > 0) {
+      parts.push("DOCUMENTS:\n" + (allDocs ?? []).map(d => `${d.created_at.slice(0, 10)}: ${d.name}\nExcerpt: ${(d.extracted_text ?? "").slice(0, 400)}`).join("\n\n"));
+    }
+    const context = parts.join("\n\n");
+    const prompt = `Generate a comprehensive chronological timeline for the case "${caseData.title}" using the records below.
+
+${context || "No specific records provided — generate a timeline from the case description and type."}
+
+Output a unified timeline. Format each entry EXACTLY as:
+**[DATE]** — [EVENT/FACT]
+
+Sort strictly by date (earliest first). Include: contract signing dates, notice dates, procedural steps, hearings, orders, submissions. Extract specific dates mentioned in document excerpts. If a precise date is unknown, use approximate dates. Do NOT include bullet points or numbering — only the bold-date format above.`;
+    const result = await callCaseAI(caseData, prompt);
+    setChronology(result);
+    setLoadingChronology(false);
+  }
+
+  async function exportCaseSummary() {
+    setExportingCase(true);
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const { user } = await supabase.auth.getUser();
+    const parties = Array.isArray(caseData.parties) ? caseData.parties : [];
+    const prompt = `Generate a comprehensive Case Management Summary document for the matter "${caseData.title}".
+
+Structure the document with these sections:
+1. MATTER OVERVIEW — title, reference number, type, framework, status, parties, counsel
+2. NATURE OF DISPUTE — description of the dispute and background facts
+3. PARTIES AND REPRESENTATIVES — full party details and roles
+4. PROCEDURAL STATUS — current stage, key milestones completed
+5. ISSUES FOR DETERMINATION — all identified legal and factual issues
+6. EVIDENCE ON FILE — summary of documentary and witness evidence
+7. UPCOMING STEPS — next procedural steps and deadlines
+8. STRATEGIC NOTES — key risks, opportunities, and tactical considerations
+9. COST ESTIMATE — estimated costs to date and projected costs (if inferable)
+10. RECOMMENDATIONS — suggested next steps for client/counsel
+
+Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"}, Parties: ${parties.map(p => `${p.name} (${p.role})`).join(", ")}.`;
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/generate-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ prompt, case_id: caseData.id, user_id: user?.id, jurisdiction: "ghana", template_type: "case_management_summary" }),
+    });
+    const data = await res.json();
+    if (data.draft_id) {
+      navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
+    }
+    setExportingCase(false);
+  }
+
   const today = new Date();
 
   return (
@@ -88,8 +161,17 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
         <button onClick={() => onTabChange("research")} className="flex items-center gap-2 px-4 py-2 bg-navy-800/60 border border-navy-700 text-slate-300 hover:text-white hover:border-gold-500/30 rounded-lg text-xs font-semibold transition-colors">
           <Search size={13} />Research
         </button>
+        {caseData.type === "mediation" && (
+          <button onClick={() => onTabChange("settlement")} className="flex items-center gap-2 px-4 py-2 bg-navy-800/60 border border-navy-700 text-emerald-400 hover:text-white hover:border-emerald-500/30 rounded-lg text-xs font-semibold transition-colors">
+            <Handshake size={13} />Mediation
+          </button>
+        )}
         <button onClick={() => onTabChange("ai")} className="flex items-center gap-2 px-4 py-2 bg-navy-800/60 border border-navy-700 text-slate-300 hover:text-white hover:border-gold-500/30 rounded-lg text-xs font-semibold transition-colors">
           <Scale size={13} />AI Insights
+        </button>
+        <button onClick={exportCaseSummary} disabled={exportingCase} className="flex items-center gap-2 px-4 py-2 bg-navy-800/60 border border-navy-700 text-slate-300 hover:text-white hover:border-blue-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+          {exportingCase ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          Case Summary
         </button>
       </div>
 
@@ -210,6 +292,29 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
           <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
         ) : (
           <p className="text-xs text-slate-500">Click "Generate Summary" for an AI-powered overview of this matter.</p>
+        )}
+      </div>
+
+      {/* Case Chronology */}
+      <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+            <Clock size={13} className="text-blue-400" />Case Chronology
+          </h3>
+          <button onClick={generateChronology} disabled={loadingChronology}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors disabled:opacity-50">
+            {loadingChronology ? <Loader2 size={11} className="animate-spin" /> : <Clock size={11} />}
+            {chronology ? "Regenerate" : "Generate Timeline"}
+          </button>
+        </div>
+        {loadingChronology ? (
+          <div className="flex items-center gap-2 text-slate-400 text-sm py-2">
+            <Loader2 size={14} className="animate-spin" />Building timeline from documents, hearings & orders...
+          </div>
+        ) : chronology ? (
+          <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">{chronology}</div>
+        ) : (
+          <p className="text-xs text-slate-500">Generate a unified chronological timeline extracted from documents, hearings, and procedural orders.</p>
         )}
       </div>
 

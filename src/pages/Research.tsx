@@ -19,6 +19,8 @@ import {
   ChevronUp,
   CheckCircle2,
   Trash2,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -151,6 +153,9 @@ export default function Research() {
   const [savedSessions, setSavedSessions] = useState<{ id: string; query: string; jurisdiction: string; created_at: string }[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [validityResult, setValidityResult] = useState("");
+  const [validityLoading, setValidityLoading] = useState(false);
+  const [showValidity, setShowValidity] = useState(false);
 
   function toggleType(type: string) {
     setSelectedTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
@@ -226,6 +231,42 @@ export default function Research() {
       sources_count: (data.results ?? []).length,
     });
     setError("");
+  }
+
+  async function validateAuthorities() {
+    if (!response?.sources.length) return;
+    setValidityLoading(true);
+    setValidityResult("");
+    setShowValidity(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const { data: { session } } = await supabase.auth.getSession();
+      const sourceList = response.sources
+        .map((s, i) => `${i + 1}. ${s.source_name}${s.citation ? ` — ${s.citation}` : ""}${s.jurisdiction ? ` (${s.jurisdiction})` : ""}`)
+        .join("\n");
+      const prompt = `You are a legal citator assistant. For each authority listed below, assess its current validity as good law.
+
+Authorities retrieved:
+${sourceList}
+
+For EACH authority, provide:
+- **Status**: Good Law ✓ | Caution ⚠ | Overruled/Superseded ✗ | Unable to verify
+- **Reason**: One sentence explaining the status (e.g., "Confirmed good law under Ghana ADR Act 2010", "Distinguished in subsequent decisions but not overruled", "Superseded by 2021 UNCITRAL Rules amendment")
+- **Note**: Any important limitation on how the authority should be used
+
+Format as a numbered list matching the order above. Be specific about Ghanaian law where applicable. If you cannot verify the status with confidence, say so honestly rather than guessing.`;
+      const res = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], context: "research" }),
+      });
+      const data = await res.json();
+      setValidityResult(data.choices?.[0]?.message?.content ?? "No result returned.");
+    } catch {
+      setValidityResult("Validity check failed. Please try again.");
+    } finally {
+      setValidityLoading(false);
+    }
   }
 
   function formatDate(d: string) {
@@ -323,16 +364,52 @@ export default function Research() {
             <div className="space-y-6">
               {response.sources.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="p-1.5 rounded-lg bg-navy-50"><Database size={14} className="text-navy-600" /></div>
-                    <div>
-                      <h3 className="text-sm font-bold text-navy-950">Retrieved Legal Sources</h3>
-                      <p className="text-xs text-slate-500">{response.sources.length} sources retrieved via semantic search</p>
+                  <div className="flex items-center justify-between gap-2.5 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-navy-50"><Database size={14} className="text-navy-600" /></div>
+                      <div>
+                        <h3 className="text-sm font-bold text-navy-950">Retrieved Legal Sources</h3>
+                        <p className="text-xs text-slate-500">{response.sources.length} sources retrieved via semantic search</p>
+                      </div>
                     </div>
+                    <button
+                      onClick={validateAuthorities}
+                      disabled={validityLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-navy-300 text-navy-700 hover:text-navy-900 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
+                    >
+                      {validityLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                      Validate Authorities
+                    </button>
                   </div>
                   <div className="space-y-3">
                     {response.sources.map((source, i) => <SourceCard key={source.id} source={source} index={i} />)}
                   </div>
+
+                  {/* Validity check result */}
+                  {showValidity && (
+                    <div className="mt-3 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck size={13} className="text-navy-600" />
+                          <span className="text-xs font-semibold text-navy-900">Authority Validity Assessment</span>
+                        </div>
+                        <button onClick={() => setShowValidity(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                          <X size={13} />
+                        </button>
+                      </div>
+                      <div className="p-4">
+                        {validityLoading ? (
+                          <div className="flex items-center gap-2 text-slate-500 text-sm py-2">
+                            <Loader2 size={14} className="animate-spin" />Checking validity of {response.sources.length} authorit{response.sources.length !== 1 ? "ies" : "y"}...
+                          </div>
+                        ) : (
+                          <div className="prose-doc text-sm leading-relaxed">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{validityResult}</ReactMarkdown>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

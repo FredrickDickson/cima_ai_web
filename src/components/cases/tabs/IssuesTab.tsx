@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Plus, CheckCircle2, ChevronDown, Loader2, Sparkles, ShieldAlert } from "lucide-react";
+import { Plus, CheckCircle2, ChevronDown, Loader2, Sparkles, ShieldAlert, LayoutList, Copy, Check, FileCheck } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type Issue = {
   id: string;
@@ -26,6 +28,14 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
   const [aiAction, setAiAction] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [matrixResult, setMatrixResult] = useState("");
+  const [matrixLoading, setMatrixLoading] = useState(false);
+  const [showMatrix, setShowMatrix] = useState(false);
+  const [matrixCopied, setMatrixCopied] = useState(false);
+  const [jointResult, setJointResult] = useState("");
+  const [jointLoading, setJointLoading] = useState(false);
+  const [showJoint, setShowJoint] = useState(false);
+  const [jointCopied, setJointCopied] = useState(false);
 
   useEffect(() => {
     supabase.from("issues").select("*").eq("case_id", caseId).order("issue_number", { ascending: true })
@@ -64,6 +74,72 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
     setAiLoading(false);
   }
 
+  async function generateMatrix() {
+    setMatrixLoading(true);
+    setShowMatrix(true);
+    setMatrixResult("");
+    const { data: evidence } = await supabase.from("evidence").select("title, type, summary").eq("case_id", caseId).limit(20);
+    const evidenceList = (evidence ?? []).map(e => `- ${e.title} (${e.type})${e.summary ? `: ${e.summary}` : ""}`).join("\n");
+    const prompt = `Generate a comprehensive Issue Matrix for this case as a markdown table with exactly these columns: Issue | Claimant Position | Respondent Position | Key Evidence | Status.
+
+For each issue below, populate all columns using the case details, party positions, and evidence provided. The Status column should indicate: Open, Resolved, or Determinative (if this issue alone could decide the case).
+
+Issues:
+${issueList || "No issues recorded yet."}
+
+${evidenceList ? `Evidence on file:\n${evidenceList}` : ""}
+
+Format the output ONLY as a markdown table — no preamble or explanation text before the table. After the table, add a brief section "Key Observations" (2-3 bullet points about the most critical issues or evidentiary gaps).`;
+
+    const result = await callCaseAI(caseData, prompt, `\nIssue matrix requested for ${issues.length} issues.`);
+    setMatrixResult(result);
+    setMatrixLoading(false);
+  }
+
+  async function copyMatrix() {
+    await navigator.clipboard.writeText(matrixResult);
+    setMatrixCopied(true);
+    setTimeout(() => setMatrixCopied(false), 2000);
+  }
+
+  async function generateJointStatement() {
+    setJointLoading(true);
+    setShowJoint(true);
+    setJointResult("");
+    const parties = Array.isArray(caseData.parties) ? caseData.parties : [];
+    const claimant = parties.find(p => /claimant/i.test(p.role))?.name ?? "Claimant";
+    const respondent = parties.find(p => /respondent/i.test(p.role))?.name ?? "Respondent";
+    const prompt = `Generate a Joint Statement of Agreed and Disputed Facts for the case "${caseData.title}" between ${claimant} (Claimant) and ${respondent} (Respondent).
+
+Issues in the case:
+${issueList || "No issues recorded."}
+
+Structure the output as follows:
+
+**AGREED FACTS**
+List facts that both parties would likely agree on based on the issues (e.g., that the contract existed, that a dispute arose, procedural facts). Number each fact.
+
+**FACTS IN DISPUTE — CLAIMANT'S POSITION**
+For each disputed issue, state the Claimant's factual assertion. Number each entry to correspond with the issues above.
+
+**FACTS IN DISPUTE — RESPONDENT'S POSITION**
+For each disputed issue, state the Respondent's likely factual assertion. Number each entry.
+
+**DOCUMENTS LIKELY TO BE AGREED AUTHENTIC**
+List 3-5 categories of documents whose authenticity both parties would typically accept (e.g., signed contract, invoices, correspondence).
+
+Keep each section concise and professionally worded in the third person. This is a procedural document for submission to the Tribunal.`;
+    const result = await callCaseAI(caseData, prompt, `\nJoint statement requested for ${issues.length} issues.`);
+    setJointResult(result);
+    setJointLoading(false);
+  }
+
+  async function copyJoint() {
+    await navigator.clipboard.writeText(jointResult);
+    setJointCopied(true);
+    setTimeout(() => setJointCopied(false), 2000);
+  }
+
   if (loading) return <div className="text-slate-500 text-sm py-4">Loading issues...</div>;
 
   return (
@@ -71,6 +147,12 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
       <div className="flex justify-between items-center">
         <p className="text-sm text-slate-400">{issues.filter(i => i.status === "open").length} open / {issues.length} total</p>
         <div className="flex gap-2">
+          <button onClick={generateMatrix} disabled={matrixLoading || issues.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-blue-400 hover:border-blue-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+            {matrixLoading ? <Loader2 size={13} className="animate-spin" /> : <LayoutList size={13} />}Issue Matrix
+          </button>
+          <button onClick={generateJointStatement} disabled={jointLoading || issues.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-emerald-400 hover:border-emerald-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+            {jointLoading ? <Loader2 size={13} className="animate-spin" /> : <FileCheck size={13} />}Joint Statement
+          </button>
           <button onClick={() => setShowAI(p => !p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-gold-400 hover:border-gold-500/30 rounded-lg text-xs font-semibold transition-colors">
             <Sparkles size={13} />{showAI ? "Hide AI" : "AI Actions"}
           </button>
@@ -109,6 +191,74 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
               <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{aiResult}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Issue Matrix Output */}
+      {showMatrix && (
+        <div className="bg-navy-900/80 border border-blue-500/20 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-blue-500/15">
+            <div className="flex items-center gap-2">
+              <LayoutList size={13} className="text-blue-400" />
+              <span className="text-xs font-semibold text-blue-400 uppercase tracking-wide">Issue Matrix</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {matrixResult && (
+                <button onClick={copyMatrix} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors">
+                  {matrixCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {matrixCopied ? "Copied" : "Copy"}
+                </button>
+              )}
+              <button onClick={() => setShowMatrix(false)} className="text-xs text-slate-500 hover:text-white transition-colors">Hide</button>
+            </div>
+          </div>
+          <div className="p-4 overflow-x-auto">
+            {matrixLoading ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
+                <Loader2 size={14} className="animate-spin" />Generating issue matrix...
+              </div>
+            ) : matrixResult ? (
+              <div className="bg-white rounded-lg p-4 min-w-max">
+                <div className="prose-doc text-xs leading-relaxed">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{matrixResult}</ReactMarkdown>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Joint Statement Output */}
+      {showJoint && (
+        <div className="bg-navy-900/80 border border-emerald-500/20 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-500/15">
+            <div className="flex items-center gap-2">
+              <FileCheck size={13} className="text-emerald-400" />
+              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">Joint Statement of Facts</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {jointResult && (
+                <button onClick={copyJoint} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors">
+                  {jointCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {jointCopied ? "Copied" : "Copy"}
+                </button>
+              )}
+              <button onClick={() => setShowJoint(false)} className="text-xs text-slate-500 hover:text-white transition-colors">Hide</button>
+            </div>
+          </div>
+          <div className="p-4">
+            {jointLoading ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
+                <Loader2 size={14} className="animate-spin" />Generating joint statement...
+              </div>
+            ) : jointResult ? (
+              <div className="bg-white rounded-lg p-4">
+                <div className="prose-doc text-xs leading-relaxed">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{jointResult}</ReactMarkdown>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 

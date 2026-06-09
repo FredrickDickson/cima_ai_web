@@ -233,6 +233,9 @@ export default function DraftingStudio() {
   // Draft output state
   const [draftContent, setDraftContent] = useState("");
   const [legalNotes, setLegalNotes] = useState("");
+  const [shortForm, setShortForm] = useState("");
+  const [plainEnglish, setPlainEnglish] = useState("");
+  const [outputTab, setOutputTab] = useState<"full" | "short" | "plain">("full");
   const [wordCount, setWordCount] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
 
@@ -242,7 +245,7 @@ export default function DraftingStudio() {
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
 
   // Right panel state (Features 2-5)
-  const [rightTab, setRightTab] = useState<"assistant" | "review" | "research">("assistant");
+  const [rightTab, setRightTab] = useState<"assistant" | "review" | "research" | "clauses">("assistant");
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
@@ -252,6 +255,16 @@ export default function DraftingStudio() {
   const [researchSources, setResearchSources] = useState<ResearchSource[]>([]);
   const [researchAnalysis, setResearchAnalysis] = useState("");
   const [researchLoading, setResearchLoading] = useState(false);
+  const [validityLoading, setValidityLoading] = useState(false);
+  const [validityResult, setValidityResult] = useState("");
+  const [showValidity, setShowValidity] = useState(false);
+
+  // Clause library state (C7)
+  const [clauseQuery, setClauseQuery] = useState("");
+  const [clauseResult, setClauseResult] = useState("");
+  const [clauseLoading, setClauseLoading] = useState(false);
+  const [clauseMode, setClauseMode] = useState<"library" | "suggest">("library");
+  const [clauseSuggestions, setClauseSuggestions] = useState("");
 
   // Inline toolbar state (Feature 3)
   const [showInlineToolbar, setShowInlineToolbar] = useState(false);
@@ -359,6 +372,9 @@ export default function DraftingStudio() {
   function handleNewDraft() {
     setDraftContent("");
     setLegalNotes("");
+    setShortForm("");
+    setPlainEnglish("");
+    setOutputTab("full");
     setSelectedTemplate(null);
     setNlPrompt("");
     setDraftId(null);
@@ -413,6 +429,9 @@ export default function DraftingStudio() {
     setError("");
     setDraftContent("");
     setLegalNotes("");
+    setShortForm("");
+    setPlainEnglish("");
+    setOutputTab("full");
     setSaved(false);
     setSelectedTemplate(null);
     setEditorMode("preview");
@@ -430,6 +449,8 @@ export default function DraftingStudio() {
       const data = await res.json();
       setDraftContent(data.content ?? "");
       setLegalNotes(data.legal_notes ?? "");
+      setShortForm(data.short_form ?? "");
+      setPlainEnglish(data.plain_english ?? "");
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
       loadDrafts();
@@ -451,6 +472,9 @@ export default function DraftingStudio() {
     if (draftContent) versions.push(draftContent, "Before regeneration");
     setDraftContent("");
     setLegalNotes("");
+    setShortForm("");
+    setPlainEnglish("");
+    setOutputTab("full");
     setSaved(false);
     setEditorMode("preview");
     setMode("output");
@@ -471,6 +495,8 @@ export default function DraftingStudio() {
       const data = await res.json();
       setDraftContent(data.content ?? "");
       setLegalNotes(data.legal_notes ?? "");
+      setShortForm(data.short_form ?? "");
+      setPlainEnglish(data.plain_english ?? "");
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
       loadDrafts();
@@ -612,6 +638,91 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // C7: Clause Recommendation Engine
+  // ---------------------------------------------------------------------------
+  async function handleClauseSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!clauseQuery.trim()) return;
+    setClauseLoading(true);
+    setClauseResult("");
+
+    const docContext = draftContent
+      ? `\n\nCurrent document context (first 800 chars):\n${draftContent.slice(0, 800)}`
+      : "";
+
+    const prompt = `You are a clause library assistant for Ghanaian commercial law and international arbitration.
+
+The user is searching for the clause: "${clauseQuery}"${docContext}
+
+Provide a complete clause reference in exactly this structure:
+
+**CLAUSE NAME:** [Full formal name of the clause]
+
+**DEFINITION:** [1-2 sentence definition of what this clause is]
+
+**PURPOSE:** [Why this clause is included — what risk or obligation it addresses]
+
+**RISKS IF OMITTED:** [What happens if this clause is missing from the agreement — specific legal/commercial consequences]
+
+**WORDING VARIANT 1 — Simple:**
+[Complete clause text, simple and concise]
+
+**WORDING VARIANT 2 — Standard:**
+[Complete clause text, standard commercial drafting]
+
+**WORDING VARIANT 3 — Comprehensive:**
+[Complete clause text, comprehensive with sub-clauses]
+
+**APPLICABLE LAW:** [Any specific Ghanaian statute, common law principle, or international standard relevant to this clause]`;
+
+    try {
+      const result = await callAiChat([{ role: "user", content: prompt }], "drafting");
+      setClauseResult(result);
+    } catch {
+      setClauseResult("Failed to retrieve clause. Please try again.");
+    } finally {
+      setClauseLoading(false);
+    }
+  }
+
+  async function handleClauseSuggest() {
+    setClauseLoading(true);
+    setClauseSuggestions("");
+
+    const docTitle = draftContent
+      ? draftContent.split("\n").find(l => l.trim())?.replace(/^#+\s*/, "").slice(0, 120) ?? "this document"
+      : selectedTemplate?.title ?? "this document";
+    const docSnippet = draftContent.slice(0, 1000);
+
+    const prompt = `You are a clause recommendation engine for Ghanaian law and international arbitration.
+
+Document being drafted: "${docTitle}"
+${docSnippet ? `Opening content:\n${docSnippet}` : ""}
+
+Analyse the document type and recommend exactly 7 clauses that should be included. For each clause output:
+**[NUMBER]. [CLAUSE NAME]** — [One sentence: why it is essential for this document type] | Risk if omitted: [one sentence]
+
+Cover a mix of: commercial protections, dispute resolution, confidentiality, governing law, liability, boilerplate essentials. Tailor specifically to the document type.`;
+
+    try {
+      const result = await callAiChat([{ role: "user", content: prompt }], "drafting");
+      setClauseSuggestions(result);
+    } catch {
+      setClauseSuggestions("Failed to generate suggestions. Please try again.");
+    } finally {
+      setClauseLoading(false);
+    }
+  }
+
+  function insertClauseVariant(variantText: string) {
+    if (!variantText.trim()) return;
+    versions.push(draftContent, "Before inserting clause");
+    setDraftContent(draftContent + "\n\n" + variantText);
+    updateWordCount(draftContent + variantText);
+    setSaved(false);
+  }
+
   function insertCitation(source: ResearchSource) {
     const citation = source.citation
       ? `\n\n> **${source.source_name}** (${source.citation}): "${source.content.slice(0, 200)}..."\n`
@@ -626,6 +737,29 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
     }
     updateWordCount(draftContent + citation);
     setSaved(false);
+  }
+
+  async function handleValidateAuthorities() {
+    if (researchSources.length === 0) return;
+    setValidityLoading(true);
+    setShowValidity(false);
+    setValidityResult("");
+    const sourceList = researchSources
+      .map((s, i) => {
+        const parts = [`${i + 1}. ${s.source_name}`];
+        if (s.citation) parts.push(`Citation: ${s.citation}`);
+        if (s.jurisdiction) parts.push(`Jurisdiction: ${s.jurisdiction}`);
+        return parts.join(" | ");
+      })
+      .join("\n");
+    const prompt = `You are a legal research assistant. For each authority listed below, provide its current validity status on a single line in this format:\n<Number>. <Name> — <Status> <Icon> — <One-sentence reason>\n\nStatus options:\n- Good Law ✓ (still valid and followed)\n- Caution ⚠ (limited, distinguished, or questioned)\n- Overruled ✗ (explicitly overruled or superseded)\n- Unable to verify (insufficient information)\n\nAuthorities:\n${sourceList}\n\nRespond with only the numbered list, no preamble.`;
+    try {
+      const result = await callAiChat([{ role: "user", content: prompt }], "drafting");
+      setValidityResult(result);
+      setShowValidity(true);
+    } finally {
+      setValidityLoading(false);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1009,7 +1143,26 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                         {saved && <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 size={11} /> Saved</span>}
                       </div>
                       <div className="flex items-center gap-1">
-                        {/* Edit/Preview toggle */}
+                        {/* Output variant tabs: Full / Short / Plain */}
+                        <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden mr-1.5">
+                          <button onClick={() => setOutputTab("full")}
+                            className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${outputTab === "full" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}>
+                            Full
+                          </button>
+                          <button onClick={() => setOutputTab("short")} disabled={!shortForm}
+                            className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 ${outputTab === "short" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}
+                            title="Short-form version">
+                            Short
+                          </button>
+                          <button onClick={() => setOutputTab("plain")} disabled={!plainEnglish}
+                            className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 ${outputTab === "plain" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}
+                            title="Plain-English summary">
+                            Plain
+                          </button>
+                        </div>
+
+                        {/* Edit/Preview toggle — only for Full tab */}
+                        {outputTab === "full" && (
                         <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden mr-1">
                           <button onClick={() => setEditorMode("edit")}
                             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${editorMode === "edit" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}>
@@ -1020,6 +1173,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                             <Eye size={12} /> Preview
                           </button>
                         </div>
+                        )}
 
                         <button onClick={handleUndo} disabled={!versions.canUndo} className="p-1.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30" title="Undo"><Undo2 size={14} /></button>
                         <button onClick={handleRedo} disabled={!versions.canRedo} className="p-1.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30" title="Redo"><Redo2 size={14} /></button>
@@ -1094,7 +1248,21 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
 
                     {/* Editor / Preview content */}
                     <div className="flex-1 overflow-y-auto p-6">
-                      {editorMode === "edit" ? (
+                      {outputTab !== "full" ? (
+                        <div className="max-w-3xl mx-auto bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+                          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                            {outputTab === "short" ? <FileText size={14} className="text-navy-600" /> : <Globe size={14} className="text-navy-600" />}
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                              {outputTab === "short" ? "Short-Form Version" : "Plain-English Summary"}
+                            </span>
+                          </div>
+                          <div className="prose-doc text-sm leading-relaxed">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {outputTab === "short" ? shortForm : plainEnglish}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      ) : editorMode === "edit" ? (
                         <div className="max-w-3xl mx-auto">
                           <textarea
                             ref={editorRef}
@@ -1142,10 +1310,11 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                         { id: "assistant" as const, icon: Wand2, label: "AI" },
                         { id: "review" as const, icon: ShieldCheck, label: "Review" },
                         { id: "research" as const, icon: Search, label: "Research" },
+                        { id: "clauses" as const, icon: BookMarked, label: "Clauses" },
                       ]).map((tab) => (
                         <button key={tab.id} onClick={() => setRightTab(tab.id)}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors ${rightTab === tab.id ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
-                          <tab.icon size={13} />{tab.label}
+                          className={`flex-1 flex items-center justify-center gap-1 py-3 text-xs font-semibold transition-colors ${rightTab === tab.id ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
+                          <tab.icon size={12} />{tab.label}
                         </button>
                       ))}
                     </div>
@@ -1319,7 +1488,17 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
 
                         {researchSources.length > 0 && (
                           <div className="px-3 pb-3 space-y-1.5">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">{researchSources.length} sources found</p>
+                            <div className="flex items-center justify-between px-1">
+                              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{researchSources.length} sources found</p>
+                              <button
+                                onClick={handleValidateAuthorities}
+                                disabled={validityLoading || researchSources.length === 0}
+                                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 border border-navy-200 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {validityLoading ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
+                                Validate
+                              </button>
+                            </div>
                             {researchSources.map((source) => (
                               <div key={source.id} className="bg-white rounded-lg border border-slate-200 p-3">
                                 <div className="flex items-start justify-between gap-2">
@@ -1351,6 +1530,20 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                                 </div>
                               </div>
                             ))}
+                            {showValidity && validityResult && (
+                              <div className="mt-1 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <ShieldCheck size={12} className="text-navy-600" />
+                                    <span className="text-xs font-semibold text-navy-900">Authority Validity</span>
+                                  </div>
+                                  <button onClick={() => setShowValidity(false)} className="p-0.5 text-slate-400 hover:text-slate-600 rounded">
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                                <pre className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">{validityResult}</pre>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1359,6 +1552,118 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                             <Database size={24} className="text-slate-200 mx-auto mb-2" />
                             <p className="text-xs text-slate-400 max-w-[200px] mx-auto">Search legal authorities and insert citations directly into your document.</p>
                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ---- CLAUSES TAB (C7) ---- */}
+                    {rightTab === "clauses" && (
+                      <div className="flex-1 overflow-y-auto flex flex-col">
+                        {/* Mode toggle */}
+                        <div className="flex border-b border-slate-100">
+                          <button onClick={() => setClauseMode("library")}
+                            className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${clauseMode === "library" ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
+                            Library
+                          </button>
+                          <button onClick={() => setClauseMode("suggest")}
+                            className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${clauseMode === "suggest" ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
+                            Suggest
+                          </button>
+                        </div>
+
+                        {clauseMode === "library" ? (
+                          <>
+                            <form onSubmit={handleClauseSearch} className="p-3">
+                              <div className="flex gap-1.5">
+                                <input value={clauseQuery} onChange={e => setClauseQuery(e.target.value)}
+                                  placeholder="e.g. force majeure, indemnity..."
+                                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600" />
+                                <button type="submit" disabled={clauseLoading || !clauseQuery.trim()}
+                                  className="px-3 py-2 bg-navy-950 hover:bg-navy-800 text-white rounded-lg transition-colors disabled:opacity-50">
+                                  {clauseLoading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                                </button>
+                              </div>
+                            </form>
+
+                            {clauseLoading && (
+                              <div className="px-4 py-8 text-center">
+                                <Loader2 size={20} className="text-navy-600 animate-spin mx-auto mb-3" />
+                                <p className="text-xs text-slate-500">Retrieving clause...</p>
+                              </div>
+                            )}
+
+                            {clauseResult && !clauseLoading && (() => {
+                              const v1 = clauseResult.match(/WORDING VARIANT 1[^:]*:\s*\n([\s\S]+?)(?=\*\*WORDING VARIANT 2|\*\*APPLICABLE|$)/i);
+                              const v2 = clauseResult.match(/WORDING VARIANT 2[^:]*:\s*\n([\s\S]+?)(?=\*\*WORDING VARIANT 3|\*\*APPLICABLE|$)/i);
+                              const v3 = clauseResult.match(/WORDING VARIANT 3[^:]*:\s*\n([\s\S]+?)(?=\*\*APPLICABLE|$)/i);
+                              return (
+                                <div className="px-3 pb-3 space-y-3">
+                                  <div className="bg-slate-50 rounded-lg border border-slate-200 p-3 max-h-44 overflow-y-auto">
+                                    <div className="prose-doc text-xs leading-relaxed">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{clauseResult}</ReactMarkdown>
+                                    </div>
+                                  </div>
+                                  {[v1, v2, v3].map((m, i) => m ? (
+                                    <div key={i} className="border border-slate-200 rounded-lg overflow-hidden">
+                                      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+                                        <span className="text-xs font-semibold text-slate-600">Variant {i + 1}</span>
+                                        <button onClick={() => insertClauseVariant(m[1].trim())}
+                                          className="flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900 font-medium transition-colors">
+                                          <Plus size={10} />Insert
+                                        </button>
+                                      </div>
+                                      <div className="p-2.5 max-h-24 overflow-y-auto">
+                                        <p className="text-xs text-slate-700 leading-relaxed font-mono whitespace-pre-wrap">{m[1].trim().slice(0, 300)}{m[1].trim().length > 300 ? "…" : ""}</p>
+                                      </div>
+                                    </div>
+                                  ) : null)}
+                                </div>
+                              );
+                            })()}
+
+                            {!clauseLoading && !clauseResult && (
+                              <div className="px-4 py-10 text-center">
+                                <BookMarked size={24} className="text-slate-200 mx-auto mb-2" />
+                                <p className="text-xs text-slate-400 max-w-[200px] mx-auto">Search any clause by name to get its definition, purpose, risks if omitted, and 3 wording variants.</p>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="p-3">
+                              <button onClick={handleClauseSuggest} disabled={clauseLoading}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-navy-950 hover:bg-navy-800 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60">
+                                {clauseLoading ? <><Loader2 size={13} className="animate-spin" />Analysing...</> : <><Sparkles size={13} />Suggest Clauses</>}
+                              </button>
+                              <p className="text-xs text-slate-400 text-center mt-2">Based on your current document type</p>
+                            </div>
+                            {clauseLoading && (
+                              <div className="px-4 py-8 text-center">
+                                <Loader2 size={20} className="text-navy-600 animate-spin mx-auto mb-3" />
+                                <p className="text-xs text-slate-500">Analysing document and recommending clauses...</p>
+                              </div>
+                            )}
+                            {clauseSuggestions && !clauseLoading && (
+                              <div className="px-3 pb-3">
+                                <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <Sparkles size={11} className="text-gold-600" />
+                                    <span className="text-xs font-bold text-slate-700">Recommended Clauses</span>
+                                  </div>
+                                  <div className="prose-doc text-xs leading-relaxed max-h-80 overflow-y-auto">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{clauseSuggestions}</ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-slate-400 mt-2 border-t border-slate-100 pt-2">Switch to Library to look up and insert any clause.</p>
+                                </div>
+                              </div>
+                            )}
+                            {!clauseLoading && !clauseSuggestions && (
+                              <div className="px-4 py-10 text-center">
+                                <Sparkles size={24} className="text-slate-200 mx-auto mb-2" />
+                                <p className="text-xs text-slate-400 max-w-[200px] mx-auto">Get context-aware clause recommendations based on your document type.</p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
