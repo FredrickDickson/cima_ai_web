@@ -1,45 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchLawsAfricaContext, COUNTRY_MAP } from "../_shared/laws-africa.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
-
-// ---------------------------------------------------------------------------
-// Laws.Africa — jurisdiction-specific legislation context
-// ---------------------------------------------------------------------------
-const lawsAfricaCountryMap: Record<string, string> = {
-  ghana: "gh", kenya: "ke", "south africa": "za", nigeria: "ng",
-  uganda: "ug", tanzania: "tz", zambia: "zm", zimbabwe: "zw",
-  malawi: "mw", namibia: "na", botswana: "bw", rwanda: "rw",
-  mauritius: "mu", eswatini: "sz", lesotho: "ls", mozambique: "mz",
-};
-
-async function fetchLawsAfricaContext(query: string, apiKey: string, jurisdiction?: string): Promise<string> {
-  if (!apiKey) return "";
-  try {
-    const countryCode = lawsAfricaCountryMap[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-    const res = await fetch(
-      `https://api.laws.africa/v3/search/?q=${encodeURIComponent(query)}&country=${countryCode}&page_size=3`,
-      { headers: { "Authorization": `Token ${apiKey}` } }
-    );
-    if (!res.ok) return "";
-    const data = await res.json();
-    const results = (data.results ?? []).slice(0, 3);
-    if (results.length === 0) return "";
-    const entries = results.map((item: { title?: string; citation?: string; snippet?: string; content?: string }, i: number) => {
-      const title = item.title ?? "Untitled";
-      const citation = item.citation ?? "";
-      const snippet = item.snippet ?? item.content ?? "";
-      return `[L${i + 1}] ${title}${citation ? ` (${citation})` : ""}\n${snippet}`;
-    });
-    return `\n\nRelevant Legislation:\n${entries.join("\n\n")}`;
-  } catch {
-    return "";
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Industry-specific review focus
@@ -73,8 +40,9 @@ Deno.serve(async (req: Request) => {
     const excerpt = text.slice(0, 20000);
     const industryFocus = INDUSTRY_FOCUS[industry_type ?? "commercial"] ?? INDUSTRY_FOCUS.commercial;
 
+    const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
     const lawsQuery = `contract ${industry_type ?? "commercial"} law ${jurisdiction ?? "ghana"}`;
-    const lawsContext = await fetchLawsAfricaContext(lawsQuery, lawsAfricaKey, jurisdiction);
+    const lawsContext = await fetchLawsAfricaContext(lawsQuery, lawsAfricaKey, countryCode);
 
     const res = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",

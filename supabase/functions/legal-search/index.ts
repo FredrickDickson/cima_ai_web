@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchLawsAfricaSources, COUNTRY_MAP } from "../_shared/laws-africa.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -113,31 +114,18 @@ Deno.serve(async (req: Request) => {
 
     if (lawsAfricaKey) {
       try {
-        // Map jurisdiction names to Laws.Africa country codes
-        const countryMap: Record<string, string> = {
-          ghana: "gh", kenya: "ke", "south africa": "za", nigeria: "ng",
-          uganda: "ug", tanzania: "tz", zambia: "zm", zimbabwe: "zw",
-          malawi: "mw", namibia: "na", botswana: "bw", rwanda: "rw",
-          mauritius: "mu", eswatini: "sz", lesotho: "ls", mozambique: "mz",
-        };
-        const countryCode = countryMap[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-        const lawsRes = await fetch(
-          `https://api.laws.africa/v3/search/?q=${encodeURIComponent(query)}&country=${countryCode}&page_size=3`,
-          { headers: { "Authorization": `Token ${lawsAfricaKey}` } }
-        );
-        if (lawsRes.ok) {
-          const lawsData = await lawsRes.json();
-          for (const item of (lawsData.results ?? []).slice(0, 3)) {
-            sources.push({
-              id: `laws-africa-${item.frbr_uri ?? item.url}`,
-              source_name: item.title ?? item.document?.title ?? "Laws.Africa Result",
-              citation: item.citation ?? "",
-              source_type: "statute",
-              jurisdiction: jurisdiction ?? "ghana",
-              content: item.snippet ?? item.content ?? item.document?.description ?? "",
-              url: item.url,
-            });
-          }
+        const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+        const lawsSources = await fetchLawsAfricaSources(query, lawsAfricaKey, countryCode);
+        for (const s of lawsSources) {
+          sources.push({
+            id: s.id,
+            source_name: s.source_name,
+            citation: s.citation,
+            source_type: s.source_type,
+            jurisdiction: s.jurisdiction,
+            content: s.content,
+            url: s.url,
+          });
         }
       } catch { /* non-fatal */ }
     }
