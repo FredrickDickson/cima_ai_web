@@ -10,7 +10,8 @@
       "Bash(npm test:*)",
       "Bash(npx vitest:*)",
       "Bash(xargs grep:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }
