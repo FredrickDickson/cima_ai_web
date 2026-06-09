@@ -243,8 +243,9 @@ export default function Documents() {
   // ── Case linking ──────────────────────────────────────────────────────────
   const [linkingCase, setLinkingCase] = useState(false);
 
-  // ── Semantic debounce timer ───────────────────────────────────────────────
+  // ── Semantic debounce timer & abort controller ────────────────────────────
   const semanticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const semanticAbort = useRef<AbortController | null>(null);
 
   // ─── AI Helper ─────────────────────────────────────────────────────────────
 
@@ -266,9 +267,14 @@ export default function Documents() {
         body: JSON.stringify({ messages, context }),
       }
     );
-    if (!res.ok) throw new Error("AI request failed");
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`AI request failed (${res.status})${errText ? `: ${errText}` : ""}`);
+    }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? "";
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("AI returned an empty response. Please try again.");
+    return content;
   }
 
   // ─── Data Loading ───────────────────────────────────────────────────────────
@@ -660,8 +666,13 @@ Use formal legal language appropriate for court or tribunal submission.`,
 
   async function handleCompare() {
     const docIds = Array.from(selectedIds);
-    const docA = documents.find((d) => d.id === docIds[0])!;
-    const docB = documents.find((d) => d.id === docIds[1])!;
+    const docA = documents.find((d) => d.id === docIds[0]);
+    const docB = documents.find((d) => d.id === docIds[1]);
+
+    if (!docA || !docB) {
+      setUploadError("One or both selected documents could not be found. Please reselect and try again.");
+      return;
+    }
 
     setCompareLoading(true);
     setCompareResult("");
@@ -705,6 +716,11 @@ Provide a structured comparison covering:
       setSemanticResults([]);
       return;
     }
+    // Cancel any in-flight request before starting a new one
+    semanticAbort.current?.abort();
+    semanticAbort.current = new AbortController();
+    const signal = semanticAbort.current.signal;
+
     setSemanticLoading(true);
     try {
       const {
@@ -719,6 +735,7 @@ Provide a structured comparison covering:
             Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({ query, user_id: user.id }),
+          signal,
         }
       );
       if (res.ok) {
@@ -746,7 +763,8 @@ Provide a structured comparison covering:
         }
         setSemanticResults(matched);
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setSemanticResults([]);
     } finally {
       setSemanticLoading(false);

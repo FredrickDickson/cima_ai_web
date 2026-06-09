@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function fetchProfile(userId: string) {
+  async function fetchProfile(userId: string, userObj?: { email?: string }) {
     const { data } = await supabase
       .from("profiles")
       .select("*")
@@ -45,14 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       // Profile missing (e.g. created before migration or insert failed during sign-up).
       // Auto-create a default profile so FK constraints on other tables don't break.
-      const email = user?.email ?? "";
-      const fallbackName = email.split("@")[0].replace(/[._-]/g, " ");
+      const email = userObj?.email ?? "";
+      const fallbackName = email.split("@")[0].replace(/[._-]/g, " ") || "User";
       const { data: created } = await supabase
         .from("profiles")
         .upsert({ id: userId, full_name: fallbackName, role: "lawyer" })
         .select()
         .maybeSingle();
-      setProfile(created);
+      if (created) setProfile(created);
     }
   }
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.user);
       setLoading(false);
     }).catch(() => {
       if (mounted) setLoading(false);
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          fetchProfile(session.user.id);
+          fetchProfile(session.user.id, session.user);
         } else {
           setProfile(null);
         }
@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
       });
       if (profileErr) {
-        console.error("Failed to create profile:", profileErr.message);
+        return { error: `Account created but profile setup failed: ${profileErr.message}` };
       }
     }
     return { error: null };

@@ -224,7 +224,8 @@ export default function AIAssistant() {
         throw new Error("Session expired. Please refresh the page and log in again.");
       }
 
-      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+      // Build history from messages before the current turn (userMsg is already in state)
+      const history = messages.slice(-10).filter(m => m.id !== userMsg.id).map(m => ({ role: m.role, content: m.content }));
       history.push({ role: "user", content: userMsg.content });
 
       const body: Record<string, unknown> = {
