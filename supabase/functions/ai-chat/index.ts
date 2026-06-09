@@ -1,4 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  detectJurisdiction,
+  extractLegalQuery,
+  fetchLawsAfricaContext,
+} from "../_shared/laws-africa.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,52 +20,6 @@ interface ChatRequest {
   messages: Message[];
   context?: string;
   stream?: boolean;
-}
-
-const lawsAfricaCountryMap: Record<string, string> = {
-  ghana: "gh", kenya: "ke", "south africa": "za", nigeria: "ng",
-  uganda: "ug", tanzania: "tz", zambia: "zm", zimbabwe: "zw",
-  malawi: "mw", namibia: "na", botswana: "bw", rwanda: "rw",
-  mauritius: "mu", eswatini: "sz", lesotho: "ls", mozambique: "mz",
-};
-
-/** Query Laws.Africa for relevant legislation to ground the AI response. */
-async function fetchLawsAfricaContext(query: string, apiKey: string, jurisdiction?: string): Promise<string> {
-  if (!apiKey) return "";
-  try {
-    const countryCode = lawsAfricaCountryMap[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-    const res = await fetch(
-      `https://api.laws.africa/v3/search/?q=${encodeURIComponent(query)}&country=${countryCode}&page_size=3`,
-      { headers: { "Authorization": `Token ${apiKey}` } }
-    );
-    if (!res.ok) return "";
-    const data = await res.json();
-    const results = (data.results ?? []).slice(0, 3);
-    if (results.length === 0) return "";
-
-    const entries = results.map((item: { title?: string; citation?: string; snippet?: string; content?: string; url?: string; frbr_uri?: string }, i: number) => {
-      const title = item.title ?? "Untitled";
-      const citation = item.citation ?? "";
-      const snippet = item.snippet ?? item.content ?? "";
-      const url = item.url ?? (item.frbr_uri ? `https://api.laws.africa${item.frbr_uri}` : "");
-      return `[LA${i + 1}] ${title}${citation ? ` (${citation})` : ""}${url ? `\nSource: ${url}` : ""}\n${snippet}`;
-    });
-
-    return `\n\n--- Laws.Africa Legal Sources (Ghana) ---\n${entries.join("\n\n")}`;
-  } catch {
-    return "";
-  }
-}
-
-/** Extract a concise search query from the last user message. */
-function extractSearchQuery(messages: Message[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
-      // Use the first 200 chars of the last user message as the search query
-      return messages[i].content.slice(0, 200);
-    }
-  }
-  return "";
 }
 
 Deno.serve(async (req: Request) => {
@@ -81,9 +40,13 @@ Deno.serve(async (req: Request) => {
 
     const { messages, context = "general", stream = false }: ChatRequest = await req.json();
 
-    // Fetch Laws.Africa context based on the user's query
-    const userQuery = extractSearchQuery(messages);
-    const lawsContext = userQuery ? await fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY) : "";
+    const userQuery = extractLegalQuery(messages);
+    const jurisdiction = detectJurisdiction(
+      messages.findLast((m) => m.role === "user")?.content ?? ""
+    );
+    const lawsContext = userQuery
+      ? await fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdiction)
+      : "";
 
     const systemPrompt = buildSystemPrompt(context, lawsContext);
 
