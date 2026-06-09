@@ -310,6 +310,7 @@ export interface ContractClauseAnalysis {
   clause_name: string;
   start_phrase: string;
   risk_level: "critical" | "high" | "medium" | "low";
+  defect_type?: "ambiguity" | "unenforceable" | "jurisdictional" | "missing_obligation" | "liability" | "arbitration" | "risk";
   analysis: string;
   redline_suggestion?: string;
   standard_alternative?: string;

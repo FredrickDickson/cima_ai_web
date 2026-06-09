@@ -9,17 +9,22 @@ const corsHeaders = {
 };
 
 // ---------------------------------------------------------------------------
-// Industry-specific review focus
+// Document-type-specific review focus
 // ---------------------------------------------------------------------------
-const INDUSTRY_FOCUS: Record<string, string> = {
-  commercial: "standard commercial contract risks including payment terms, liability caps, indemnities, and force majeure",
+const DOCUMENT_TYPE_FOCUS: Record<string, string> = {
+  commercial: "standard commercial contract risks including payment terms, liability caps, indemnities, force majeure, and termination rights",
   construction: "construction-specific risks including delay provisions, variation clauses, payment certification, defects liability, performance bonds, and dispute boards",
   employment: "employment law compliance including termination rights, restrictive covenants, transfer protections, discrimination provisions, and statutory entitlements",
   technology: "technology contract risks including IP ownership, data protection compliance, SLA provisions, source code escrow, and liability for software defects",
   "joint venture": "JV-specific risks including deadlock mechanisms, exit provisions, tag-along/drag-along rights, reserved matters, and management structure",
   shareholder: "shareholder agreement risks including pre-emption rights, minority protections, dividend policies, anti-dilution provisions, and drag-along mechanics",
-  real_estate: "real estate contract risks including title, encumbrances, planning conditions, vacant possession, and completion mechanics",
+  real_estate: "real estate risks including title clarity, encumbrances, planning conditions, vacant possession, and completion mechanics",
   finance: "finance agreement risks including events of default, acceleration rights, security enforcement, financial covenants, and MAC clauses",
+  arbitration_agreement: "arbitration agreement validity, scope of arbitrable disputes, seat selection, institutional rules compliance, and enforceability under the New York Convention",
+  court_award: "award completeness, finality, enforceability under the New York Convention, grounds for challenge, and cross-border recognition issues",
+  settlement: "settlement agreement enforceability, adequacy of consideration, scope of release, confidentiality obligations, and breach remedies",
+  mou: "MOU/LOI enforceability, which provisions are binding vs non-binding, implied obligations, and risk of unintended contract formation",
+  general: "all standard legal risk categories including ambiguity, enforceability, jurisdictional defects, missing obligations, liability exposure, and dispute resolution gaps",
 };
 
 Deno.serve(async (req: Request) => {
@@ -28,8 +33,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { text, document_id, case_id, user_id, industry_type, jurisdiction } = await req.json();
+    // Accept both document_type (new) and industry_type (legacy) params
+    const { text, document_id, case_id, user_id, document_type, industry_type, jurisdiction } = await req.json();
     if (!text || !user_id) throw new Error("text and user_id are required");
+
+    const effectiveDocType = document_type ?? industry_type ?? "commercial";
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
@@ -38,10 +46,10 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const excerpt = text.slice(0, 20000);
-    const industryFocus = INDUSTRY_FOCUS[industry_type ?? "commercial"] ?? INDUSTRY_FOCUS.commercial;
+    const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
 
     const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-    const lawsQuery = `contract ${industry_type ?? "commercial"} law ${jurisdiction ?? "ghana"}`;
+    const lawsQuery = `document review ${effectiveDocType} law ${jurisdiction ?? "ghana"}`;
     const lawsContext = await fetchLawsAfricaContext(lawsQuery, lawsAfricaKey, countryCode);
 
     const res = await fetch("https://api.deepseek.com/chat/completions", {
@@ -51,38 +59,40 @@ Deno.serve(async (req: Request) => {
         model: "deepseek-chat",
         messages: [{
           role: "user",
-          content: `You are a senior contract review lawyer specialising in ${jurisdiction ?? "Ghanaian"} law. Analyse the following contract thoroughly and return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+          content: `You are a senior legal reviewer specialising in ${jurisdiction ?? "Ghanaian"} law. Conduct a comprehensive document review and return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
 
 {
   "overall_risk_score": number 0-100,
-  "ai_summary": "3-4 sentence executive summary of the contract",
+  "detected_document_type": "auto-detected document type (e.g. Commercial Contract, Settlement Agreement, Court Award, MOU, Employment Agreement, etc.)",
+  "ai_summary": "3-4 sentence executive summary of the document and its key legal character",
   "arbitration_clause_valid": boolean,
   "arbitration_clause_issues": "string describing issues or empty string",
   "arbitration_seat": "seat of arbitration or empty string",
   "arbitration_institution": "arbitral institution or empty string",
-  "arbitration_improved": "complete improved arbitration clause wording or empty string",
+  "arbitration_improved": "complete improved arbitration/dispute resolution clause wording or empty string",
   "governing_law_found": boolean,
   "governing_law": "jurisdiction string or empty string",
   "detected_parties": {
-    "party_a_name": "full name of first party from the contract",
-    "party_b_name": "full name of second party from the contract"
+    "party_a_name": "full name of first party from the document",
+    "party_b_name": "full name of second party from the document"
   },
   "clauses": [
     {
       "clause_name": "short descriptive name",
-      "start_phrase": "first 8-10 words of the clause verbatim from the text",
+      "start_phrase": "first 8-10 words of the provision verbatim from the text",
       "risk_level": "low|medium|high|critical",
-      "analysis": "what this clause does and the risk it creates",
-      "redline_suggestion": "suggested revised language to improve the clause",
-      "standard_alternative": "what market standard looks like for this type of clause"
+      "defect_type": "ambiguity|unenforceable|jurisdictional|missing_obligation|liability|arbitration|risk",
+      "analysis": "what this provision does, the defect or risk it creates, and why it matters legally",
+      "redline_suggestion": "complete revised language that fixes the defect or reduces risk",
+      "standard_alternative": "what market standard or best practice looks like for this type of provision"
     }
   ],
   "missing_clauses": [
     {
-      "clause_type": "name of missing clause",
+      "clause_type": "name of missing provision",
       "importance": "low|medium|high|critical",
-      "consequence_of_omission": "what happens without this clause",
-      "suggested_text": "complete draft text for this clause"
+      "consequence_of_omission": "what legal or commercial risk arises without this provision",
+      "suggested_text": "complete draft text for this provision"
     }
   ],
   "obligations": {
@@ -91,26 +101,36 @@ Deno.serve(async (req: Request) => {
   },
   "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
   "negotiation_points": [
-    "specific point 1 the reviewing party should negotiate",
+    "specific point 1 the reviewing party should negotiate or address",
     "specific point 2",
     "specific point 3",
     "specific point 4",
     "specific point 5"
   ],
-  "ai_insights": "Write 4-5 substantive paragraphs as a senior associate memo covering: (1) overall risk profile and key concerns with this specific contract, (2) the most critical clauses and negotiation leverage points, (3) missing protections and their commercial impact, (4) dispute resolution assessment and enforceability under applicable law, (5) practical recommendations before signing. Be specific to this contract — do not write generic advice."
+  "ai_insights": "Write 4-5 substantive paragraphs as a senior associate review memo covering: (1) overall risk profile and key legal concerns with this specific document, (2) the most critical defects — ambiguities, unenforceable provisions, and jurisdictional gaps — and their legal consequences, (3) missing protections and their commercial impact, (4) dispute resolution assessment and enforceability under applicable law, (5) practical recommendations before signing or relying on this document. Be specific to this document — do not write generic advice."
 }
 
-Industry focus: Review using standards and risk factors for ${industryFocus}.
+DEFECT TYPES — classify each clause/provision under one of these:
+- "ambiguity": vague, undefined terms, or language that could be interpreted in multiple ways
+- "unenforceable": provisions that are void, contrary to statute, against public policy, or unlikely to be upheld by a court or tribunal
+- "jurisdictional": defects relating to choice of law, seat of arbitration, jurisdiction clauses, or cross-border enforceability
+- "missing_obligation": a party's obligation that is implied but not expressly stated, creating enforcement risk
+- "liability": excessive, uncapped, or one-sided liability exposure; indemnities that are broader than justified
+- "arbitration": invalid, pathological, or incomplete arbitration/dispute resolution clauses
+- "risk": general commercial or legal risk not covered by the above categories
+
+Document focus: Review using standards and risk factors specific to ${docFocus}.
 ${lawsContext ? `\nApplicable legislation to reference:\n${lawsContext}` : ""}
 
 Requirements:
-- Identify at least 8-12 clauses
-- Identify at least 4-6 missing clauses
-- Use actual party names from the contract in the obligations section
+- Identify at least 8-12 provisions (clauses), covering all 6 defect categories where present
+- Specifically flag: (1) all ambiguous terms, (2) any provision that may be unenforceable, (3) jurisdictional defects, (4) missing key obligations, (5) excessive liability exposure, (6) arbitration clause issues
+- Identify at least 4-6 missing provisions
+- Use actual party names from the document in the obligations section
 - The ai_insights field must contain substantive paragraphs, not bullet points
-- Be specific and practical in all fields
+- Be specific and practical in all fields — refer to actual text from the document
 
-CONTRACT TEXT:
+DOCUMENT TEXT:
 ${excerpt}`,
         }],
         temperature: 0.1,
@@ -129,6 +149,7 @@ ${excerpt}`,
     } catch {
       analysis = {
         overall_risk_score: 50,
+        detected_document_type: "Document",
         ai_summary: "Analysis could not be parsed. Please try again.",
         clauses: [], missing_clauses: [],
         obligations: { party_a: [], party_b: [] },
@@ -152,7 +173,7 @@ ${excerpt}`,
       recommendations: analysis.recommendations ?? [],
       negotiation_points: analysis.negotiation_points ?? [],
       ai_insights: String(analysis.ai_insights ?? ""),
-      industry_type: industry_type ?? "commercial",
+      industry_type: effectiveDocType,
       ai_summary: String(analysis.ai_summary ?? ""),
       contract_text: text.slice(0, 50000),
       arbitration_clause_valid: Boolean(analysis.arbitration_clause_valid),

@@ -22,7 +22,7 @@ const navItems = [
   { to: "/cases", icon: Briefcase, label: "Cases" },
   { to: "/documents", icon: FileText, label: "Documents" },
   { to: "/drafting", icon: PenTool, label: "Drafting Studio" },
-  { to: "/contracts", icon: ClipboardCheck, label: "Contract Review" },
+  { to: "/review", icon: ClipboardCheck, label: "Document Review" },
   { to: "/assistant", icon: Bot, label: "AI Assistant" },
 ];
 

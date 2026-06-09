@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
   ClipboardCheck,
   Upload,
@@ -79,16 +80,31 @@ const RISK_HIGHLIGHT: Record<string, string> = {
   low: "#d1fae5",
 };
 
-const INDUSTRY_OPTIONS = [
-  { value: "commercial", label: "Commercial" },
-  { value: "construction", label: "Construction" },
-  { value: "employment", label: "Employment" },
-  { value: "technology", label: "Technology / SaaS" },
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: "commercial", label: "Commercial Contract" },
+  { value: "employment", label: "Employment Agreement" },
+  { value: "real_estate", label: "Lease / Real Estate" },
+  { value: "arbitration_agreement", label: "Arbitration Agreement" },
+  { value: "court_award", label: "Court Award / Judgment" },
+  { value: "settlement", label: "Settlement Agreement" },
+  { value: "mou", label: "MOU / Letter of Intent" },
+  { value: "shareholder", label: "Shareholder Agreement" },
   { value: "joint venture", label: "Joint Venture" },
-  { value: "shareholder", label: "Shareholder" },
-  { value: "real_estate", label: "Real Estate" },
-  { value: "finance", label: "Finance" },
+  { value: "technology", label: "Technology / SaaS" },
+  { value: "finance", label: "Finance Agreement" },
+  { value: "construction", label: "Construction Contract" },
+  { value: "general", label: "General Document" },
 ];
+
+const DEFECT_LABELS: Record<string, { label: string; color: string }> = {
+  ambiguity:           { label: "Ambiguity",           color: "bg-purple-100 text-purple-700 border-purple-200" },
+  unenforceable:       { label: "Unenforceable",        color: "bg-red-100 text-red-700 border-red-200" },
+  jurisdictional:      { label: "Jurisdictional Defect", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  missing_obligation:  { label: "Missing Obligation",   color: "bg-amber-100 text-amber-700 border-amber-200" },
+  liability:           { label: "Excessive Liability",  color: "bg-rose-100 text-rose-700 border-rose-200" },
+  arbitration:         { label: "Arbitration Issue",    color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+  risk:                { label: "General Risk",         color: "bg-slate-100 text-slate-700 border-slate-200" },
+};
 
 const JURISDICTIONS = [
   "Ghana", "Kenya", "Nigeria", "South Africa", "Uganda", "Tanzania",
@@ -98,12 +114,12 @@ const JURISDICTIONS = [
 ];
 
 const CLAUSE_ACTIONS = [
-  { id: "explain", label: "Explain", prompt: "Explain this contract clause in plain English, including its legal effect and implications for both parties:" },
-  { id: "simplify", label: "Simplify", prompt: "Rewrite this clause in simpler language while preserving its legal meaning:" },
-  { id: "rewrite", label: "Rewrite", prompt: "Rewrite this clause to be clearer, fairer, and more professionally drafted:" },
-  { id: "mutual", label: "Make Mutual", prompt: "Rewrite this clause to be mutual and balanced for both parties:" },
-  { id: "reduce", label: "Reduce Risk", prompt: "Rewrite this clause to reduce risk exposure for the reviewing party:" },
-  { id: "alternative", label: "Alternative", prompt: "Provide a market-standard alternative to this clause:" },
+  { id: "explain", label: "Explain", prompt: "Explain this document provision in plain English, including its legal effect and implications for all parties:" },
+  { id: "simplify", label: "Simplify", prompt: "Rewrite this provision in simpler language while preserving its legal meaning:" },
+  { id: "rewrite", label: "Rewrite", prompt: "Rewrite this provision to be clearer, fairer, and more professionally drafted:" },
+  { id: "mutual", label: "Make Mutual", prompt: "Rewrite this provision to be mutual and balanced for all parties:" },
+  { id: "reduce", label: "Reduce Risk", prompt: "Rewrite this provision to reduce risk and liability exposure for the reviewing party:" },
+  { id: "alternative", label: "Alternative", prompt: "Provide a market-standard alternative to this provision:" },
 ];
 
 const STEPS = ["Parsing text", "Identifying clauses", "Risk scoring", "Checking compliance", "Extracting obligations", "Generating insights"];
@@ -112,7 +128,7 @@ async function extractTextFromFile(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
     const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     const pages: string[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -210,9 +226,16 @@ function ClauseCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-navy-950">{clause.clause_name}</p>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize border shrink-0 ${RISK_COLORS[clause.risk_level]}`}>
-              {clause.risk_level}
-            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              {clause.defect_type && DEFECT_LABELS[clause.defect_type] && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${DEFECT_LABELS[clause.defect_type].color}`}>
+                  {DEFECT_LABELS[clause.defect_type].label}
+                </span>
+              )}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize border ${RISK_COLORS[clause.risk_level]}`}>
+                {clause.risk_level}
+              </span>
+            </div>
           </div>
           {clause.start_phrase && (
             <p className="text-xs text-slate-500 mt-1 italic truncate">"{clause.start_phrase}..."</p>
@@ -305,7 +328,7 @@ export default function ContractReview() {
   const [inputTab, setInputTab] = useState<"paste" | "upload">("paste");
   const [contractText, setContractText] = useState("");
   const [fileName, setFileName] = useState("");
-  const [industryType, setIndustryType] = useState("commercial");
+  const [documentType, setDocumentType] = useState("commercial");
   const [jurisdiction, setJurisdiction] = useState("Ghana");
   const [cases, setCases] = useState<Case[]>([]);
   const [casesLoaded, setCasesLoaded] = useState(false);
@@ -449,7 +472,7 @@ export default function ContractReview() {
           text: contractText,
           case_id: linkedCaseId || undefined,
           user_id: user.id,
-          industry_type: industryType,
+          document_type: documentType,
           jurisdiction,
         }),
       });
@@ -514,7 +537,7 @@ export default function ContractReview() {
       const original = analysis.contract_text.slice(0, 6000);
       const revised = redlineText.slice(0, 6000);
       const result = await callAiChat(
-        `You are a contract review lawyer. Compare these two contract versions and identify all changes. Structure your response with these exact headings:\n\n## Added Clauses\n## Deleted Clauses\n## Modified Clauses\n## Risk Changes\n\nFor each item, note the clause name and describe the change. Flag any increase in risk prominently.\n\n---ORIGINAL CONTRACT---\n${original}\n\n---REVISED CONTRACT---\n${revised}`
+        `You are a legal reviewer. Compare these two document versions and identify all changes. Structure your response with these exact headings:\n\n## Added Provisions\n## Deleted Provisions\n## Modified Provisions\n## Risk Changes\n\nFor each item, note the provision name and describe the change. Flag any increase in risk, new liability exposure, or removal of protections prominently.\n\n---ORIGINAL DOCUMENT---\n${original}\n\n---REVISED DOCUMENT---\n${revised}`
       );
       setRedlineResult(result);
     } catch {
@@ -562,7 +585,7 @@ export default function ContractReview() {
       lines.push(`**Parties:** ${a.detected_parties.party_a_name} / ${a.detected_parties.party_b_name}`);
     }
     lines.push(`**Governing Law:** ${a.governing_law || "Not found"}`);
-    lines.push(`**Industry:** ${INDUSTRY_OPTIONS.find((o) => o.value === industryType)?.label ?? industryType}`);
+    lines.push(`**Document Type:** ${DOCUMENT_TYPE_OPTIONS.find((o) => o.value === documentType)?.label ?? documentType}`);
     lines.push(`\n## Executive Summary\n${a.ai_summary}`);
     lines.push(`\n## Clause Analysis`);
     for (const c of a.clauses) {
@@ -619,7 +642,7 @@ export default function ContractReview() {
 
   return (
     <AppLayout>
-      <Header title="Contract Review" subtitle="AI-powered clause analysis, risk scoring, and redline suggestions" />
+      <Header title="Document Review & Risk Analysis" subtitle="AI review for ambiguity, unenforceable clauses, jurisdictional defects, missing obligations, and liability exposure" />
 
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
 
@@ -629,13 +652,13 @@ export default function ContractReview() {
             /* Input controls */
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Industry</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Document Type</p>
                 <select
-                  value={industryType}
-                  onChange={(e) => setIndustryType(e.target.value)}
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
                 >
-                  {INDUSTRY_OPTIONS.map((opt) => (
+                  {DOCUMENT_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
@@ -756,7 +779,7 @@ export default function ContractReview() {
                       onClick={() => setInputTab(tab)}
                       className={`flex-1 py-3 text-xs font-semibold transition-colors ${inputTab === tab ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}
                     >
-                      {tab === "paste" ? "Paste Contract Text" : "Upload File"}
+                      {tab === "paste" ? "Paste Document Text" : "Upload File"}
                     </button>
                   ))}
                 </div>
@@ -767,7 +790,7 @@ export default function ContractReview() {
                       value={contractText}
                       onChange={(e) => setContractText(e.target.value)}
                       rows={14}
-                      placeholder="Paste the full contract text here..."
+                      placeholder="Paste the full document text here..."
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none font-mono leading-relaxed"
                     />
                   ) : (
@@ -818,7 +841,7 @@ export default function ContractReview() {
                   disabled={!contractText.trim()}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <ClipboardCheck size={16} /> Analyse Contract
+                  <ClipboardCheck size={16} /> Analyse Document
                 </button>
               )}
             </div>
@@ -830,10 +853,10 @@ export default function ContractReview() {
               <div className="flex items-center gap-2 min-w-0">
                 <FileText size={14} className="text-navy-600 shrink-0" />
                 <span className="text-xs font-semibold text-navy-950 truncate">
-                  {fileName || "Contract Text"}
+                  {fileName || "Document Text"}
                 </span>
                 {analysis && (
-                  <span className="text-xs text-slate-400 shrink-0">— {analysis.clauses.length} clauses highlighted</span>
+                  <span className="text-xs text-slate-400 shrink-0">— {analysis.clauses.length} provisions highlighted</span>
                 )}
               </div>
             </div>
@@ -939,9 +962,9 @@ export default function ContractReview() {
                     </div>
                     <div className="flex items-center gap-3 p-3">
                       <Building2 size={13} className="text-navy-400 shrink-0" />
-                      <span className="text-xs text-slate-500 font-medium w-24 shrink-0">Industry</span>
+                      <span className="text-xs text-slate-500 font-medium w-24 shrink-0">Doc Type</span>
                       <span className="ml-auto text-xs font-semibold text-navy-950 capitalize">
-                        {INDUSTRY_OPTIONS.find((o) => o.value === industryType)?.label ?? industryType}
+                        {DOCUMENT_TYPE_OPTIONS.find((o) => o.value === documentType)?.label ?? documentType}
                       </span>
                     </div>
                   </div>

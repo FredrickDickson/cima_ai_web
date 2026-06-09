@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import ClassicLoader from "./components/ui/loader";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -34,17 +35,19 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function LoadingScreen() {
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "#c9a227", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
-        </div>
-        <p style={{ color: "#94a3b8", fontSize: 14 }}>Loading CIMA AI...</p>
+    <div className="min-h-screen bg-navy-950 flex flex-col items-center justify-center gap-6">
+      {/* Logo mark */}
+      <div className="w-14 h-14 rounded-2xl bg-gold-500 flex items-center justify-center shadow-lg">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
+        </svg>
       </div>
+      {/* Spinner */}
+      <ClassicLoader size={36} />
+      {/* Label */}
+      <p className="text-slate-400 text-sm tracking-wide">Loading CIMA AI...</p>
     </div>
   );
 }
@@ -102,7 +105,7 @@ export default function App() {
             element={<RequireAuth><DraftingStudio /></RequireAuth>}
           />
           <Route
-            path="/contracts"
+            path="/review"
             element={<RequireAuth><ContractReview /></RequireAuth>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
