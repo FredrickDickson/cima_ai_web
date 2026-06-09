@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -200,6 +201,15 @@ export default function Research() {
       setError(err instanceof Error ? err.message : "Research failed. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function deleteSession(sessionId: string) {
+    await supabase.from("research_sessions").delete().eq("id", sessionId);
+    setSavedSessions(p => p.filter(s => s.id !== sessionId));
+    if (activeSessionId === sessionId) {
+      setActiveSessionId(null);
+      setResponse(null);
     }
   }
 
@@ -397,14 +407,22 @@ export default function Research() {
               </div>
             ) : (
               savedSessions.map((s) => (
-                <button key={s.id} onClick={() => loadSession(s.id)} className={`w-full text-left p-2.5 rounded-lg border transition-all group ${activeSessionId === s.id ? "bg-navy-50 border-navy-200" : "hover:bg-slate-50 border-transparent hover:border-slate-200"}`}>
-                  <p className="text-xs font-medium text-navy-900 line-clamp-2 group-hover:text-navy-700">{s.query}</p>
-                  <div className="flex items-center gap-1 mt-1.5">
-                    <Clock size={10} className="text-slate-400" />
-                    <span className="text-xs text-slate-400">{formatDate(s.created_at)}</span>
-                    <ChevronRight size={10} className="text-slate-300 ml-auto" />
-                  </div>
-                </button>
+                <div key={s.id} className={`group relative rounded-lg border transition-all ${activeSessionId === s.id ? "bg-navy-50 border-navy-200" : "hover:bg-slate-50 border-transparent hover:border-slate-200"}`}>
+                  <button onClick={() => loadSession(s.id)} className="w-full text-left p-2.5 pr-7">
+                    <p className="text-xs font-medium text-navy-900 line-clamp-2 group-hover:text-navy-700">{s.query}</p>
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <Clock size={10} className="text-slate-400" />
+                      <span className="text-xs text-slate-400">{formatDate(s.created_at)}</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => deleteSession(s.id)}
+                    className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                    title="Delete"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
               ))
             )}
           </div>

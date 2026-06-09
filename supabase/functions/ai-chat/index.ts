@@ -3,6 +3,7 @@ import {
   detectJurisdiction,
   extractLegalQuery,
   fetchLawsAfricaContext,
+  COUNTRY_NAMES,
 } from "../_shared/laws-africa.ts";
 
 const corsHeaders = {
@@ -41,14 +42,16 @@ Deno.serve(async (req: Request) => {
     const { messages, context = "general", stream = false }: ChatRequest = await req.json();
 
     const userQuery = extractLegalQuery(messages);
-    const jurisdiction = detectJurisdiction(
+    const jurisdictionCode = detectJurisdiction(
       messages.findLast((m) => m.role === "user")?.content ?? ""
     );
+    const jurisdictionLabel = COUNTRY_NAMES[jurisdictionCode]
+      ?? (jurisdictionCode !== "gh" ? jurisdictionCode : "Ghana");
     const lawsContext = userQuery
-      ? await fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdiction)
+      ? await fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode)
       : "";
 
-    const systemPrompt = buildSystemPrompt(context, lawsContext);
+    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel);
 
     const allMessages: Message[] = [
       { role: "system", content: systemPrompt },
@@ -100,7 +103,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(context: string, lawsContext: string): string {
+function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = "Ghana"): string {
   const base = `You are CIMA AI, an elite AI-powered legal intelligence assistant designed for professional lawyers, arbitrators, mediators, and legal researchers. You have deep expertise in:
 
 - Commercial and investment arbitration (ICC, UNCITRAL, LCIA, Ghana ADR Act 2010 / Act 798)
@@ -110,25 +113,28 @@ function buildSystemPrompt(context: string, lawsContext: string): string {
 - Comparative international law
 - The New York Convention on the Recognition and Enforcement of Foreign Arbitral Awards
 
+DETECTED JURISDICTION: ${jurisdiction}
+
 Core principles:
-1. Always cite legal authority (statutes, case law, arbitration rules) when making legal claims
+1. Always cite legal authority (statutes, case law, arbitration rules) when making legal claims — specific to ${jurisdiction} where applicable
 2. Distinguish clearly between legal analysis and your own opinion
-3. Flag jurisdiction-specific considerations
-4. When drafting, produce professional-grade legal language
-5. Identify risks and flag unusual clauses in contracts
-6. Structure responses clearly with headers when providing detailed analysis
-7. Never fabricate citations — if uncertain, say so explicitly
-8. When Laws.Africa sources are provided below, use them to ground your analysis in real legislation and cite them where relevant`;
+3. When Laws.Africa sources are provided below, treat them as primary authority and cite them where relevant
+4. Only cite sources that are directly relevant to the jurisdiction and question — if a source is from a different jurisdiction and not applicable as comparative law, do not cite it
+5. If you cannot find a relevant source, provide analysis based on your training knowledge and clearly state you are drawing on general legal knowledge
+6. Never fabricate citations — if uncertain about a case name or statute, say so explicitly
+7. When drafting, produce professional-grade legal language
+8. Structure responses clearly with headers when providing detailed analysis`;
 
   const contextMap: Record<string, string> = {
-    research: `\n\nCurrent mode: LEGAL RESEARCH. Focus on retrieving and synthesizing legal authorities, citing statutes and case law, and providing structured legal analysis with clear citation references.`,
-    drafting: `\n\nCurrent mode: LEGAL DRAFTING. Focus on producing professional, jurisdiction-aware legal drafts. Use proper legal language, standard clause structures, and insert placeholder variables in [SQUARE BRACKETS] where specific details are needed.`,
-    analysis: `\n\nCurrent mode: DOCUMENT ANALYSIS. Focus on extracting key issues, identifying risks, summarizing legal obligations, and flagging unusual or problematic provisions.`,
-    review: `\n\nCurrent mode: CONTRACT REVIEW. Focus on clause-by-clause analysis, risk scoring, unusual language detection, liability analysis, and practical recommendations.`,
-    arbitration: `\n\nCurrent mode: ARBITRATION MANAGEMENT. Focus on procedural requirements, applicable rules, timeline management, jurisdictional issues, and award enforcement considerations.`,
-    case_strategy: `\n\nCurrent mode: CASE STRATEGY. Focus on analyzing the specific case details provided, identifying legal strategies, procedural next steps, strengths, weaknesses, and relevant precedents for the matter at hand.`,
-    general: `\n\nProvide comprehensive, professional legal assistance across all areas of legal practice.`,
+    research: `\n\nCurrent mode: LEGAL RESEARCH. Focus on retrieving and synthesizing legal authorities for ${jurisdiction}, citing statutes and case law, and providing structured legal analysis with clear citation references.`,
+    drafting: `\n\nCurrent mode: LEGAL DRAFTING. Focus on producing professional, ${jurisdiction}-law-compliant legal drafts. Use proper legal language, standard clause structures, and insert placeholder variables in [SQUARE BRACKETS] where specific details are needed.`,
+    analysis: `\n\nCurrent mode: DOCUMENT ANALYSIS. Focus on extracting key issues, identifying risks, summarizing legal obligations, and flagging unusual or problematic provisions under ${jurisdiction} law.`,
+    review: `\n\nCurrent mode: CONTRACT REVIEW. Focus on clause-by-clause analysis, risk scoring, unusual language detection, liability analysis, and practical recommendations under ${jurisdiction} law.`,
+    arbitration: `\n\nCurrent mode: ARBITRATION MANAGEMENT. Focus on procedural requirements, applicable rules, timeline management, jurisdictional issues, and award enforcement considerations under ${jurisdiction} law.`,
+    case_strategy: `\n\nCurrent mode: CASE STRATEGY. Focus on analyzing the specific case details provided, identifying legal strategies, procedural next steps, strengths, weaknesses, and relevant precedents under ${jurisdiction} law.`,
+    general: `\n\nProvide comprehensive, professional legal assistance under ${jurisdiction} law across all areas of legal practice.`,
   };
 
   return base + (contextMap[context] ?? contextMap.general) + lawsContext;
 }
+

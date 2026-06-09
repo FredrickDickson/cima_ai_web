@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { fetchLawsAfricaSources, COUNTRY_MAP } from "../_shared/laws-africa.ts";
+import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/laws-africa.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,8 +132,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Determine resolved country code for jurisdiction-aware filtering
+    const resolvedCountryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+    const isAfricanJurisdiction = Object.values(COUNTRY_MAP).includes(resolvedCountryCode);
+    const jurisdictionLabel = COUNTRY_NAMES[resolvedCountryCode] ?? jurisdiction ?? "Ghana";
+
     const effectiveSourceTypes = source_types ?? [];
-    if (courtlistenerKey && (effectiveSourceTypes.length === 0 || effectiveSourceTypes.includes("case"))) {
+    // CourtListener only indexes US courts — skip entirely for African jurisdictions
+    if (!isAfricanJurisdiction && courtlistenerKey && (effectiveSourceTypes.length === 0 || effectiveSourceTypes.includes("case"))) {
       try {
         const clRes = await fetch(
           `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(query)}&type=o&format=json&page_size=3`,
@@ -189,7 +195,23 @@ Deno.serve(async (req: Request) => {
 
     // Laws.Africa legislation always appears first; fill remaining slots with other sources
     const allSources = [...lawsSources, ...sources];
-    const contextSources = allSources.slice(0, 10);
+
+    // Fix 3: For African jurisdictions, exclude case-law sources from non-matching jurisdictions
+    // before building the AI context (keeps Laws.Africa + local library + document chunks)
+    const AFRICAN_CODES = new Set(Object.values(COUNTRY_MAP));
+    const relevantSources = isAfricanJurisdiction
+      ? sources.filter((s) => {
+          if (s.source_type === "case" && s.jurisdiction) {
+            const j = s.jurisdiction.toLowerCase();
+            // Keep only if jurisdiction matches or is directly applicable international law
+            return j === resolvedCountryCode || j === "international" && false;
+          }
+          return true; // keep statutes, documents, rules
+        })
+      : sources;
+
+    // Suppress the unused variable warning
+    void AFRICAN_CODES;
 
     const legislationBlock = lawsSources.length > 0
       ? `\n\nPrimary Legislation (Laws.Africa):\n${lawsSources
@@ -197,19 +219,34 @@ Deno.serve(async (req: Request) => {
           .join("\n\n")}`
       : "";
 
-    const otherSourcesBlock = sources.length > 0
-      ? `\n\nAdditional Sources:\n${sources
+    const otherSourcesBlock = relevantSources.length > 0
+      ? `\n\nAdditional Sources:\n${relevantSources
           .slice(0, 8)
           .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}:\n${s.content.slice(0, 600)}`)
           .join("\n\n")}`
       : "";
 
+    // Fix 2: Jurisdiction-aware synthesis prompt that explicitly instructs the AI
+    // to discard off-jurisdiction sources and fall back to training knowledge if needed
     const synthesisPrompt = (legislationBlock || otherSourcesBlock)
-      ? `You are CIMA AI, an expert legal intelligence assistant specialised in African law, international commercial arbitration, and comparative law. Using the sources below, provide a comprehensive, well-structured legal analysis. Cite legislation by [L1], [L2] etc. and other sources by [1], [2] etc.${legislationBlock}${otherSourcesBlock}\n\nQuery: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`
-      : `You are CIMA AI, an expert legal intelligence assistant specialised in African law and international commercial arbitration. Provide a comprehensive legal analysis of: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`;
+      ? `You are CIMA AI, an expert legal intelligence assistant specialised in African law, international commercial arbitration, and comparative law.
 
-    // Keep contextSources for the response (used by frontend to display sources panel)
-    void contextSources;
+JURISDICTION: ${jurisdictionLabel}
+QUERY: ${query}
+
+INSTRUCTIONS:
+- Only cite sources that are directly relevant to the query AND the jurisdiction above
+- If a source is from a different jurisdiction (e.g., a US court case when the jurisdiction is ${jurisdictionLabel}), explicitly state it is not applicable and do NOT base your analysis on it
+- Laws.Africa legislation sources (marked [L1], [L2] etc.) are primary authority — prioritise these
+- If no retrieved sources are relevant, still provide a comprehensive analysis based on your training knowledge of ${jurisdictionLabel} law, and clearly state you are drawing on general legal knowledge
+- Structure your response with clear headers
+- Cite legislation by [L1], [L2] etc. and other sources by [1], [2] etc. — only when actually relevant${legislationBlock}${otherSourcesBlock}`
+      : `You are CIMA AI, an expert legal intelligence assistant specialised in African law and international commercial arbitration.
+
+JURISDICTION: ${jurisdictionLabel}
+QUERY: ${query}
+
+No external sources were retrieved for this query. Provide a comprehensive legal analysis based on your training knowledge of ${jurisdictionLabel} law. Clearly indicate that you are drawing on general legal knowledge. Structure your response with clear headers and cite any specific legislation or case law from your training where relevant.`;
 
     const dsRes = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
