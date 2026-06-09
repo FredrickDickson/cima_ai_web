@@ -165,28 +165,37 @@ ${lawsContext ? `Use the following legal sources to ensure the draft complies wi
 Produce the complete final document in professional legal format. At the end, add a section titled "LEGAL NOTES" with 3-5 key points the parties should know about this document, citing any relevant legislation from the sources above.`;
 
     } else if (prompt) {
-      // Path 2: Natural language drafting (NEW)
+      // Path 2: Natural language drafting
       templateTitle = prompt.length > 80 ? prompt.slice(0, 77) + "..." : prompt;
+
+      // Extract the document type from the user's prompt to enforce it in the AI instruction
+      const docTypeMatch = prompt.match(/^draft\s+(?:a\s+|an\s+)?(.+?)\s+(?:for|between|regarding|concerning|in|under|about)/i);
+      const requestedDocType = docTypeMatch ? docTypeMatch[1].trim() : prompt.slice(0, 60);
 
       aiPrompt = `You are an expert legal drafter specialising in ${jurisdiction ?? "Ghanaian"} law and international commercial arbitration.
 
-The user has requested:
+The user has requested the following document:
 "${prompt}"
 
-${matterContext ? `Use the following matter details to populate the document with accurate party names, dates, jurisdictions, and case specifics:\n\n${matterContext}\n` : ""}
+CRITICAL INSTRUCTIONS — READ CAREFULLY:
+1. The document type is: "${requestedDocType}". Draft EXACTLY this document type. Do NOT substitute a different document type (e.g. do not draft an Arbitration Agreement when a Notice of Arbitration is requested, do not draft a contract when a letter is requested).
+2. ALL specific details mentioned in the user's request MUST appear in the document. This includes: party names, contract types, dispute descriptions, amounts, dates, and any other specifics. Do NOT replace named parties or facts with generic placeholders — use them verbatim.
+3. Only use placeholders (e.g. [ADDRESS], [DATE], [AMOUNT]) for details that were not provided by the user and cannot reasonably be inferred.
+
+${matterContext ? `Use the following linked matter details for additional party names, dates, and case specifics:\n\n${matterContext}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
 ${custom_instructions ? `Additional instructions: ${custom_instructions}\n` : ""}
 Jurisdiction: ${jurisdiction ?? "Ghana"}
 
 Produce a complete, professionally formatted legal document in markdown. Include:
-- Proper document title and heading
-- All standard provisions appropriate for this document type
+- A document title that matches exactly what was requested
+- All standard clauses and provisions specific to this document type
 - Numbered clauses and sub-clauses where applicable
-- Party names and roles (use the matter details above if provided, otherwise use realistic placeholders like [PARTY A NAME])
+- The exact party names and facts from the user's request (not generic placeholders)
 - Signature blocks
-- Professional legal language and structure
+- Professional legal language and structure appropriate for ${jurisdiction ?? "Ghana"}
 
-At the end, add a section titled "LEGAL NOTES" with 3-5 key points about this document, citing any relevant legislation from the sources above.`;
+At the end, add a section titled "LEGAL NOTES" with 3-5 key legal points the parties should know about this specific document, citing any relevant legislation from the sources above.`;
 
     } else {
       // Path 3: Freeform (existing fallback)
