@@ -537,15 +537,20 @@ export default function ContractReview() {
     setRedlineResult(null);
   }
 
-  function handleExport(fmt: "pdf" | "word") {
+  async function handleExport(fmt: "pdf" | "word") {
     if (!analysis) return;
     setExportOpen(false);
+    setError("");
     const title = `Contract Analysis — ${new Date().toLocaleDateString()}`;
-    if (fmt === "word") {
-      const content = buildExportMarkdown(analysis);
-      exportToWord(content, title);
-    } else {
-      exportToPdf("contract-analysis-report", title);
+    try {
+      if (fmt === "word") {
+        const content = buildExportMarkdown(analysis);
+        await exportToWord(content, title);
+      } else {
+        await exportToPdf("contract-analysis-report", title);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed. Please try again.");
     }
   }
 

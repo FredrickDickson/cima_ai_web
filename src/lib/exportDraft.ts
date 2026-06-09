@@ -197,7 +197,10 @@ export async function exportToPdf(elementId: string, title: string) {
   // html2pdf.js is a UMD module — dynamic import avoids SSR issues
   const html2pdf = (await import("html2pdf.js")).default;
   const element = document.getElementById(elementId);
-  if (!element) return;
+  if (!element) {
+    console.error(`exportToPdf: element #${elementId} not found in DOM`);
+    throw new Error("Could not generate PDF: the content panel was not found. Please scroll to the report and try again.");
+  }
 
   const opt = {
     margin: [15, 15, 15, 15],

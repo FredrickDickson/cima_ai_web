@@ -38,9 +38,10 @@ export default function Dashboard() {
     if (!user) return;
 
     async function load() {
-      const [casesRes, docsRes, researchRes, hearingsRes] = await Promise.all([
+      const [casesRes, docsRes, docsCountRes, researchRes, hearingsRes] = await Promise.all([
         supabase.from("cases").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(5),
         supabase.from("documents").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(4),
+        supabase.from("documents").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
         supabase.from("research_sessions").select("id").eq("user_id", user!.id),
         supabase.from("hearings").select("*").eq("user_id", user!.id).gte("scheduled_at", new Date().toISOString()).order("scheduled_at").limit(3),
       ]);
@@ -51,7 +52,7 @@ export default function Dashboard() {
       setUpcomingHearings(hearingsRes.data ?? []);
       setStats({
         activeCases: allCases.filter((c) => c.status === "active").length,
-        totalDocuments: docsRes.data?.length ?? 0,
+        totalDocuments: docsCountRes.count ?? 0,
         researchSessions: researchRes.data?.length ?? 0,
         upcomingHearings: hearingsRes.data?.length ?? 0,
       });

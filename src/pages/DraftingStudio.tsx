@@ -245,6 +245,7 @@ export default function DraftingStudio() {
   const [rightTab, setRightTab] = useState<"assistant" | "review" | "research">("assistant");
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [researchQuery, setResearchQuery] = useState("");
@@ -257,6 +258,7 @@ export default function DraftingStudio() {
   const [inlineToolbarPos, setInlineToolbarPos] = useState({ x: 0, y: 0 });
 
   // UI state
+  const [draftLoading, setDraftLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -304,9 +306,10 @@ export default function DraftingStudio() {
     // If navigated from Cases with a draft_id, load it immediately
     const draftIdParam = searchParams.get("draft_id");
     if (draftIdParam && user) {
+      setDraftLoading(true);
       supabase.from("drafts").select("*").eq("id", draftIdParam).maybeSingle().then(({ data }) => {
         if (data) loadDraft(data as Draft);
-      });
+      }).finally(() => setDraftLoading(false));
     }
   }, [user]);
 
@@ -850,8 +853,8 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
               {myDrafts.length === 0 ? (
                 <div className="py-8 text-center"><FileText size={20} className="text-slate-200 mx-auto mb-2" /><p className="text-xs text-slate-400">No saved drafts yet</p></div>
               ) : myDrafts.map((d) => (
-                <button key={d.id} onClick={() => loadDraft(d)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${draftId === d.id ? "bg-navy-50 border-navy-200" : "hover:bg-slate-50 border-transparent hover:border-slate-200"}`}>
+                <button key={d.id} onClick={() => loadDraft(d)} disabled={draftLoading}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all disabled:opacity-60 disabled:cursor-not-allowed ${draftId === d.id ? "bg-navy-50 border-navy-200" : "hover:bg-slate-50 border-transparent hover:border-slate-200"}`}>
                   <p className="text-xs font-medium text-navy-950 line-clamp-1">{d.title}</p>
                   <p className="text-xs text-slate-400 mt-0.5 capitalize">{d.template_type === "natural_language" ? "AI Draft" : d.template_type} · {d.jurisdiction}</p>
                 </button>
@@ -1178,16 +1181,14 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1 mb-2">Custom instruction</p>
                           <div className="flex gap-1.5">
                             <input
-                              value={aiResult ? "" : ""}
+                              value={customPrompt}
+                              onChange={(e) => setCustomPrompt(e.target.value)}
                               placeholder="e.g. Add indemnity clause..."
                               className="flex-1 px-2.5 py-2 border border-slate-200 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600"
                               onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const target = e.target as HTMLInputElement;
-                                  if (target.value.trim()) {
-                                    handleAiAction("custom", target.value);
-                                    target.value = "";
-                                  }
+                                if (e.key === "Enter" && customPrompt.trim()) {
+                                  handleAiAction("custom", customPrompt);
+                                  setCustomPrompt("");
                                 }
                               }}
                             />
