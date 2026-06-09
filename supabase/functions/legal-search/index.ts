@@ -56,6 +56,26 @@ Deno.serve(async (req: Request) => {
       url?: string;
     }[] = [];
 
+    // Fetch Laws.Africa legislation first — guaranteed slots in AI context
+    const lawsSources: typeof sources = [];
+    if (lawsAfricaKey) {
+      try {
+        const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+        const results = await fetchLawsAfricaSources(query, lawsAfricaKey, countryCode);
+        for (const s of results) {
+          lawsSources.push({
+            id: s.id,
+            source_name: s.source_name,
+            citation: s.citation,
+            source_type: s.source_type,
+            jurisdiction: s.jurisdiction,
+            content: s.content,
+            url: s.url,
+          });
+        }
+      } catch { /* non-fatal */ }
+    }
+
     const queryEmbedding = hfKey ? await getEmbedding(query, hfKey) : null;
 
     if (queryEmbedding) {
@@ -110,24 +130,6 @@ Deno.serve(async (req: Request) => {
           content: r.content,
         });
       }
-    }
-
-    if (lawsAfricaKey) {
-      try {
-        const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-        const lawsSources = await fetchLawsAfricaSources(query, lawsAfricaKey, countryCode);
-        for (const s of lawsSources) {
-          sources.push({
-            id: s.id,
-            source_name: s.source_name,
-            citation: s.citation,
-            source_type: s.source_type,
-            jurisdiction: s.jurisdiction,
-            content: s.content,
-            url: s.url,
-          });
-        }
-      } catch { /* non-fatal */ }
     }
 
     const effectiveSourceTypes = source_types ?? [];
@@ -185,14 +187,29 @@ Deno.serve(async (req: Request) => {
       } catch { /* non-fatal */ }
     }
 
-    const contextText = sources
-      .slice(0, 8)
-      .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}:\n${s.content.slice(0, 600)}`)
-      .join("\n\n");
+    // Laws.Africa legislation always appears first; fill remaining slots with other sources
+    const allSources = [...lawsSources, ...sources];
+    const contextSources = allSources.slice(0, 10);
 
-    const synthesisPrompt = contextText
-      ? `You are CIMA AI, an expert legal intelligence assistant. Using the following retrieved legal sources, provide a comprehensive, well-structured legal analysis of the query. Cite sources by their bracketed numbers [1], [2], etc.\n\nRetrieved Sources:\n${contextText}\n\nQuery: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`
-      : `You are CIMA AI, an expert legal intelligence assistant specialised in international commercial arbitration and Ghanaian law. Provide a comprehensive legal analysis of: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`;
+    const legislationBlock = lawsSources.length > 0
+      ? `\n\nPrimary Legislation (Laws.Africa):\n${lawsSources
+          .map((s, i) => `[L${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}${s.url ? `\nSource: ${s.url}` : ""}:\n${s.content.slice(0, 1000)}`)
+          .join("\n\n")}`
+      : "";
+
+    const otherSourcesBlock = sources.length > 0
+      ? `\n\nAdditional Sources:\n${sources
+          .slice(0, 8)
+          .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}:\n${s.content.slice(0, 600)}`)
+          .join("\n\n")}`
+      : "";
+
+    const synthesisPrompt = (legislationBlock || otherSourcesBlock)
+      ? `You are CIMA AI, an expert legal intelligence assistant specialised in African law, international commercial arbitration, and comparative law. Using the sources below, provide a comprehensive, well-structured legal analysis. Cite legislation by [L1], [L2] etc. and other sources by [1], [2] etc.${legislationBlock}${otherSourcesBlock}\n\nQuery: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`
+      : `You are CIMA AI, an expert legal intelligence assistant specialised in African law and international commercial arbitration. Provide a comprehensive legal analysis of: ${query}${jurisdiction ? `\nJurisdiction: ${jurisdiction}` : ""}`;
+
+    // Keep contextSources for the response (used by frontend to display sources panel)
+    void contextSources;
 
     const dsRes = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
@@ -212,7 +229,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ sources, ai_analysis: aiAnalysis, tavily_results: tavilyResults, sources_count: sources.length }),
+      JSON.stringify({ sources: allSources, ai_analysis: aiAnalysis, tavily_results: tavilyResults, sources_count: allSources.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
