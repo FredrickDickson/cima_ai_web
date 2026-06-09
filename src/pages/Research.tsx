@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   BookOpen,
@@ -138,8 +139,10 @@ function SourceCard({ source, index }: { source: RetrievedSource; index: number 
 
 export default function Research() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const linkedCaseId = searchParams.get("case_id") ?? "";
   const [query, setQuery] = useState("");
-  const [jurisdiction, setJurisdiction] = useState("");
+  const [jurisdiction, setJurisdiction] = useState(searchParams.get("jurisdiction") ?? "");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -186,7 +189,11 @@ export default function Research() {
       const data: SearchResponse = await res.json();
       setResponse(data);
       if (user) {
-        await supabase.from("research_sessions").insert({ user_id: user.id, query, jurisdiction, results: data.sources, ai_analysis: data.ai_analysis });
+        await supabase.from("research_sessions").insert({
+          user_id: user.id, query, jurisdiction,
+          results: data.sources, ai_analysis: data.ai_analysis,
+          ...(linkedCaseId ? { case_id: linkedCaseId } : {}),
+        } as never);
         loadSavedResearch();
       }
     } catch (err) {
@@ -227,7 +234,7 @@ export default function Research() {
     <AppLayout>
       <Header title="Legal Research" subtitle="RAG-powered semantic search across legal library, case law, and live sources" />
       <div className="flex-1 overflow-hidden flex">
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <form onSubmit={handleSearch} className="space-y-4">
               <div>
@@ -241,7 +248,7 @@ export default function Research() {
                 />
               </div>
               <div className="flex flex-wrap items-end gap-3">
-                <div className="w-48">
+                <div className="w-full sm:w-48">
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">Jurisdiction</label>
                   <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-navy-950 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent bg-white">
                     {JURISDICTIONS.map((j) => <option key={j.value} value={j.value}>{j.label}</option>)}
@@ -371,8 +378,8 @@ export default function Research() {
           )}
         </div>
 
-        {/* Right sidebar */}
-        <div className="w-64 border-l border-slate-200 bg-white flex flex-col shrink-0">
+        {/* Right sidebar — hidden on mobile */}
+        <div className="hidden lg:flex w-64 border-l border-slate-200 bg-white flex-col shrink-0">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Bookmark size={14} className="text-navy-600" />

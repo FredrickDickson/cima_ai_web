@@ -111,7 +111,7 @@ export default function Dashboard() {
         subtitle="Your legal intelligence workspace"
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, change }) => (

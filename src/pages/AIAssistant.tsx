@@ -3,13 +3,14 @@ import {
   Bot, Send, Plus, Search, Scale, FileText, Gavel, Loader2,
   ChevronRight, MessageSquare, Sparkles, User, Clock, Trash2,
   Paperclip, X, Briefcase, ShieldAlert, TrendingUp, BookOpen,
-  PenTool, HandshakeIcon, Award, Target,
+  PenTool, HandshakeIcon, Award, Target, Menu,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useSidebar } from "../contexts/SidebarContext";
 
 type AIConversation = {
   id: string;
@@ -109,6 +110,7 @@ function formatDate(d: string) {
 
 export default function AIAssistant() {
   const { user } = useAuth();
+  const { toggle } = useSidebar();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConv, setActiveConv] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -279,8 +281,8 @@ export default function AIAssistant() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-hidden flex h-full bg-navy-950">
-        {/* ── Sidebar ── */}
-        <div className="w-64 border-r border-navy-800 bg-navy-900 flex flex-col shrink-0">
+        {/* ── Sidebar — hidden on mobile ── */}
+        <div className="hidden md:flex w-64 border-r border-navy-800 bg-navy-900 flex-col shrink-0">
           <div className="flex items-center justify-between px-4 py-4 border-b border-navy-800">
             <div className="flex items-center gap-2">
               <Bot size={15} className="text-gold-400" />
@@ -339,11 +341,18 @@ export default function AIAssistant() {
         {/* ── Chat Area ── */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-navy-800 bg-navy-900/60">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gold-500/10">
+          <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-navy-800 bg-navy-900/60">
+            <button
+              onClick={toggle}
+              className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-md transition-colors shrink-0"
+              aria-label="Open navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gold-500/10 shrink-0">
               {contextInfo ? <contextInfo.icon size={15} className="text-gold-400" /> : <Bot size={15} className="text-gold-400" />}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">CIMA AI — {contextInfo?.label ?? "Legal Assistant"}</p>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

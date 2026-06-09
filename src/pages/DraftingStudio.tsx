@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useSearchParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
@@ -208,6 +209,7 @@ function severityBorder(severity: string) {
 // ---------------------------------------------------------------------------
 export default function DraftingStudio() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // Data
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -220,7 +222,7 @@ export default function DraftingStudio() {
   // Natural language prompt state
   const [nlPrompt, setNlPrompt] = useState("");
   const [nlJurisdiction, setNlJurisdiction] = useState("ghana");
-  const [nlLinkedCaseId, setNlLinkedCaseId] = useState("");
+  const [nlLinkedCaseId, setNlLinkedCaseId] = useState(searchParams.get("case_id") ?? "");
 
   // Template-based state
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -299,6 +301,13 @@ export default function DraftingStudio() {
     loadTemplates();
     loadCases();
     loadDrafts();
+    // If navigated from Cases with a draft_id, load it immediately
+    const draftIdParam = searchParams.get("draft_id");
+    if (draftIdParam && user) {
+      supabase.from("drafts").select("*").eq("id", draftIdParam).maybeSingle().then(({ data }) => {
+        if (data) loadDraft(data as Draft);
+      });
+    }
   }, [user]);
 
   async function loadTemplates() {
@@ -786,7 +795,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
         {/* ================================================================ */}
         {/* LEFT PANEL                                                       */}
         {/* ================================================================ */}
-        <div className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0">
+        <div className="hidden lg:flex w-64 border-r border-slate-200 bg-white flex-col shrink-0">
           <div className="flex border-b border-slate-100">
             {(["templates", "drafts"] as const).map((tab) => (
               <button key={tab} onClick={() => setLeftTab(tab)}
@@ -927,7 +936,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
 
           {/* TEMPLATE MODE */}
           {mode === "template" && selectedTemplate && (
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
               <div className="max-w-xl mx-auto">
                 <div className="mb-6">
                   <button onClick={handleNewDraft} className="text-xs text-slate-500 hover:text-navy-700 transition-colors mb-1">&larr; Back</button>
@@ -1123,7 +1132,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
                   {/* ============================================================ */}
                   {/* RIGHT PANEL — AI Assistant / Review / Research               */}
                   {/* ============================================================ */}
-                  <div className="w-72 border-l border-slate-200 bg-white flex flex-col shrink-0">
+                  <div className="hidden lg:flex w-72 border-l border-slate-200 bg-white flex-col shrink-0">
                     {/* Right panel tabs */}
                     <div className="flex border-b border-slate-100">
                       {([

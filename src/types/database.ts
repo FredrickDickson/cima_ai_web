@@ -305,3 +305,45 @@ export interface Template {
   content: string;
   created_at: string;
 }
+
+export interface ContractClauseAnalysis {
+  clause_name: string;
+  start_phrase: string;
+  risk_level: "critical" | "high" | "medium" | "low";
+  analysis: string;
+  redline_suggestion?: string;
+  standard_alternative?: string;
+}
+
+export interface MissingClause {
+  clause_type: string;
+  importance: "low" | "medium" | "high" | "critical";
+  consequence_of_omission: string;
+  suggested_text?: string;
+}
+
+export interface RiskItem {
+  title: string;
+  risk_level: "critical" | "high" | "medium" | "low";
+  explanation: string;
+  impact: string;
+  recommendation: string;
+}
+
+export interface ArbitrationDetails {
+  valid: boolean;
+  seat?: string;
+  institution?: string;
+  governing_law?: string;
+  enforceability?: string;
+  issues: string[];
+}
+
+export interface AIInsights {
+  key_risks: string[];
+  negotiation_points: string[];
+  missing_protections: string[];
+  commercial_concerns: string[];
+  litigation_exposure: string[];
+  arbitration_concerns: string[];
+}
