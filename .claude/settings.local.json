@@ -13,7 +13,12 @@
       "Bash(npx vite:*)",
       "Bash(npx supabase:*)",
       "mcp__claude_ai_Higgsfield__job_status",
-      "mcp__claude_ai_Higgsfield__generate_video"
+      "mcp__claude_ai_Higgsfield__generate_video",
+      "Bash(node take-screenshots2.mjs)",
+      "Bash(curl *)",
+      "Bash(node seed-demo.mjs)",
+      "Bash(mkdir -p \"C:/Users/Administrator/Documents/projects/project/screenshots\")",
+      "Bash(node take-screenshots-final.mjs)"
     ]
   }
 }
