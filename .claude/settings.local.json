@@ -11,7 +11,9 @@
       "Bash(npx vitest:*)",
       "Bash(xargs grep:*)",
       "Bash(npx vite:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "mcp__claude_ai_Higgsfield__job_status",
+      "mcp__claude_ai_Higgsfield__generate_video"
     ]
   }
 }
