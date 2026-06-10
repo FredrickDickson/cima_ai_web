@@ -13,7 +13,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const displayName = profile?.full_name || user?.email || "User";
 
   return (
-    <header className="flex items-center justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-b border-slate-200 shrink-0">
+    <header className="relative z-20 flex items-center justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-b border-slate-200 shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         {/* Hamburger — mobile only */}
         <button

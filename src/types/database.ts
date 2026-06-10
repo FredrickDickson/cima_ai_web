@@ -1,3 +1,5 @@
+export type Json = any;
+
 export interface Database {
   public: {
     Tables: {
@@ -12,9 +14,9 @@ export interface Database {
         Update: Partial<Omit<Case, "id" | "created_at">>;
       };
       documents: {
-        Row: Document;
-        Insert: Omit<Document, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Document, "id" | "created_at">>;
+        Row: DbDocument;
+        Insert: Omit<DbDocument, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<DbDocument, "id" | "created_at">>;
       };
       ai_conversations: {
         Row: AIConversation;
@@ -55,6 +57,30 @@ export interface Database {
         Row: ContractAnalysis;
         Insert: Omit<ContractAnalysis, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<ContractAnalysis, "id" | "created_at">>;
+      };
+      contract_clause_actions: {
+        Row: {
+          id: string;
+          analysis_id: string;
+          clause_name: string;
+          action_id: string;
+          result_text: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          analysis_id: string;
+          clause_name: string;
+          action_id: string;
+          result_text: string;
+          created_at?: string;
+        };
+        Update: Partial<{
+          analysis_id: string;
+          clause_name: string;
+          action_id: string;
+          result_text: string;
+        }>;
       };
       issues: {
         Row: Issue;
@@ -104,7 +130,7 @@ export interface Case {
   status: "active" | "pending" | "closed" | "settled";
   framework: string;
   description: string;
-  parties: Party[];
+  parties: any;
   next_hearing: string | null;
   created_at: string;
   updated_at: string;
@@ -116,7 +142,7 @@ export interface Party {
   counsel?: string;
 }
 
-export interface Document {
+export interface DbDocument {
   id: string;
   user_id: string;
   case_id: string | null;
@@ -129,7 +155,7 @@ export interface Document {
   ai_summary: string;
   risk_score: number;
   status: "uploading" | "processing" | "ready" | "error";
-  metadata: Record<string, unknown>;
+  metadata: any;
   created_at: string;
   updated_at: string;
 }
@@ -149,7 +175,7 @@ export interface AIMessage {
   conversation_id: string;
   role: "user" | "assistant";
   content: string;
-  metadata: Record<string, unknown>;
+  metadata: any;
   created_at: string;
 }
 
@@ -158,19 +184,19 @@ export interface ResearchSession {
   user_id: string;
   query: string;
   jurisdiction: string;
-  results: ResearchResult[];
+  results: any;
   ai_analysis: string;
   created_at: string;
 }
 
-export interface ResearchResult {
+export type ResearchResult = {
   title: string;
   citation: string;
   type: "case" | "statute" | "rule" | "article";
   jurisdiction: string;
   summary: string;
   relevance: number;
-}
+};
 
 export interface Draft {
   id: string;
@@ -225,10 +251,10 @@ export interface ContractAnalysis {
   user_id: string;
   case_id: string | null;
   overall_risk_score: number;
-  risk_items: Record<string, unknown>[];
-  clauses_data: Record<string, unknown>[];
-  missing_clauses: Record<string, unknown>[];
-  obligations: Record<string, unknown>;
+  risk_items: any;
+  clauses_data: any;
+  missing_clauses: any;
+  obligations: any;
   recommendations: string[];
   ai_summary: string;
   contract_text: string;
@@ -301,7 +327,7 @@ export interface Template {
   template_type: string;
   jurisdiction: string;
   framework: string;
-  variables: TemplateVariable[];
+  variables: any;
   content: string;
   created_at: string;
 }

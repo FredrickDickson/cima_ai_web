@@ -18,7 +18,7 @@ import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-import type { Case, Document, Hearing } from "../types/database";
+import type { Case, DbDocument as Document, Hearing } from "../types/database";
 
 interface Stats {
   activeCases: number;
@@ -51,7 +51,7 @@ export default function Dashboard() {
       setRecentDocs(docsRes.data ?? []);
       setUpcomingHearings(hearingsRes.data ?? []);
       setStats({
-        activeCases: allCases.filter((c) => c.status === "active").length,
+        activeCases: (allCases as any[]).filter((c) => c.status === "active").length,
         totalDocuments: docsCountRes.count ?? 0,
         researchSessions: researchRes.data?.length ?? 0,
         upcomingHearings: hearingsRes.data?.length ?? 0,

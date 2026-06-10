@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
@@ -15,7 +15,6 @@ import {
   Scale,
   FileText,
   Sparkles,
-  Briefcase,
   Bot,
   Copy,
   Users,
@@ -30,7 +29,10 @@ import {
   ChevronRight,
   Wand2,
   ExternalLink,
+  Settings,
+  X
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
@@ -41,6 +43,7 @@ import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } fr
 interface AnalysisResult {
   id?: string;
   overall_risk_score: number;
+  detected_document_type?: string;
   ai_summary: string;
   arbitration_clause_valid: boolean;
   arbitration_clause_issues: string;
@@ -131,11 +134,39 @@ async function extractTextFromFile(file: File): Promise<string> {
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     const pages: string[] = [];
+    let totalTextLength = 0;
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" "));
+      const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
+      pages.push(pageText);
+      totalTextLength += pageText.trim().length;
     }
+
+    if (totalTextLength < 50 && pdf.numPages > 0) {
+      console.log("No embedded text found in PDF, falling back to OCR...");
+      const Tesseract = await import("tesseract.js");
+      const ocrPages: string[] = [];
+      
+      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Limit OCR to 10 pages for perf
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        
+        const dataUrl = canvas.toDataURL("image/png");
+        const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
+        const { data: { text } } = await recognize(dataUrl, "eng");
+        ocrPages.push(text);
+      }
+      return ocrPages.join("\n\n");
+    }
+
     return pages.join("\n\n");
   }
   if (name.endsWith(".docx")) {
@@ -182,7 +213,11 @@ function highlightText(text: string, clauses: ContractClauseAnalysis[], highligh
   let result = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   for (const clause of clauses) {
     if (!clause.start_phrase) continue;
-    const escaped = clause.start_phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escaped = clause.start_phrase
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s+");
     const bg = RISK_HIGHLIGHT[clause.risk_level] ?? "#fef9c3";
     const isHighlighted = highlighted === clause.clause_name;
     const style = isHighlighted
@@ -190,8 +225,8 @@ function highlightText(text: string, clauses: ContractClauseAnalysis[], highligh
       : `background:${bg};padding:1px 2px;border-radius:2px;`;
     try {
       result = result.replace(
-        new RegExp(escaped, "i"),
-        `<mark data-clause="${escapeAttr(clause.clause_name)}" style="${style}" title="${escapeAttr(clause.clause_name)}">$&</mark>`
+        new RegExp(`(${escaped})`, "i"),
+        `<mark data-clause="${escapeAttr(clause.clause_name)}" style="${style}" title="${escapeAttr(clause.clause_name)}">$1</mark>`
       );
     } catch { /* bad regex — skip */ }
   }
@@ -328,6 +363,10 @@ export default function ContractReview() {
   const [inputTab, setInputTab] = useState<"paste" | "upload">("paste");
   const [contractText, setContractText] = useState("");
   const [fileName, setFileName] = useState("");
+  // Mobile UX State
+  const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"document" | "analysis">("analysis");
+
   const [documentType, setDocumentType] = useState("commercial");
   const [jurisdiction, setJurisdiction] = useState("Ghana");
   const [cases, setCases] = useState<Case[]>([]);
@@ -360,7 +399,7 @@ export default function ContractReview() {
 
   // Export
   const [exportOpen, setExportOpen] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
+  const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -411,7 +450,27 @@ export default function ContractReview() {
       arbitration_seat?: string;
       arbitration_institution?: string;
       arbitration_improved?: string;
+      industry_type?: string;
     };
+    if (a.industry_type) setDocumentType(a.industry_type);
+    
+    // Fetch clause actions
+    const { data: actionsData } = await supabase.from("contract_clause_actions").select("*").eq("analysis_id", id);
+    const loadedClauseResults: Record<string, Record<string, string>> = {};
+    const loadedGeneratedClauses: Record<string, string> = {};
+    if (actionsData) {
+      for (const action of actionsData as any[]) {
+        if (action.action_id === "generate") {
+          loadedGeneratedClauses[action.clause_name] = action.result_text;
+        } else {
+          if (!loadedClauseResults[action.clause_name]) {
+            loadedClauseResults[action.clause_name] = {};
+          }
+          loadedClauseResults[action.clause_name][action.action_id] = action.result_text;
+        }
+      }
+    }
+
     setAnalysis({
       id: a.id,
       overall_risk_score: a.overall_risk_score,
@@ -424,8 +483,8 @@ export default function ContractReview() {
       governing_law_found: a.governing_law_found,
       governing_law: a.governing_law,
       detected_parties: a.detected_parties,
-      clauses: (a.clauses_data ?? []) as ContractClauseAnalysis[],
-      missing_clauses: (a.missing_clauses ?? []) as MissingClause[],
+      clauses: (a.clauses_data ?? []) as unknown as ContractClauseAnalysis[],
+      missing_clauses: (a.missing_clauses ?? []) as unknown as MissingClause[],
       obligations: (a.obligations as { party_a: string[]; party_b: string[] }) ?? { party_a: [], party_b: [] },
       recommendations: a.recommendations ?? [],
       negotiation_points: a.negotiation_points,
@@ -435,8 +494,8 @@ export default function ContractReview() {
     setMode("analysis");
     setActiveTab("overview");
     setHighlightedClause(null);
-    setClauseResults({});
-    setGeneratedClauses({});
+    setClauseResults(loadedClauseResults);
+    setGeneratedClauses(loadedGeneratedClauses);
     setRedlineText("");
     setRedlineResult(null);
   }
@@ -448,6 +507,33 @@ export default function ContractReview() {
     try {
       const text = await extractTextFromFile(file);
       setContractText(text);
+
+      if (user) {
+        const fileExt = file.name.split('.').pop() || 'pdf';
+        const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+        
+        await supabase.storage.from("documents").upload(filePath, file).catch(() => {});
+        
+        const payload: any = {
+          user_id: user.id,
+          case_id: linkedCaseId || null,
+          name: file.name,
+          type: "contract",
+          file_path: filePath,
+          file_size: file.size,
+          mime_type: file.type || "text/plain",
+          extracted_text: text.slice(0, 50000),
+          ai_summary: "",
+          risk_score: 0,
+          status: "ready",
+          metadata: {}
+        };
+        const { data: docData, error: dbError } = await supabase.from("documents").insert(payload).select("id").single();
+        
+        if (!dbError && docData) {
+          setUploadedDocId((docData as any).id);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to read file");
     }
@@ -470,6 +556,7 @@ export default function ContractReview() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           text: contractText,
+          document_id: uploadedDocId || undefined,
           case_id: linkedCaseId || undefined,
           user_id: user.id,
           document_type: documentType,
@@ -512,6 +599,16 @@ export default function ContractReview() {
         ...prev,
         [clause.clause_name]: { ...(prev[clause.clause_name] ?? {}), [action.id]: result },
       }));
+      
+      if (analysis?.id) {
+        const payload: any = {
+          analysis_id: analysis.id,
+          clause_name: clause.clause_name,
+          action_id: action.id,
+          result_text: result,
+        };
+        await supabase.from("contract_clause_actions").upsert(payload, { onConflict: "analysis_id,clause_name,action_id" });
+      }
     } catch { /* ignore */ } finally {
       setClauseActionLoading(null);
     }
@@ -524,6 +621,16 @@ export default function ContractReview() {
         `Draft a complete, professional ${clause.clause_type} clause for inclusion in a commercial contract governed by ${jurisdiction} law.\n\nConsequence of omission: ${clause.consequence_of_omission}\n${clause.suggested_text ? `\nStarting point: ${clause.suggested_text}` : ""}\n\nReturn only the clause text, no preamble.`
       );
       setGeneratedClauses((prev) => ({ ...prev, [clause.clause_type]: result }));
+      
+      if (analysis?.id) {
+        const payload: any = {
+          analysis_id: analysis.id,
+          clause_name: clause.clause_type,
+          action_id: "generate",
+          result_text: result,
+        };
+        await supabase.from("contract_clause_actions").upsert(payload, { onConflict: "analysis_id,clause_name,action_id" });
+      }
     } catch { /* ignore */ } finally {
       setGeneratingClause(null);
     }
@@ -534,8 +641,8 @@ export default function ContractReview() {
     setComparingRedlines(true);
     setRedlineResult(null);
     try {
-      const original = analysis.contract_text.slice(0, 6000);
-      const revised = redlineText.slice(0, 6000);
+      const original = analysis.contract_text;
+      const revised = redlineText;
       const result = await callAiChat(
         `You are a legal reviewer. Compare these two document versions and identify all changes. Structure your response with these exact headings:\n\n## Added Provisions\n## Deleted Provisions\n## Modified Provisions\n## Risk Changes\n\nFor each item, note the provision name and describe the change. Flag any increase in risk, new liability exposure, or removal of protections prominently.\n\n---ORIGINAL DOCUMENT---\n${original}\n\n---REVISED DOCUMENT---\n${revised}`
       );
@@ -564,7 +671,7 @@ export default function ContractReview() {
     if (!analysis) return;
     setExportOpen(false);
     setError("");
-    const title = `Contract Analysis — ${new Date().toLocaleDateString()}`;
+    const title = `Document Review — ${new Date().toLocaleDateString()}`;
     try {
       if (fmt === "word") {
         const content = buildExportMarkdown(analysis);
@@ -579,7 +686,7 @@ export default function ContractReview() {
 
   function buildExportMarkdown(a: AnalysisResult): string {
     const lines: string[] = [];
-    lines.push(`# Contract Analysis Report`);
+    lines.push(`# Document Review Report`);
     lines.push(`**Risk Score:** ${a.overall_risk_score}/100`);
     if (a.detected_parties) {
       lines.push(`**Parties:** ${a.detected_parties.party_a_name} / ${a.detected_parties.party_b_name}`);
@@ -640,9 +747,103 @@ export default function ContractReview() {
       ]
     : [];
 
+  const renderConfigOptions = () => (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Document Type</p>
+        <select
+          value={documentType}
+          onChange={(e) => setDocumentType(e.target.value)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
+        >
+          {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Jurisdiction</p>
+        <select
+          value={jurisdiction}
+          onChange={(e) => setJurisdiction(e.target.value)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
+        >
+          {JURISDICTIONS.map((j) => (
+            <option key={j} value={j}>{j}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Link to Matter</p>
+        <select
+          value={linkedCaseId}
+          onFocus={loadCases}
+          onChange={(e) => setLinkedCaseId(e.target.value)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
+        >
+          <option value="">— No matter —</option>
+          {cases.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}{c.matter_number ? ` (${c.matter_number})` : ""}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Past reviews */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Past Reviews</p>
+          {!reviewsLoaded && (
+            <button onClick={loadPastReviews} className="text-xs text-navy-600 hover:text-navy-900 font-medium">Load</button>
+          )}
+        </div>
+        {loadingReviews ? (
+          <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+            <Loader2 size={11} className="animate-spin" /> Loading...
+          </div>
+        ) : reviewsLoaded && pastReviews.length === 0 ? (
+          <p className="text-xs text-slate-400">No past reviews</p>
+        ) : (
+          <div className="space-y-1">
+            {pastReviews.slice(0, 8).map((r) => (
+              <button
+                key={r.id}
+                onClick={() => { loadPastAnalysis(r.id); setMobileConfigOpen(false); }}
+                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors group"
+              >
+                <div className={`w-2 h-2 rounded-full shrink-0 ${r.overall_risk_score >= 70 ? "bg-red-400" : r.overall_risk_score >= 40 ? "bg-amber-400" : "bg-emerald-400"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-700 truncate">{r.ai_summary?.split(".")[0] || "Review"}</p>
+                  <p className="text-xs text-slate-400">{new Date(r.created_at).toLocaleDateString()}</p>
+                </div>
+                <ChevronRight size={11} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <AppLayout>
       <Header title="Document Review & Risk Analysis" subtitle="AI review for ambiguity, unenforceable clauses, jurisdictional defects, missing obligations, and liability exposure" />
+
+      {/* Mobile Config Drawer */}
+      {mobileConfigOpen && mode === "input" && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end md:hidden">
+          <div className="w-80 max-w-full bg-white h-full shadow-xl flex flex-col animate-in slide-in-from-right">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-sm font-bold text-navy-950">Review Settings</h2>
+              <button onClick={() => setMobileConfigOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            {renderConfigOptions()}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
 
@@ -650,82 +851,7 @@ export default function ContractReview() {
         <div className="hidden md:flex w-64 shrink-0 border-r border-slate-200 bg-white flex-col overflow-hidden">
           {mode === "input" ? (
             /* Input controls */
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Document Type</p>
-                <select
-                  value={documentType}
-                  onChange={(e) => setDocumentType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
-                >
-                  {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Jurisdiction</p>
-                <select
-                  value={jurisdiction}
-                  onChange={(e) => setJurisdiction(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
-                >
-                  {JURISDICTIONS.map((j) => (
-                    <option key={j} value={j}>{j}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Link to Matter</p>
-                <select
-                  value={linkedCaseId}
-                  onFocus={loadCases}
-                  onChange={(e) => setLinkedCaseId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
-                >
-                  <option value="">— No matter —</option>
-                  {cases.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}{c.matter_number ? ` (${c.matter_number})` : ""}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Past reviews */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Past Reviews</p>
-                  {!reviewsLoaded && (
-                    <button onClick={loadPastReviews} className="text-xs text-navy-600 hover:text-navy-900 font-medium">Load</button>
-                  )}
-                </div>
-                {loadingReviews ? (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                    <Loader2 size={11} className="animate-spin" /> Loading...
-                  </div>
-                ) : reviewsLoaded && pastReviews.length === 0 ? (
-                  <p className="text-xs text-slate-400">No past reviews</p>
-                ) : (
-                  <div className="space-y-1">
-                    {pastReviews.slice(0, 8).map((r) => (
-                      <button
-                        key={r.id}
-                        onClick={() => loadPastAnalysis(r.id)}
-                        className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors group"
-                      >
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${r.overall_risk_score >= 70 ? "bg-red-400" : r.overall_risk_score >= 40 ? "bg-amber-400" : "bg-emerald-400"}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-700 truncate">{r.ai_summary?.split(".")[0] || "Review"}</p>
-                          <p className="text-xs text-slate-400">{new Date(r.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <ChevronRight size={11} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            renderConfigOptions()
           ) : (
             /* Analysis sidebar */
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -769,6 +895,15 @@ export default function ContractReview() {
         {/* ── CENTER ── */}
         {mode === "input" ? (
           <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+            <div className="md:hidden flex justify-end mb-4">
+              <button 
+                onClick={() => setMobileConfigOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-navy-950 shadow-sm"
+              >
+                <Settings size={14} className="text-slate-500" />
+                Review Settings
+              </button>
+            </div>
             <div className="max-w-2xl mx-auto space-y-5">
               {/* Input tabs */}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -796,13 +931,13 @@ export default function ContractReview() {
                   ) : (
                     <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-10 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
                       <Upload size={28} className="text-slate-300 mb-3" />
-                      <p className="text-sm font-medium text-slate-500">Click to upload a contract</p>
+                      <p className="text-sm font-medium text-slate-500">Click to upload a document</p>
                       <p className="text-xs text-slate-400 mt-1">PDF, DOCX, and TXT supported</p>
                       <input type="file" accept=".txt,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
                       {contractText && (
                         <p className="mt-3 text-xs text-emerald-600 font-medium">
                           <CheckCircle2 size={12} className="inline mr-1" />
-                          {fileName || "File"} — {contractText.length.toLocaleString()} characters loaded
+                         {fileName || "File"}  {/* — {contractText.length.toLocaleString()} characters loaded */}
                         </p>
                       )}
                     </label>
@@ -819,7 +954,7 @@ export default function ContractReview() {
               {analyzing ? (
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
                   <Loader2 size={28} className="text-navy-600 animate-spin mx-auto mb-4" />
-                  <p className="text-sm font-semibold text-navy-950 mb-4">Analysing contract...</p>
+                  <p className="text-sm font-semibold text-navy-950 mb-4">Analysing document...</p>
                   <div className="space-y-2 max-w-xs mx-auto">
                     {STEPS.map((step, i) => (
                       <div key={step} className={`flex items-center gap-2.5 text-xs transition-all ${i <= currentStep ? "text-navy-700" : "text-slate-300"}`}>
@@ -847,8 +982,8 @@ export default function ContractReview() {
             </div>
           </div>
         ) : (
-          /* Contract viewer */
-          <div className="flex-1 overflow-y-auto border-r border-slate-200 bg-white">
+          /* Contract viewer (hidden on mobile if analysis mode is active and mobileView is 'analysis') */
+          <div className={`flex-1 overflow-y-auto border-r border-slate-200 bg-white ${mobileView === "analysis" ? "hidden md:block" : "block"}`}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 sticky top-0 bg-white z-10">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText size={14} className="text-navy-600 shrink-0" />
@@ -875,7 +1010,23 @@ export default function ContractReview() {
 
         {/* ── RIGHT ANALYSIS PANEL ── (only in analysis mode) */}
         {mode === "analysis" && analysis && (
-          <div className="w-full md:w-[480px] shrink-0 flex flex-col overflow-hidden bg-slate-50" id="contract-analysis-report" ref={exportRef}>
+          <div className={`w-full md:w-[480px] shrink-0 flex flex-col overflow-hidden bg-slate-50 ${mobileView === "document" ? "hidden md:flex" : "flex"}`} id="contract-analysis-report">
+            {/* Mobile View Toggle */}
+            <div className="md:hidden flex p-2 bg-white border-b border-slate-200 shrink-0">
+              <button
+                onClick={() => setMobileView("document")}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${mobileView === "document" ? "bg-navy-50 text-navy-900" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                Document
+              </button>
+              <button
+                onClick={() => setMobileView("analysis")}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${mobileView === "analysis" ? "bg-navy-50 text-navy-900" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                AI Analysis
+              </button>
+            </div>
+
             {/* Header */}
             <div className="bg-white border-b border-slate-200 px-5 py-3 shrink-0">
               <div className="flex items-center justify-between">
@@ -963,9 +1114,14 @@ export default function ContractReview() {
                     <div className="flex items-center gap-3 p-3">
                       <Building2 size={13} className="text-navy-400 shrink-0" />
                       <span className="text-xs text-slate-500 font-medium w-24 shrink-0">Doc Type</span>
-                      <span className="ml-auto text-xs font-semibold text-navy-950 capitalize">
-                        {DOCUMENT_TYPE_OPTIONS.find((o) => o.value === documentType)?.label ?? documentType}
-                      </span>
+                      <div className="ml-auto text-right">
+                        {analysis.detected_document_type && (
+                          <p className="text-xs font-semibold text-navy-950">{analysis.detected_document_type}</p>
+                        )}
+                        <p className={`text-xs ${analysis.detected_document_type ? "text-slate-400" : "font-semibold text-navy-950"}`}>
+                          {DOCUMENT_TYPE_OPTIONS.find((o) => o.value === documentType)?.label ?? documentType}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -1195,7 +1351,7 @@ export default function ContractReview() {
                   <div className="bg-white rounded-xl border border-slate-200 p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <GitCompare size={13} className="text-navy-600" />
-                      <p className="text-xs font-bold text-navy-950">Compare Contract Versions</p>
+                      <p className="text-xs font-bold text-navy-950">Compare Document Versions</p>
                     </div>
                     <p className="text-xs text-slate-500 mb-4">Upload a revised version to compare against the original.</p>
 
@@ -1236,7 +1392,9 @@ export default function ContractReview() {
                         <TrendingUp size={13} className="text-navy-600" />
                         <p className="text-xs font-bold text-navy-950">Comparison Results</p>
                       </div>
-                      <pre className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">{redlineResult}</pre>
+                      <div className="text-xs text-slate-700 leading-relaxed prose prose-xs max-w-none">
+                        <ReactMarkdown>{redlineResult}</ReactMarkdown>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1322,7 +1480,9 @@ export default function ContractReview() {
                         <Sparkles size={13} className="text-navy-600" />
                         <p className="text-xs font-bold text-navy-950">Senior Associate Review</p>
                       </div>
-                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{analysis.ai_insights}</p>
+                      <div className="text-xs text-slate-700 leading-relaxed prose prose-xs max-w-none">
+                        <ReactMarkdown>{analysis.ai_insights}</ReactMarkdown>
+                      </div>
                     </div>
                   ) : null}
 

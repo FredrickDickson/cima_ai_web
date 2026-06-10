@@ -28,7 +28,7 @@ import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-import type { Document as DocType } from "../types/database";
+import type { DbDocument as DocType } from "../types/database";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,49 +144,6 @@ function highlightText(text: string, query: string): React.ReactNode {
   );
 }
 
-// ─── File Text Extraction ─────────────────────────────────────────────────────
-
-async function extractTextFromFile(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
-
-  if (name.endsWith(".pdf") || file.type === "application/pdf") {
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      const pages: string[] = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        pages.push(
-          content.items
-            .map((item) => ("str" in item ? (item as { str: string }).str : ""))
-            .join(" ")
-        );
-      }
-      return pages.join("\n\n");
-    } catch {
-      throw new Error(
-        "Failed to extract text from PDF. The file may be encrypted or image-only."
-      );
-    }
-  }
-
-  if (
-    name.endsWith(".docx") ||
-    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  ) {
-    try {
-      const mammoth = await import("mammoth");
-      const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-      return result.value;
-    } catch {
-      throw new Error("Failed to extract text from DOCX file.");
-    }
-  }
-
-  return file.text();
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -284,7 +241,7 @@ export default function Documents() {
     setLoading(true);
     Promise.all([
       supabase
-        .from("documents")
+        .from("documents" as any)
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
@@ -377,6 +334,7 @@ export default function Documents() {
 
       let textContent: string;
       try {
+        const { extractTextFromFile } = await import("../lib/fileUtils");
         textContent = await extractTextFromFile(file);
       } catch (extractErr) {
         setUploadError(
@@ -394,21 +352,23 @@ export default function Documents() {
 
       const docName = uploadForm.name.trim() || file.name;
 
+      const payload: any = {
+        user_id: user!.id,
+        case_id: uploadForm.caseId || null,
+        name: docName,
+        type: uploadForm.type as DocType["type"],
+        file_path: file.name,
+        file_size: file.size,
+        mime_type: file.type || "text/plain",
+        status: "processing",
+        extracted_text: textContent.slice(0, 50000),
+        ai_summary: "",
+        risk_score: 0,
+      };
+
       const { data: inserted, error: insertErr } = await supabase
         .from("documents")
-        .insert({
-          user_id: user!.id,
-          case_id: uploadForm.caseId || null,
-          name: docName,
-          type: uploadForm.type as DocType["type"],
-          file_path: file.name,
-          file_size: file.size,
-          mime_type: file.type || "text/plain",
-          status: "processing",
-          extracted_text: textContent.slice(0, 50000),
-          ai_summary: "",
-          risk_score: 0,
-        })
+        .insert(payload)
         .select()
         .single();
 
@@ -482,9 +442,10 @@ export default function Documents() {
 
   async function handleLinkCase(docId: string, caseId: string | null) {
     setLinkingCase(true);
+    const payload: any = { case_id: caseId, updated_at: new Date().toISOString() };
     await supabase
       .from("documents")
-      .update({ case_id: caseId, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq("id", docId);
     setDocuments((prev) =>
       prev.map((d) => (d.id === docId ? { ...d, case_id: caseId } : d))
@@ -537,9 +498,10 @@ ${viewerDoc.extracted_text?.slice(0, 8000) ?? "[No text available]"}
 Return 2-3 paragraphs covering: (1) what this document is and its purpose, (2) the key obligations or provisions, (3) any notable risks or issues.`,
         },
       ]);
+      const payload: any = { ai_summary: result, updated_at: new Date().toISOString() };
       await supabase
         .from("documents")
-        .update({ ai_summary: result, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq("id", viewerDoc.id);
       setDocuments((prev) =>
         prev.map((d) => (d.id === viewerDoc.id ? { ...d, ai_summary: result } : d))

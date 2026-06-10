@@ -1,3 +1,4 @@
+// @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaContext, COUNTRY_MAP } from "../_shared/laws-africa.ts";
@@ -45,7 +46,7 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const excerpt = text.slice(0, 20000);
+    const excerpt = text.slice(0, 100000);
     const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
 
     const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";

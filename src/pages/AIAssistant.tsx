@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   Bot, Send, Plus, Search, Scale, FileText, Gavel, Loader2,
   ChevronRight, MessageSquare, Sparkles, User, Clock, Trash2,
-  Paperclip, X, Briefcase, ShieldAlert, TrendingUp, BookOpen,
-  PenTool, HandshakeIcon, Award, Target, Menu,
+  Paperclip, X, Briefcase, ShieldAlert,
+  PenTool, HandshakeIcon, Award, Target, Menu, Upload, Copy, Check,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
+import { FileAttachment } from "../components/ui/FileAttachment";
+import { extractTextFromFile } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
@@ -27,6 +29,8 @@ type AIMessage = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  attachmentName?: string;
+  attachmentSize?: number;
 };
 
 const CONTEXTS = [
@@ -123,8 +127,14 @@ export default function AIAssistant() {
   const [documents, setDocuments] = useState<{ id: string; name: string; ai_summary?: string }[]>([]);
   const [attachedCase, setAttachedCase] = useState<{ id: string; title: string } | null>(null);
   const [attachedDoc, setAttachedDoc] = useState<{ id: string; name: string; ai_summary?: string } | null>(null);
+  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
+  const [uploadedDocSize, setUploadedDocSize] = useState<number | undefined>(undefined);
+  const [uploadedDocText, setUploadedDocText] = useState<string | null>(null);
+  const [extractingFile, setExtractingFile] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadConversations();
@@ -156,24 +166,49 @@ export default function AIAssistant() {
     setMessages(data ?? []);
   }
 
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Show the chip immediately so the user sees it was picked
+    setUploadedDocName(file.name);
+    setUploadedDocSize(file.size);
+    setExtractingFile(true);
+    try {
+      const text = await extractTextFromFile(file);
+      setUploadedDocText(text);
+    } catch (err) {
+      console.error("Failed to extract text:", err);
+      // chip stays visible even if extraction fails
+      setUploadedDocText("[Failed to read document text. It may be an unsupported format or corrupted file.]");
+    } finally {
+      setExtractingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   async function startNewConversation() {
     setActiveConv(null);
     setMessages([]);
     setInput("");
     setAttachedCase(null);
     setAttachedDoc(null);
+    setUploadedDocName(null);
+    setUploadedDocSize(undefined);
+    setUploadedDocText(null);
   }
 
   async function handleSend() {
-    if (!input.trim() || streaming || !user) return;
+    if ((!input.trim() && !uploadedDocText) || streaming || extractingFile || !user) return;
 
     let conv = activeConv;
     if (!conv) {
+      const titleInput = input.trim() ? input.slice(0, 60) : (uploadedDocName ? `Analysis of ${uploadedDocName}` : "New Conversation");
       const { data, error: convErr } = await supabase.from("ai_conversations").insert({
         user_id: user.id,
-        title: input.slice(0, 60),
+        title: titleInput,
         context,
-      }).select().single();
+      } as any).select().single();
       if (convErr || !data) {
         console.error("Failed to create conversation:", convErr?.message);
         // Show error inline as a system message
@@ -186,25 +221,40 @@ export default function AIAssistant() {
         }]);
         return;
       }
-      conv = data;
+      conv = data as AIConversation;
       setActiveConv(conv);
       setConversations(prev => [conv!, ...prev]);
     }
+
+    const defaultDocPrompt = "Please analyze the attached document and provide a summary of its key points.";
+    const userText = input.trim() ? input : defaultDocPrompt;
+
+    const messageContent = uploadedDocText
+      ? `[Attached document: ${uploadedDocName}]\n\n${uploadedDocText.slice(0, 8000)}\n\n---\n\n${userText}`
+      : userText;
+
+    const sentAttachmentName = uploadedDocName;
+    const sentAttachmentSize = uploadedDocSize;
 
     const userMsg: AIMessage = {
       id: crypto.randomUUID(),
       conversation_id: conv.id,
       role: "user",
-      content: input,
+      content: messageContent,
       created_at: new Date().toISOString(),
+      attachmentName: sentAttachmentName ?? undefined,
+      attachmentSize: sentAttachmentSize,
     };
 
     setMessages(prev => [...prev, userMsg]);
-    const sentInput = input;
+    const sentInput = userText;
     setInput("");
+    setUploadedDocName(null);
+    setUploadedDocSize(undefined);
+    setUploadedDocText(null);
 
     // Save user message to DB (non-blocking)
-    supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "user", content: userMsg.content })
+    supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "user", content: userMsg.content } as any)
       .then(({ error }) => { if (error) console.error("Failed to save message:", error.message); });
 
     setStreaming(true);
@@ -252,10 +302,11 @@ export default function AIAssistant() {
       const content: string = data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
 
       setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
-      await supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "assistant", content });
+      await supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "assistant", content } as any);
 
       const newTitle = messages.length === 0 ? sentInput.slice(0, 60) : conv.title;
-      await supabase.from("ai_conversations").update({ title: newTitle, updated_at: new Date().toISOString() }).eq("id", conv.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from("ai_conversations") as any).update({ title: newTitle, updated_at: new Date().toISOString() }).eq("id", conv.id);
       setConversations(prev => prev.map(c => c.id === conv!.id ? { ...c, title: newTitle, updated_at: new Date().toISOString() } : c));
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -274,6 +325,29 @@ export default function AIAssistant() {
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+
+  function copyToClipboard(id: string, text: string) {
+    // Try to copy formatted HTML if possible, fallback to plain text
+    const elem = document.getElementById(`msg-${id}`);
+    if (elem) {
+      try {
+        const html = elem.innerHTML;
+        const blobInput = new Blob([text], { type: 'text/plain' });
+        const blobHtml = new Blob([html], { type: 'text/html' });
+        const data = [new ClipboardItem({ 'text/plain': blobInput, 'text/html': blobHtml })];
+        navigator.clipboard.write(data).catch(() => {
+          navigator.clipboard.writeText(text).catch(() => {});
+        });
+      } catch (err) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    } else {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+    
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   const contextInfo = CONTEXTS.find(c => c.value === context);
@@ -355,10 +429,7 @@ export default function AIAssistant() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">CIMA AI — {contextInfo?.label ?? "Legal Assistant"}</p>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs text-slate-500">DeepSeek · Legal domain active</span>
-              </div>
+              <p className="text-xs text-slate-500">{contextInfo?.desc ?? "Legal AI assistant"}</p>
             </div>
             {(attachedCase || attachedDoc) && (
               <div className="flex items-center gap-2">
@@ -415,13 +486,48 @@ export default function AIAssistant() {
                           <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
                         </div>
                       ) : msg.role === "assistant" ? (
-                        <div className="prose-ai text-sm leading-relaxed">
+                        <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                         </div>
                       ) : (
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        <div className="space-y-2">
+                          {msg.attachmentName && (
+                            <FileAttachment
+                              id={`${msg.id}-attach`}
+                              filename={msg.attachmentName}
+                              size={msg.attachmentSize}
+                            />
+                          )}
+                          {(() => {
+                            // Strip the embedded doc prefix from the visible text
+                            const docPrefix = msg.attachmentName
+                              ? `[Attached document: ${msg.attachmentName}]\n\n`
+                              : null;
+                            const separator = "\n\n---\n\n";
+                            let visible = msg.content;
+                            if (docPrefix && visible.startsWith(docPrefix)) {
+                              const sepIdx = visible.indexOf(separator);
+                              visible = sepIdx !== -1 ? visible.slice(sepIdx + separator.length) : "";
+                            }
+                            return visible
+                              ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{visible}</p>
+                              : null;
+                          })()}
+                        </div>
                       )}
-                      <p className="text-xs mt-1.5 text-slate-600">{formatTime(msg.created_at)}</p>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <p className="text-xs text-slate-600">{formatTime(msg.created_at)}</p>
+                        {msg.role === "assistant" && msg.content && (
+                          <button
+                            onClick={() => copyToClipboard(msg.id, msg.content)}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                            title="Copy response"
+                          >
+                            {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                            <span className="sr-only">Copy</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -469,17 +575,57 @@ export default function AIAssistant() {
 
           {/* Input */}
           <div className="px-6 py-4 border-t border-navy-800 bg-navy-900/40">
+            <input ref={fileInputRef} type="file" accept=".txt,.pdf,.docx" className="hidden" onChange={handleFileUpload} />
+            {(uploadedDocName || attachedDoc || attachedCase) && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {attachedCase && (
+                  <div className="relative flex items-center gap-2 pl-1 pr-2 py-1 min-w-[120px] max-w-[200px] bg-navy-800/80 rounded-[6px] border border-navy-700 shadow-sm group">
+                    <div className="flex items-center justify-center w-8 h-8 self-stretch bg-navy-900 shrink-0 rounded-[4px]">
+                      <Briefcase className="size-4 text-gold-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-medium text-slate-200 truncate" title={attachedCase.title}>{attachedCase.title}</span>
+                      <span className="text-[10px] text-slate-500">Case Matter</span>
+                    </div>
+                    <button onClick={() => setAttachedCase(null)} className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-navy-900 border border-navy-700 flex items-center justify-center transition-opacity duration-150 ease-out z-10 text-slate-400 hover:text-slate-200 opacity-0 group-hover:opacity-100">
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+                {attachedDoc && (
+                  <FileAttachment
+                    filename={attachedDoc.name}
+                    onRemove={() => setAttachedDoc(null)}
+                  />
+                )}
+                {uploadedDocName && (
+                  <FileAttachment
+                    filename={uploadedDocName}
+                    size={uploadedDocSize}
+                    onRemove={() => { setUploadedDocName(null); setUploadedDocText(null); setUploadedDocSize(undefined); }}
+                    className={extractingFile ? "opacity-50 animate-pulse pointer-events-none" : ""}
+                  />
+                )}
+              </div>
+            )}
             <div className="flex items-end gap-2 bg-navy-800 border border-navy-700 rounded-2xl px-3 py-2.5 focus-within:border-gold-500/40 transition-all">
               <button onClick={() => setShowAttach(p => !p)}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 ${showAttach || attachedCase || attachedDoc ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"}`}
                 title="Attach case or document">
                 <Paperclip size={15} />
               </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={extractingFile}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 ${uploadedDocName ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"} disabled:opacity-40`}
+                title="Upload document for AI context">
+                {extractingFile ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+              </button>
               <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                 rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}...`}
                 className="flex-1 text-sm text-slate-200 placeholder-slate-600 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
                 style={{ minHeight: "24px" }} />
-              <button onClick={handleSend} disabled={!input.trim() || streaming}
+              <button onClick={handleSend} disabled={(!input.trim() && !uploadedDocText) || streaming || extractingFile}
                 className="flex items-center justify-center w-8 h-8 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                 {streaming ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
               </button>
