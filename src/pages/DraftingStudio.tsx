@@ -25,7 +25,6 @@ import {
   Globe,
   ArrowRight,
   Scale,
-  Eye,
   Edit3,
   Wand2,
   ShieldCheck,
@@ -51,6 +50,9 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import type { Template, Case, Draft } from "../types/database";
+import LegalEditor from "../components/drafting/LegalEditor";
+import CommandBar from "../components/drafting/CommandBar";
+import type { Editor } from "@tiptap/react";
 
 // ---------------------------------------------------------------------------
 // Version history
@@ -239,10 +241,13 @@ export default function DraftingStudio() {
   const [wordCount, setWordCount] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
 
-  // Editor state (Feature 1)
-  const [editorMode, setEditorMode] = useState<"edit" | "preview">("preview");
+  // Editor state (Feature 1) — Tiptap rich-text legal editor
   const [selectedText, setSelectedText] = useState("");
-  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
+  const editorInstanceRef = useRef<Editor | null>(null);
+
+  // AI command bar (Ctrl/Cmd+K)
+  const [showCommandBar, setShowCommandBar] = useState(false);
+  const [commandLoading, setCommandLoading] = useState(false);
 
   // Right panel state (Features 2-5)
   const [rightTab, setRightTab] = useState<"assistant" | "review" | "research" | "clauses">("assistant");
@@ -266,10 +271,6 @@ export default function DraftingStudio() {
   const [clauseMode, setClauseMode] = useState<"library" | "suggest">("library");
   const [clauseSuggestions, setClauseSuggestions] = useState("");
 
-  // Inline toolbar state (Feature 3)
-  const [showInlineToolbar, setShowInlineToolbar] = useState(false);
-  const [inlineToolbarPos, setInlineToolbarPos] = useState({ x: 0, y: 0 });
-
   // UI state
   const [draftLoading, setDraftLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -285,8 +286,6 @@ export default function DraftingStudio() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const nlInputRef = useRef<HTMLTextAreaElement>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   const versions = useVersionHistory();
 
@@ -301,16 +300,17 @@ export default function DraftingStudio() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showExportMenu]);
 
-  // Close inline toolbar on click outside
+  // Open the AI command bar with Ctrl/Cmd+K while editing a draft
   useEffect(() => {
-    function handleClickOutside() {
-      setShowInlineToolbar(false);
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (mode === "output" && outputTab === "full") setShowCommandBar((v) => !v);
+      }
     }
-    if (showInlineToolbar) {
-      const timer = setTimeout(() => document.addEventListener("mousedown", handleClickOutside), 100);
-      return () => { clearTimeout(timer); document.removeEventListener("mousedown", handleClickOutside); };
-    }
-  }, [showInlineToolbar]);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mode, outputTab]);
 
   useEffect(() => {
     loadTemplates();
@@ -381,7 +381,6 @@ export default function DraftingStudio() {
     setSaved(false);
     setError("");
     setShowVersionHistory(false);
-    setEditorMode("preview");
     setAiResult("");
     setReviewItems([]);
     setResearchSources([]);
@@ -434,7 +433,6 @@ export default function DraftingStudio() {
     setOutputTab("full");
     setSaved(false);
     setSelectedTemplate(null);
-    setEditorMode("preview");
     setMode("output");
 
     try {
@@ -476,7 +474,6 @@ export default function DraftingStudio() {
     setPlainEnglish("");
     setOutputTab("full");
     setSaved(false);
-    setEditorMode("preview");
     setMode("output");
 
     try {
@@ -512,29 +509,28 @@ export default function DraftingStudio() {
   // Feature 2: AI Panel Actions (apply to full doc or selection)
   // ---------------------------------------------------------------------------
   async function handleAiAction(actionId: string, actionPrompt: string) {
-    const textToProcess = selectedText || draftContent;
+    const editor = editorInstanceRef.current;
+    const sel = editor?.state.selection;
+    const selText = editor && sel && !sel.empty ? editor.state.doc.textBetween(sel.from, sel.to, " ") : "";
+    const textToProcess = selText || draftContent;
     if (!textToProcess) return;
     setAiActionLoading(actionId);
     setAiResult("");
     setError("");
 
     try {
-      const isSelection = !!selectedText;
+      const isSelection = !!selText;
       const result = await callAiChat([{
         role: "user",
         content: `${actionPrompt}\n\n${isSelection ? "Selected text" : "Full document"}:\n\n${textToProcess}\n\nReturn ONLY the modified text, no preamble or explanation.`,
       }]);
 
-      if (isSelection && selectionRange) {
-        // Replace selection in the document
+      if (isSelection && editor && sel) {
+        // Replace the selected range in the editor; onChange re-syncs draftContent.
         versions.push(draftContent, `Before: ${actionId}`);
-        const newContent = draftContent.slice(0, selectionRange.start) + result + draftContent.slice(selectionRange.end);
-        setDraftContent(newContent);
-        updateWordCount(newContent);
+        editor.chain().focus().insertContentAt({ from: sel.from, to: sel.to }, result).run();
         setSaved(false);
         setSelectedText("");
-        setSelectionRange(null);
-        setShowInlineToolbar(false);
         setAiResult(`Applied "${actionId}" to selected text.`);
       } else {
         // Show result in panel — user decides whether to apply
@@ -724,18 +720,26 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
   }
 
   function insertCitation(source: ResearchSource) {
-    const citation = source.citation
-      ? `\n\n> **${source.source_name}** (${source.citation}): "${source.content.slice(0, 200)}..."\n`
-      : `\n\n> **${source.source_name}**: "${source.content.slice(0, 200)}..."\n`;
+    const label = source.citation ? `${source.source_name} (${source.citation})` : source.source_name;
+    const quote = `${label}: "${source.content.slice(0, 200)}..."`;
 
     versions.push(draftContent, "Before inserting citation");
-    if (editorMode === "edit" && selectionRange) {
-      const newContent = draftContent.slice(0, selectionRange.end) + citation + draftContent.slice(selectionRange.end);
-      setDraftContent(newContent);
+    const editor = editorInstanceRef.current;
+    if (editor) {
+      const pos = editor.state.selection.to;
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(pos, {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [{ type: "text", text: quote }] }],
+        })
+        .run();
     } else {
-      setDraftContent(draftContent + citation);
+      const md = `\n\n> **${label}**: "${source.content.slice(0, 200)}..."\n`;
+      setDraftContent(draftContent + md);
+      updateWordCount(draftContent + md);
     }
-    updateWordCount(draftContent + citation);
     setSaved(false);
   }
 
@@ -763,50 +767,34 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
   }
 
   // ---------------------------------------------------------------------------
-  // Feature 3: Inline AI selection handling
+  // Feature 16: AI Command Bar (Ctrl/Cmd+K) — acts directly on the document
   // ---------------------------------------------------------------------------
-  function handleEditorSelect() {
-    const el = editorRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    if (start === end) {
-      setShowInlineToolbar(false);
-      setSelectedText("");
-      setSelectionRange(null);
-      return;
+  async function handleCommandSubmit(instruction: string) {
+    const editor = editorInstanceRef.current;
+    if (!editor) return;
+    setCommandLoading(true);
+    setError("");
+    try {
+      const sel = editor.state.selection;
+      const selText = !sel.empty ? editor.state.doc.textBetween(sel.from, sel.to, " ") : "";
+      const userContent = selText
+        ? `${instruction}\n\nApply this instruction to the following selected text and return ONLY the revised text, with no preamble or explanation:\n\n${selText}`
+        : `${instruction}\n\nReturn ONLY the resulting legal text, with no preamble or explanation.`;
+      const result = await callAiChat([{ role: "user", content: userContent }], "drafting");
+
+      versions.push(draftContent, "Before AI command");
+      if (selText) {
+        editor.chain().focus().insertContentAt({ from: sel.from, to: sel.to }, result).run();
+      } else {
+        editor.chain().focus().insertContent(`\n\n${result}`).run();
+      }
+      setSaved(false);
+      setShowCommandBar(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI command failed");
+    } finally {
+      setCommandLoading(false);
     }
-    const text = el.value.slice(start, end);
-    setSelectedText(text);
-    setSelectionRange({ start, end });
-
-    // Position toolbar above the textarea
-    const rect = el.getBoundingClientRect();
-    setInlineToolbarPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
-    setShowInlineToolbar(true);
-  }
-
-  function handlePreviewSelect() {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-      setShowInlineToolbar(false);
-      setSelectedText("");
-      return;
-    }
-    const text = sel.toString();
-    setSelectedText(text);
-
-    // Find position in markdown
-    const start = draftContent.indexOf(text);
-    if (start >= 0) {
-      setSelectionRange({ start, end: start + text.length });
-    }
-
-    // Position toolbar near selection
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    setInlineToolbarPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
-    setShowInlineToolbar(true);
   }
 
   // ---------------------------------------------------------------------------
@@ -895,7 +883,6 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
     setLegalNotes("");
     setSaved(true);
     setSelectedTemplate(null);
-    setEditorMode("preview");
     setAiResult("");
     setReviewItems([]);
     versions.clear();
@@ -927,6 +914,14 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
   return (
     <AppLayout>
       <Header title="Drafting Studio" subtitle="AI-powered legal document workspace" />
+
+      <CommandBar
+        open={showCommandBar}
+        onClose={() => setShowCommandBar(false)}
+        onSubmit={handleCommandSubmit}
+        loading={commandLoading}
+        hasSelection={hasSelection}
+      />
 
       <div className="flex-1 overflow-hidden flex">
         {/* ================================================================ */}
@@ -1161,18 +1156,14 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                           </button>
                         </div>
 
-                        {/* Edit/Preview toggle — only for Full tab */}
+                        {/* AI command bar trigger — only for Full tab */}
                         {outputTab === "full" && (
-                        <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden mr-1">
-                          <button onClick={() => setEditorMode("edit")}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${editorMode === "edit" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}>
-                            <Edit3 size={12} /> Edit
+                          <button onClick={() => setShowCommandBar(true)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 mr-1 text-xs font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 border border-navy-100 rounded-lg transition-colors"
+                            title="AI command bar (Ctrl/Cmd+K)">
+                            <Sparkles size={12} className="text-gold-500" /> AI
+                            <span className="text-[10px] text-navy-400 font-normal">⌘K</span>
                           </button>
-                          <button onClick={() => setEditorMode("preview")}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${editorMode === "preview" ? "bg-navy-950 text-white" : "text-slate-500 hover:text-navy-700 hover:bg-slate-50"}`}>
-                            <Eye size={12} /> Preview
-                          </button>
-                        </div>
                         )}
 
                         <button onClick={handleUndo} disabled={!versions.canUndo} className="p-1.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30" title="Undo"><Undo2 size={14} /></button>
@@ -1202,23 +1193,6 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                         </button>
                       </div>
                     </div>
-
-                    {/* Inline selection toolbar (Feature 3) */}
-                    {showInlineToolbar && hasSelection && (
-                      <div className="flex items-center gap-1 px-4 py-2 bg-navy-950 border-b border-navy-800"
-                        style={{ zIndex: 30 }} onMouseDown={(e) => e.stopPropagation()}>
-                        <span className="text-xs text-navy-300 mr-2 shrink-0">Selection:</span>
-                        {AI_ACTIONS.slice(0, 5).map((action) => (
-                          <button key={action.id} onClick={() => handleAiAction(action.id, action.prompt)}
-                            disabled={!!aiActionLoading}
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors disabled:opacity-50">
-                            {aiActionLoading === action.id ? <Loader2 size={11} className="animate-spin" /> : <action.icon size={11} />}
-                            {action.label}
-                          </button>
-                        ))}
-                        <button onClick={() => { setShowInlineToolbar(false); setSelectedText(""); }} className="ml-auto p-1 text-white/50 hover:text-white rounded"><X size={12} /></button>
-                      </div>
-                    )}
 
                     {/* Version History Panel */}
                     {showVersionHistory && versions.past.length > 0 && (
@@ -1262,27 +1236,21 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                             </ReactMarkdown>
                           </div>
                         </div>
-                      ) : editorMode === "edit" ? (
-                        <div className="max-w-3xl mx-auto">
-                          <textarea
-                            ref={editorRef}
-                            value={draftContent}
-                            onChange={(e) => handleEditorChange(e.target.value)}
-                            onSelect={handleEditorSelect}
-                            onBlur={() => {
-                              // Save version on blur if content changed meaningfully
-                            }}
-                            className="w-full min-h-[600px] bg-white rounded-xl border border-slate-200 p-8 shadow-sm text-sm leading-relaxed text-navy-950 font-mono focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent resize-none"
-                            spellCheck
-                          />
-                        </div>
                       ) : (
-                        <div ref={previewRef} onMouseUp={handlePreviewSelect}>
-                          <div id="draft-content-area" className="max-w-3xl mx-auto bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
-                            <div className="prose-doc text-sm leading-relaxed">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{draftContent}</ReactMarkdown>
-                            </div>
-                          </div>
+                        <div className="max-w-3xl mx-auto">
+                          <LegalEditor
+                            value={draftContent}
+                            onChange={handleEditorChange}
+                            onReady={(ed) => { editorInstanceRef.current = ed; }}
+                            onSelectionTextChange={setSelectedText}
+                            aiActions={AI_ACTIONS.slice(0, 6)}
+                            onAiAction={(actionId) => {
+                              const action = AI_ACTIONS.find((a) => a.id === actionId);
+                              if (action) handleAiAction(action.id, action.prompt);
+                            }}
+                            aiActionLoading={aiActionLoading}
+                            contentId="draft-content-area"
+                          />
 
                           {legalNotes && (
                             <div className="max-w-3xl mx-auto mt-4 p-5 bg-amber-50 border border-amber-200 rounded-xl">
