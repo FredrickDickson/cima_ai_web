@@ -1,0 +1,132 @@
+/* ---------------------------------------------------------------------------
+   Legal editor (Tiptap) styling — WYSIWYG legal document formatting.
+   Scoped to .legal-editor so it never leaks into the rest of the app.
+   --------------------------------------------------------------------------- */
+
+.legal-editor {
+  outline: none;
+  color: #0f172a;
+}
+
+.legal-editor:focus {
+  outline: none;
+}
+
+/* Placeholder shown when the document is empty */
+.legal-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ----- Multilevel legal numbering: 1 / 1.1 / 1.1.1 ----- */
+.legal-editor ol {
+  list-style: none;
+  counter-reset: legal-counter;
+  padding-left: 1.6rem;
+}
+
+.legal-editor ol > li {
+  counter-increment: legal-counter;
+  position: relative;
+}
+
+.legal-editor ol > li::before {
+  content: counters(legal-counter, ".") "  ";
+  position: absolute;
+  left: -1.6rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+/* Bullet lists keep normal discs */
+.legal-editor ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+}
+
+/* ----- Tables ----- */
+.legal-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.legal-editor th,
+.legal-editor td {
+  border: 1px solid #cbd5e1;
+  padding: 0.4rem 0.6rem;
+  vertical-align: top;
+  text-align: left;
+  position: relative;
+}
+
+.legal-editor th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+.legal-editor .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(30, 58, 138, 0.08);
+  pointer-events: none;
+}
+
+.legal-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #1e3a8a;
+  cursor: col-resize;
+}
+
+/* ----- Page break ----- */
+.legal-editor .page-break {
+  border: none;
+  border-top: 2px dashed #cbd5e1;
+  margin: 1.5rem 0;
+  position: relative;
+}
+
+.legal-editor .page-break::after {
+  content: "Page break";
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 0 0.5rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+/* ----- Block spacing tuned for legal documents ----- */
+.legal-editor p {
+  margin: 0.5rem 0;
+}
+
+.legal-editor h1,
+.legal-editor h2,
+.legal-editor h3 {
+  font-weight: 700;
+  color: #0f172a;
+  margin: 1rem 0 0.5rem;
+}
+
+.legal-editor blockquote {
+  border-left: 3px solid #cbd5e1;
+  padding-left: 0.9rem;
+  color: #475569;
+  margin: 0.75rem 0;
+}
