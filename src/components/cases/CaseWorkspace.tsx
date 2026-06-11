@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Briefcase, ChevronRight, BarChart2, ShieldAlert, Calendar,
-  Layers, FileText, Gavel, Zap, BookOpen, PenTool, Scale, Handshake, Loader2,
+  Layers, FileText, Gavel, Zap, BookOpen, PenTool, Scale, Handshake, Loader2, AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -59,9 +59,11 @@ export default function CaseWorkspace({ caseData, onBack }: { caseData: Case; on
   const [activeTab, setActiveTab] = useState("overview");
   const [showAwardWizard, setShowAwardWizard] = useState(false);
   const [generatingTOR, setGeneratingTOR] = useState(false);
+  const [torError, setTorError] = useState("");
 
   async function generateTOR() {
     setGeneratingTOR(true);
+    setTorError("");
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const { data: { session } } = await supabase.auth.getSession();
@@ -93,8 +95,14 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
         body: JSON.stringify({ prompt, case_id: caseData.id, user_id: user!.id, jurisdiction: "ghana", template_type: "terms_of_reference" }),
       });
-      const data = await res.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `Generation failed (${res.status})`);
+      }
+      const data = await res.json() as { draft_id?: string };
       if (data.draft_id) navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
+    } catch (e) {
+      setTorError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGeneratingTOR(false);
     }
@@ -103,12 +111,12 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-navy-800 shrink-0">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+      <div className="flex flex-wrap items-center gap-2 px-3 sm:px-6 py-3 sm:py-4 border-b border-navy-800 shrink-0">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm shrink-0">
           <ChevronRight size={16} className="rotate-180" />Cases
         </button>
-        <span className="text-slate-700">/</span>
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <span className="text-slate-700 shrink-0">/</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gold-500/10 shrink-0">
             <Briefcase size={15} className="text-gold-400" />
           </div>
@@ -117,17 +125,17 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
             {caseData.matter_number && <p className="text-xs text-slate-500 font-mono">{caseData.matter_number}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {caseData.type === "arbitration" && (
             <>
               <button onClick={generateTOR} disabled={generatingTOR}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-slate-300 hover:text-white hover:border-gold-500/30 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50">
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-navy-800 border border-navy-700 text-slate-300 hover:text-white hover:border-gold-500/30 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50">
                 {generatingTOR ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                Gen ToR
+                <span className="hidden sm:inline">Gen </span>ToR
               </button>
               <button onClick={() => setShowAwardWizard(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gold-500/10 border border-gold-500/30 text-gold-400 hover:bg-gold-500/20 rounded-xl text-xs font-semibold transition-colors">
-                <Gavel size={13} />Draft Award
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gold-500/10 border border-gold-500/30 text-gold-400 hover:bg-gold-500/20 rounded-xl text-xs font-semibold transition-colors">
+                <Gavel size={13} /><span className="hidden sm:inline">Draft </span>Award
               </button>
             </>
           )}
@@ -138,21 +146,28 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-0.5 px-6 py-2 border-b border-navy-800 overflow-x-auto shrink-0">
+      <div className="flex items-center gap-0.5 px-2 sm:px-6 py-2 border-b border-navy-800 overflow-x-auto shrink-0">
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               activeTab === tab.id
                 ? "bg-gold-500/10 text-gold-400 border border-gold-500/20"
                 : "text-slate-400 hover:text-white hover:bg-navy-800"
             }`}>
-            <tab.icon size={13} />{tab.label}
+            <tab.icon size={13} /><span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>
 
+      {/* ToR error banner */}
+      {torError && (
+        <div className="flex items-center gap-2 mx-3 sm:mx-6 mt-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
+          <AlertCircle size={13} className="shrink-0" />{torError}
+        </div>
+      )}
+
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         {activeTab === "overview" && <OverviewTab caseData={caseData} onTabChange={setActiveTab} />}
         {activeTab === "issues" && <IssuesTab caseId={caseData.id} caseData={caseData} />}
         {activeTab === "timeline" && <DeadlinesTab caseId={caseData.id} caseData={caseData} />}

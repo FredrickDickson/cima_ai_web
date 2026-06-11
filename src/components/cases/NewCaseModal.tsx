@@ -70,7 +70,7 @@ export default function NewCaseModal({
           <h2 className="text-white font-semibold">New Matter</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={18} /></button>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form onSubmit={submit} className="p-4 sm:p-6 space-y-4">
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
               <AlertCircle size={13} className="shrink-0" />{error}
@@ -86,7 +86,7 @@ export default function NewCaseModal({
               className="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-gold-500/50"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
               <select
@@ -117,7 +117,7 @@ export default function NewCaseModal({
               {FRAMEWORKS.map(f => <option key={f} value={f}>{f || "— Select framework —"}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Claimant</label>
               <input

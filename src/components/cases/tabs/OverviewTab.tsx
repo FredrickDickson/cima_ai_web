@@ -140,15 +140,15 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
   return (
     <div className="space-y-6">
       {/* Status cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: "Status", value: caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1), color: "text-emerald-400" },
           { label: "Type", value: caseData.type.charAt(0).toUpperCase() + caseData.type.slice(1), color: "text-gold-400" },
           { label: "Framework", value: caseData.framework || "—", color: "text-blue-400" },
         ].map(item => (
-          <div key={item.label} className="bg-navy-800/50 border border-navy-700 rounded-xl p-4">
+          <div key={item.label} className="bg-navy-800/50 border border-navy-700 rounded-xl p-3 sm:p-4">
             <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-            <p className={`text-sm font-bold ${item.color} truncate`}>{item.value}</p>
+            <p className={`text-xs sm:text-sm font-bold ${item.color} truncate`}>{item.value}</p>
           </div>
         ))}
       </div>
@@ -176,7 +176,7 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
       </div>
 
       {/* 2-column widget grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Parties */}
         <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5"><Users size={13} className="text-gold-400" />Parties</h3>

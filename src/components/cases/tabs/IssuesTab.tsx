@@ -47,7 +47,7 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
     setSaving(true);
     const { data } = await supabase.from("issues").insert({
       ...form, case_id: caseId, user_id: user!.id, status: "open",
-      issue_number: (issues.length + 1),
+      issue_number: issues.length > 0 ? Math.max(...issues.map(i => i.issue_number)) + 1 : 1,
     }).select().maybeSingle();
     if (data) setIssues(p => [...p, data]);
     setForm({ description: "", claimant_position: "", respondent_position: "" });
@@ -266,7 +266,7 @@ Keep each section concise and professionally worded in the third person. This is
         <form onSubmit={add} className="bg-navy-800/50 border border-navy-700 rounded-xl p-4 space-y-3">
           <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Issue description..." required rows={2}
             className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-gold-500/50" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <textarea value={form.claimant_position} onChange={e => setForm(p => ({ ...p, claimant_position: e.target.value }))} placeholder="Claimant position..." rows={2}
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-gold-500/50" />
             <textarea value={form.respondent_position} onChange={e => setForm(p => ({ ...p, respondent_position: e.target.value }))} placeholder="Respondent position..." rows={2}
@@ -297,7 +297,7 @@ Keep each section concise and professionally worded in the third person. This is
               <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform mt-1 ${expanded === issue.id ? "rotate-180" : ""}`} />
             </button>
             {expanded === issue.id && (issue.claimant_position || issue.respondent_position) && (
-              <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {issue.claimant_position && (
                   <div className="bg-gold-500/5 border border-gold-500/15 rounded-lg p-3">
                     <p className="text-xs font-medium text-gold-400 mb-1">Claimant Position</p>

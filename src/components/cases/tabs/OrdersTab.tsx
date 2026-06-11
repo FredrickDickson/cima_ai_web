@@ -56,7 +56,7 @@ export default function OrdersTab({ caseId }: { caseId: string }) {
 
       {showForm && (
         <form onSubmit={add} className="bg-navy-800/50 border border-navy-700 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Order title..." required
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500/50" />
             <input type="date" value={form.issued_at} onChange={e => setForm(p => ({ ...p, issued_at: e.target.value }))}

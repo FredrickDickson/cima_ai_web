@@ -121,7 +121,7 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
 
       {showForm && (
         <form onSubmit={add} className="bg-navy-800/50 border border-navy-700 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Evidence title..." required
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500/50" />
             <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
@@ -144,7 +144,7 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
           <p className="text-sm text-slate-500">No evidence recorded yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {items.map(item => (
             <div key={item.id} className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
               <div className="flex items-start justify-between gap-2 mb-2">

@@ -92,13 +92,13 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
 
       {showForm && (
         <form onSubmit={add} className="bg-navy-800/50 border border-navy-700 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Hearing title..." required
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500/50" />
             <input type="datetime-local" value={form.scheduled_at} onChange={e => setForm(p => ({ ...p, scheduled_at: e.target.value }))} required
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500/50" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} placeholder="Location / Virtual link"
               className="bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
             <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}

@@ -209,6 +209,40 @@ function escapeAttr(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function applyDocumentFormatting(html: string): string {
+  const lines = html.split("\n");
+  const processed: string[] = [];
+  for (const line of lines) {
+    if (/^# /.test(line)) {
+      processed.push(`<h1 style="font-size:1.2em;font-weight:700;color:#0f172a;margin:1.6em 0 0.5em;padding-bottom:0.3em;border-bottom:1px solid #e2e8f0;line-height:1.3">${line.slice(2)}</h1>`);
+    } else if (/^## /.test(line)) {
+      processed.push(`<h2 style="font-size:1.05em;font-weight:700;color:#1e293b;margin:1.3em 0 0.4em;line-height:1.3">${line.slice(3)}</h2>`);
+    } else if (/^### /.test(line)) {
+      processed.push(`<h3 style="font-size:0.85em;font-weight:600;color:#334155;margin:1em 0 0.35em;text-transform:uppercase;letter-spacing:0.05em">${line.slice(4)}</h3>`);
+    } else {
+      processed.push(line.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>"));
+    }
+  }
+
+  let result = "";
+  let inPara = false;
+  for (const line of processed) {
+    const isBlock = /^<h[123]/.test(line);
+    if (isBlock) {
+      if (inPara) { result += "</p>"; inPara = false; }
+      result += line;
+    } else if (line.trim() === "") {
+      if (inPara) { result += "</p>"; inPara = false; }
+    } else {
+      if (!inPara) { result += `<p style="margin:0 0 0.65em;line-height:1.75;color:#334155">`; inPara = true; }
+      else result += "<br>";
+      result += line;
+    }
+  }
+  if (inPara) result += "</p>";
+  return result;
+}
+
 function highlightText(text: string, clauses: ContractClauseAnalysis[], highlighted: string | null): string {
   let result = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   for (const clause of clauses) {
@@ -230,7 +264,7 @@ function highlightText(text: string, clauses: ContractClauseAnalysis[], highligh
       );
     } catch { /* bad regex — skip */ }
   }
-  return result;
+  return applyDocumentFormatting(result);
 }
 
 function ClauseCard({
@@ -725,10 +759,10 @@ export default function ContractReview() {
 
   const riskBands = analysis
     ? {
-        critical: analysis.clauses.filter((c) => c.risk_level === "critical").length,
-        high: analysis.clauses.filter((c) => c.risk_level === "high").length,
-        medium: analysis.clauses.filter((c) => c.risk_level === "medium").length,
-        low: analysis.clauses.filter((c) => c.risk_level === "low").length,
+        critical: analysis.clauses?.filter((c) => c.risk_level === "critical").length ?? 0,
+        high: analysis.clauses?.filter((c) => c.risk_level === "high").length ?? 0,
+        medium: analysis.clauses?.filter((c) => c.risk_level === "medium").length ?? 0,
+        low: analysis.clauses?.filter((c) => c.risk_level === "low").length ?? 0,
       }
     : null;
 
@@ -737,10 +771,10 @@ export default function ContractReview() {
   const TABS: { id: AnalysisTab; label: string }[] = analysis
     ? [
         { id: "overview", label: "Overview" },
-        { id: "clauses", label: `Clauses (${analysis.clauses.length})` },
+        { id: "clauses", label: `Clauses (${analysis.clauses?.length ?? 0})` },
         { id: "obligations", label: "Obligations" },
         { id: "risks", label: `Risks (${riskClauses.length})` },
-        { id: "missing", label: `Missing (${analysis.missing_clauses.length})` },
+        { id: "missing", label: `Missing (${analysis.missing_clauses?.length ?? 0})` },
         { id: "redlines", label: "Redlines" },
         { id: "arbitration", label: "Arbitration" },
         { id: "ai_insights", label: "AI Insights" },
@@ -926,7 +960,8 @@ export default function ContractReview() {
                       onChange={(e) => setContractText(e.target.value)}
                       rows={10}
                       placeholder="Paste the full document text here..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none font-mono leading-relaxed"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none leading-relaxed"
+                      style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
                     />
                   ) : (
                     <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-6 md:p-10 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
@@ -991,18 +1026,21 @@ export default function ContractReview() {
                   {fileName || "Document Text"}
                 </span>
                 {analysis && (
-                  <span className="text-xs text-slate-400 shrink-0">— {analysis.clauses.length} provisions highlighted</span>
+                  <span className="text-xs text-slate-400 shrink-0">— {analysis.clauses?.length ?? 0} provisions highlighted</span>
                 )}
               </div>
             </div>
-            <div className="p-6" id="contract-text-viewer">
+            <div className="p-6 md:p-10 bg-slate-100 min-h-full" id="contract-text-viewer">
               {analysis && (
-                <div
-                  className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-mono"
-                  dangerouslySetInnerHTML={{
-                    __html: highlightText(analysis.contract_text, analysis.clauses, highlightedClause),
-                  }}
-                />
+                <div className="max-w-[680px] mx-auto bg-white shadow-sm rounded-lg px-10 py-12 border border-slate-200">
+                  <div
+                    className="text-sm text-slate-700"
+                    style={{ fontFamily: "'Georgia', 'Times New Roman', serif", lineHeight: 1.75 }}
+                    dangerouslySetInnerHTML={{
+                      __html: highlightText(analysis.contract_text, analysis.clauses ?? [], highlightedClause),
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -1176,7 +1214,7 @@ export default function ContractReview() {
               {/* ── CLAUSES ── */}
               {activeTab === "clauses" && (
                 <div className="space-y-3">
-                  {analysis.clauses.map((clause, i) => (
+                  {analysis.clauses?.map((clause, i) => (
                     <ClauseCard
                       key={i}
                       clause={clause}
@@ -1194,8 +1232,8 @@ export default function ContractReview() {
               {activeTab === "obligations" && (
                 <div className="space-y-4">
                   {[
-                    { label: partyA, items: analysis.obligations.party_a },
-                    { label: partyB, items: analysis.obligations.party_b },
+                    { label: partyA, items: analysis.obligations?.party_a ?? [] },
+                    { label: partyB, items: analysis.obligations?.party_b ?? [] },
                   ].map(({ label, items }) => (
                     <div key={label} className="bg-white rounded-xl border border-slate-200 p-4">
                       <p className="text-xs font-bold text-navy-950 mb-3">{label} — Obligations</p>
@@ -1262,7 +1300,7 @@ export default function ContractReview() {
               {/* ── MISSING CLAUSES ── */}
               {activeTab === "missing" && (
                 <div className="space-y-3">
-                  {analysis.missing_clauses.map((clause, i) => (
+                  {analysis.missing_clauses?.map((clause, i) => (
                     <div key={i} className="bg-white rounded-xl border border-slate-200 p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <p className="text-sm font-semibold text-navy-950">{clause.clause_type}</p>
@@ -1315,11 +1353,11 @@ export default function ContractReview() {
               {activeTab === "redlines" && (
                 <div className="space-y-3">
                   {/* Per-clause redlines */}
-                  {analysis.clauses.filter((c) => c.redline_suggestion).length > 0 && (
+                  {analysis.clauses?.filter((c) => c.redline_suggestion).length > 0 && (
                     <div className="bg-white rounded-xl border border-slate-200 p-4">
                       <p className="text-xs font-bold text-navy-950 mb-3">Suggested Redlines</p>
                       <div className="space-y-4">
-                        {analysis.clauses.filter((c) => c.redline_suggestion).map((clause, i) => (
+                        {analysis.clauses?.filter((c) => c.redline_suggestion).map((clause, i) => (
                           <div key={i}>
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-xs font-semibold text-slate-600">{clause.clause_name}</p>

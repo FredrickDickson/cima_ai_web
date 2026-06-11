@@ -175,6 +175,7 @@ DRAFTING INSTRUCTIONS:
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      onClose();
       navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");

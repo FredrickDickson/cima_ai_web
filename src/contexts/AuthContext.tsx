@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fallbackName = email.split("@")[0].replace(/[._-]/g, " ") || "User";
       const { data: created } = await supabase
         .from("profiles")
-        .upsert({ id: userId, full_name: fallbackName, role: "lawyer" })
+        .upsert({ id: userId, full_name: fallbackName, role: "lawyer", organization: "", jurisdiction: "" } as any)
         .select()
         .maybeSingle();
       if (created) setProfile(created);
@@ -69,9 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) setLoading(false);
     });
 
+    // onAuthStateChange handles future state changes only (sign-in, sign-out, token refresh).
+    // INITIAL_SESSION is skipped — getSession() above already handles the initial load.
+    // setLoading is never called here: if INITIAL_SESSION fires with null before getSession()
+    // resolves it would set user=null and loading=false, causing a spurious redirect to /login.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
+        if (event === 'INITIAL_SESSION') return;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -79,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
         }
-        setLoading(false);
       }
     );
 
@@ -100,14 +104,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName: string,
     role: string
   ) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: { full_name: fullName }
+      }
+    });
     if (error) return { error: error.message };
     if (data.user) {
-      const { error: profileErr } = await supabase.from("profiles").insert({
+      const { error: profileErr } = await supabase.from("profiles").upsert({
         id: data.user.id,
         full_name: fullName,
         role,
-      });
+        organization: "",
+        jurisdiction: "",
+      } as any);
       if (profileErr) {
         return { error: `Account created but profile setup failed: ${profileErr.message}` };
       }

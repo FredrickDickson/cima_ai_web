@@ -310,7 +310,7 @@ Output ONLY the ITEM lines — no explanation, no headers, no other text.`;
           const due = new Date(d.due_date);
           const overdue = due < today && d.status !== "completed";
           return (
-            <div key={d.id} className={`flex items-center gap-4 p-4 rounded-xl border ${d.status === "completed" ? "border-navy-800 opacity-60" : overdue ? "border-red-500/30 bg-red-500/5" : "border-navy-700 bg-navy-800/30"}`}>
+            <div key={d.id} className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border ${d.status === "completed" ? "border-navy-800 opacity-60" : overdue ? "border-red-500/30 bg-red-500/5" : "border-navy-700 bg-navy-800/30"}`}>
               <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${overdue ? "bg-red-500/15" : "bg-navy-700"}`}>
                 <span className={`text-xs font-bold ${overdue ? "text-red-400" : "text-gold-400"}`}>{due.toLocaleDateString("en", { month: "short" }).toUpperCase()}</span>
                 <span className={`text-lg font-bold leading-none ${overdue ? "text-red-400" : "text-white"}`}>{due.getDate()}</span>

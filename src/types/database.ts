@@ -182,6 +182,7 @@ export interface AIMessage {
 export interface ResearchSession {
   id: string;
   user_id: string;
+  case_id: string | null;
   query: string;
   jurisdiction: string;
   results: any;
