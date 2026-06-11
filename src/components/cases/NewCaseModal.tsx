@@ -64,8 +64,8 @@ export default function NewCaseModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-navy-900 border border-navy-700 rounded-2xl w-full max-w-lg shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-navy-900 border border-navy-700 rounded-2xl w-full max-w-lg shadow-2xl my-4 sm:my-0">
         <div className="flex items-center justify-between px-6 py-4 border-b border-navy-800">
           <h2 className="text-white font-semibold">New Matter</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={18} /></button>

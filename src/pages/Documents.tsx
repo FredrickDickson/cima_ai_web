@@ -783,7 +783,7 @@ Provide a structured comparison covering:
         )}
 
         {/* ── Filter Sidebar — hidden on mobile, drawer on mobile ────────────────────────────── */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-52 md:z-auto md:translate-x-0 md:flex ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-52 md:max-w-none md:z-auto md:translate-x-0 md:flex ${
           mobileFilterOpen ? "translate-x-0 flex" : "-translate-x-full md:flex hidden"
         }`}>
           <div className="p-3 border-b border-slate-100 flex items-center justify-between">

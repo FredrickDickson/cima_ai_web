@@ -152,7 +152,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           {/* Recent Cases */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">

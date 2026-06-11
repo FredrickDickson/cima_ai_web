@@ -924,12 +924,12 @@ export default function ContractReview() {
                     <textarea
                       value={contractText}
                       onChange={(e) => setContractText(e.target.value)}
-                      rows={14}
+                      rows={10}
                       placeholder="Paste the full document text here..."
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none font-mono leading-relaxed"
                     />
                   ) : (
-                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-10 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-6 md:p-10 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
                       <Upload size={28} className="text-slate-300 mb-3" />
                       <p className="text-sm font-medium text-slate-500">Click to upload a document</p>
                       <p className="text-xs text-slate-400 mt-1">PDF, DOCX, and TXT supported</p>
@@ -1010,7 +1010,7 @@ export default function ContractReview() {
 
         {/* ── RIGHT ANALYSIS PANEL ── (only in analysis mode) */}
         {mode === "analysis" && analysis && (
-          <div className={`w-full md:w-[480px] shrink-0 flex flex-col overflow-hidden bg-slate-50 ${mobileView === "document" ? "hidden md:flex" : "flex"}`} id="contract-analysis-report">
+          <div className={`w-full md:w-[360px] lg:w-[480px] shrink-0 flex flex-col overflow-hidden bg-slate-50 ${mobileView === "document" ? "hidden md:flex" : "flex"}`} id="contract-analysis-report">
             {/* Mobile View Toggle */}
             <div className="md:hidden flex p-2 bg-white border-b border-slate-200 shrink-0">
               <button

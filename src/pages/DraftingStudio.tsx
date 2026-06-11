@@ -950,7 +950,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
         {/* ================================================================ */}
         {/* LEFT PANEL                                                       */}
         {/* ================================================================ */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-64 lg:z-auto lg:translate-x-0 lg:flex ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-64 lg:max-w-none lg:z-auto lg:translate-x-0 lg:flex ${
           mobileLeftOpen ? "translate-x-0 flex" : "-translate-x-full lg:flex hidden"
         }`}>
           <div className="flex items-center justify-between border-b border-slate-100">
@@ -1328,7 +1328,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                   {/* ============================================================ */}
                   {/* RIGHT PANEL — AI Assistant / Review / Research               */}
                   {/* ============================================================ */}
-                  <div className={`fixed inset-y-0 right-0 z-50 w-80 bg-white border-l border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-72 lg:z-auto lg:translate-x-0 lg:flex ${
+                  <div className={`fixed inset-y-0 right-0 z-50 w-full sm:w-80 bg-white border-l border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-72 lg:z-auto lg:translate-x-0 lg:flex ${
                     mobileRightOpen ? "translate-x-0 flex" : "translate-x-full lg:flex hidden"
                   }`}>
                     {/* Right panel tabs */}

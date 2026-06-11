@@ -380,7 +380,7 @@ export default function AIAssistant() {
         )}
         
         {/* ── Sidebar — hidden on mobile, drawer on mobile ── */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-navy-800 bg-navy-900 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-64 md:z-auto md:translate-x-0 md:flex ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-full sm:w-72 border-r border-navy-800 bg-navy-900 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-64 md:z-auto md:translate-x-0 md:flex ${
           mobileSidebarOpen ? "translate-x-0 flex" : "-translate-x-full md:flex hidden"
         }`}>
           <div className="flex items-center justify-between px-4 py-4 border-b border-navy-800">
