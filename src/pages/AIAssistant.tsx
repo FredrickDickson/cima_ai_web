@@ -496,7 +496,7 @@ export default function AIAssistant() {
                   <Scale size={22} className="text-gold-400" />
                 </div>
                 <h2 className="text-lg font-bold text-white mb-2">CIMA Legal AI</h2>
-                <p className="text-sm text-slate-500 leading-relaxed mb-2">{contextInfo?.desc ?? "Powered by DeepSeek with legal domain expertise."}</p>
+                <p className="text-sm text-slate-500 leading-relaxed mb-2">{contextInfo?.desc ?? "Powered by CIMA AI with legal domain expertise."}</p>
                 <p className="text-xs text-slate-600 mb-6">Ask about arbitration, contracts, case law, drafting, and more.</p>
                 <div className="grid gap-2 w-full">
                   {starters.map(p => (

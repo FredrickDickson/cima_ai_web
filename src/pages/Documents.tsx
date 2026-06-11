@@ -1362,7 +1362,7 @@ Provide a structured comparison covering:
                         <div className="flex items-center gap-1.5 p-2 bg-navy-50 rounded-lg border border-navy-100">
                           <Bot size={13} className="text-navy-600 shrink-0" />
                           <span className="text-[11px] font-medium text-navy-700">
-                            AI Summary — DeepSeek
+                            AI Summary — CIMA AI
                           </span>
                         </div>
                         <div className="prose-doc text-xs leading-relaxed">

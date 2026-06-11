@@ -139,7 +139,7 @@ ${excerpt}`,
       }),
     });
 
-    if (!res.ok) throw new Error(`DeepSeek error: ${res.status}`);
+    if (!res.ok) throw new Error(`AI service error: ${res.status}`);
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content ?? "{}";
 

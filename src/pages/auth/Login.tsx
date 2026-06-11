@@ -48,7 +48,7 @@ export default function Login() {
               "Legal research in seconds, not hours",
               "AI-powered contract review and risk analysis",
               "Integrated arbitration case management",
-              "DeepSeek AI with legal domain expertise",
+              "CIMA AI with legal domain expertise",
             ].map((item) => (
               <div key={item} className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-gold-400 shrink-0" />

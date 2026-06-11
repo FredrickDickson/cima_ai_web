@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     if (!DEEPSEEK_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "DeepSeek API key not configured" }),
+        JSON.stringify({ error: "AI service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -76,7 +76,7 @@ Deno.serve(async (req: Request) => {
     if (!response.ok) {
       const errorText = await response.text();
       return new Response(
-        JSON.stringify({ error: `DeepSeek API error: ${errorText}` }),
+        JSON.stringify({ error: `AI service error: ${errorText}` }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

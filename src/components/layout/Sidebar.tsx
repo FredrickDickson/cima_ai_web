@@ -101,7 +101,7 @@ export default function Sidebar() {
       <div className="mx-3 mb-3 px-3 py-2.5 rounded-lg bg-navy-800/60 border border-navy-700 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs text-slate-400">DeepSeek Online</span>
+          <span className="text-xs text-slate-400">CIMA AI Online</span>
         </div>
         <div className="flex items-center gap-1.5 mt-1">
           <Gavel size={11} className="text-gold-500/60" />

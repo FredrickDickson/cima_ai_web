@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
       : `${templateTitle} ${jurisdiction ?? "Ghana"} law`;
     const lawsContext = await fetchLawsAfricaContext(searchQuery, lawsAfricaKey, jurisdiction);
 
-    // ---- Build the DeepSeek prompt based on input path ----
+    // ---- Build the AI prompt based on input path ----
     let aiPrompt: string;
 
     if (template_id && templateContent) {
@@ -253,7 +253,7 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
       }),
     });
 
-    if (!res.ok) throw new Error(`DeepSeek error: ${res.status}`);
+    if (!res.ok) throw new Error(`AI service error: ${res.status}`);
     const data = await res.json();
     const fullContent = data.choices?.[0]?.message?.content ?? "";
 

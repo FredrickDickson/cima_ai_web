@@ -251,7 +251,7 @@ export default function Dashboard() {
             <div className="bg-navy-950 rounded-xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-400">DeepSeek AI Online</span>
+                <span className="text-xs font-medium text-emerald-400">CIMA AI Online</span>
               </div>
               <p className="text-sm font-semibold text-white mb-1">Legal AI Ready</p>
               <p className="text-xs text-slate-400 mb-4">Legal domain expertise active. Ask me anything about your cases, contracts, or legal research.</p>
