@@ -109,6 +109,7 @@ interface SearchItem {
   frbr_uri?: string;
   url?: string;
   title?: string;
+  source_title?: string;
   document?: { title?: string };
   citation?: string;
   snippet?: string;
@@ -143,19 +144,34 @@ async function queryAIApi(
   countryCode: string,
   apiKey: string,
 ): Promise<LawsAfricaSource[]> {
-  const url =
-    `https://api.laws.africa/ai/v1/knowledge-bases/${countryCode}/search/?q=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { headers: { Authorization: `Token ${apiKey}` } });
-  if (!res.ok) return [];
+  const kbCode = `${countryCode}-legislation`;
+  const url = `https://api.laws.africa/ai/v1/knowledge-bases/${kbCode}/retrieve`;
+  
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ query, limit: 3 })
+  });
+
+  if (!res.ok) {
+    console.error("Laws.Africa AI retrieve failed:", res.status, await res.text());
+    return [];
+  }
   const data = await res.json();
+  console.log(`Laws.Africa AI response for ${kbCode}:`, JSON.stringify(data).slice(0, 500));
+  
   const results: SearchItem[] = Array.isArray(data.results)
     ? data.results
     : Array.isArray(data)
     ? data
     : [];
-  return results.slice(0, 3).map((item, i) => ({
+    
+  return results.map((item, i) => ({
     id: `laws-africa-ai-${item.frbr_uri ?? item.url ?? i}`,
-    source_name: item.title ?? item.document?.title ?? "Laws.Africa AI",
+    source_name: item.source_title ?? item.title ?? item.document?.title ?? "Laws.Africa AI",
     citation: item.citation ?? "",
     source_type: "statute" as const,
     jurisdiction: countryCode,

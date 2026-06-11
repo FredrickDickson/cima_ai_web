@@ -40,6 +40,7 @@ import {
   ExternalLink,
   Database,
   ArrowDown,
+  Menu,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -286,6 +287,10 @@ export default function DraftingStudio() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const nlInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Mobile UI state
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
 
   const versions = useVersionHistory();
 
@@ -363,7 +368,7 @@ export default function DraftingStudio() {
       throw new Error(errBody.error || "AI request failed");
     }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? "";
+    return data.content ?? "";
   }
 
   // ---------------------------------------------------------------------------
@@ -923,18 +928,47 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
         hasSelection={hasSelection}
       />
 
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex-1 overflow-hidden flex relative">
+        {/* Mobile left panel overlay */}
+        {mobileLeftOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setMobileLeftOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        
+        {/* Mobile right panel overlay */}
+        {mobileRightOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setMobileRightOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* ================================================================ */}
         {/* LEFT PANEL                                                       */}
         {/* ================================================================ */}
-        <div className="hidden lg:flex w-64 border-r border-slate-200 bg-white flex-col shrink-0">
-          <div className="flex border-b border-slate-100">
-            {(["templates", "drafts"] as const).map((tab) => (
-              <button key={tab} onClick={() => setLeftTab(tab)}
-                className={`flex-1 py-3 text-xs font-semibold capitalize transition-colors ${leftTab === tab ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
-                {tab === "templates" ? "Templates" : "My Drafts"}
-              </button>
-            ))}
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-64 lg:z-auto lg:translate-x-0 lg:flex ${
+          mobileLeftOpen ? "translate-x-0 flex" : "-translate-x-full lg:flex hidden"
+        }`}>
+          <div className="flex items-center justify-between border-b border-slate-100">
+            <div className="flex">
+              {(["templates", "drafts"] as const).map((tab) => (
+                <button key={tab} onClick={() => setLeftTab(tab)}
+                  className={`px-4 py-3 text-xs font-semibold capitalize transition-colors ${leftTab === tab ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
+                  {tab === "templates" ? "Templates" : "My Drafts"}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setMobileLeftOpen(false)}
+              className="lg:hidden p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+              aria-label="Close panel"
+            >
+              <X size={18} />
+            </button>
           </div>
 
           {leftTab === "templates" && (
@@ -996,11 +1030,34 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
         {/* CENTER — WORKSPACE                                               */}
         {/* ================================================================ */}
         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+          
+          {/* Mobile toolbar */}
+          <div className="lg:hidden flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200">
+            <button
+              onClick={() => setMobileLeftOpen(true)}
+              className="p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+              aria-label="Open templates"
+            >
+              <Menu size={18} />
+            </button>
+            <span className="text-xs font-semibold text-navy-900 truncate max-w-[150px]">
+              {mode === "prompt" ? "Drafting Studio" : mode === "template" ? selectedTemplate?.title : draftTitle}
+            </span>
+            {mode === "output" && (
+              <button
+                onClick={() => setMobileRightOpen(true)}
+                className="p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label="Open AI tools"
+              >
+                <Wand2 size={18} />
+              </button>
+            )}
+          </div>
 
           {/* PROMPT MODE */}
           {mode === "prompt" && (
             <div className="flex-1 overflow-y-auto">
-              <div className="flex flex-col items-center justify-center min-h-full p-8">
+              <div className="flex flex-col items-center justify-center min-h-full p-4 md:p-8">
                 <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm mb-6">
                   <Scale size={28} className="text-navy-600" />
                 </div>
@@ -1271,20 +1328,31 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                   {/* ============================================================ */}
                   {/* RIGHT PANEL — AI Assistant / Review / Research               */}
                   {/* ============================================================ */}
-                  <div className="hidden lg:flex w-72 border-l border-slate-200 bg-white flex-col shrink-0">
+                  <div className={`fixed inset-y-0 right-0 z-50 w-80 bg-white border-l border-slate-200 flex-col overflow-y-auto transition-transform duration-300 lg:static lg:w-72 lg:z-auto lg:translate-x-0 lg:flex ${
+                    mobileRightOpen ? "translate-x-0 flex" : "translate-x-full lg:flex hidden"
+                  }`}>
                     {/* Right panel tabs */}
-                    <div className="flex border-b border-slate-100">
-                      {([
-                        { id: "assistant" as const, icon: Wand2, label: "AI" },
-                        { id: "review" as const, icon: ShieldCheck, label: "Review" },
-                        { id: "research" as const, icon: Search, label: "Research" },
-                        { id: "clauses" as const, icon: BookMarked, label: "Clauses" },
-                      ]).map((tab) => (
-                        <button key={tab.id} onClick={() => setRightTab(tab.id)}
-                          className={`flex-1 flex items-center justify-center gap-1 py-3 text-xs font-semibold transition-colors ${rightTab === tab.id ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
-                          <tab.icon size={12} />{tab.label}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between border-b border-slate-100">
+                      <div className="flex">
+                        {([
+                          { id: "assistant" as const, icon: Wand2, label: "AI" },
+                          { id: "review" as const, icon: ShieldCheck, label: "Review" },
+                          { id: "research" as const, icon: Search, label: "Research" },
+                          { id: "clauses" as const, icon: BookMarked, label: "Clauses" },
+                        ]).map((tab) => (
+                          <button key={tab.id} onClick={() => setRightTab(tab.id)}
+                            className={`px-3 py-3 text-xs font-semibold transition-colors ${rightTab === tab.id ? "text-navy-900 border-b-2 border-navy-900" : "text-slate-400 hover:text-slate-600"}`}>
+                            <tab.icon size={12} />{tab.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setMobileRightOpen(false)}
+                        className="lg:hidden p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+                        aria-label="Close panel"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
 
                     {/* ---- ASSISTANT TAB ---- */}

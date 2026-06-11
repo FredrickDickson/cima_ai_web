@@ -12,6 +12,7 @@ import {
   ExternalLink,
   File,
   FileText,
+  Filter,
   GitCompare,
   Loader2,
   Plus,
@@ -160,6 +161,7 @@ export default function Documents() {
   const [activeSection, setActiveSection] = useState<Section>("all");
   const [filterCaseId, setFilterCaseId] = useState<string | null>(null);
   const [caseFilterExpanded, setCaseFilterExpanded] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // ── Search ────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -771,14 +773,32 @@ Provide a structured comparison covering:
 
       <div className="flex-1 overflow-hidden flex relative">
 
-        {/* ── Filter Sidebar — hidden on mobile ────────────────────────────── */}
-        <div className="hidden md:flex w-52 shrink-0 border-r border-slate-200 bg-white flex-col overflow-y-auto">
-          <div className="p-3 border-b border-slate-100">
+        {/* Mobile filter overlay backdrop */}
+        {mobileFilterOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileFilterOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* ── Filter Sidebar — hidden on mobile, drawer on mobile ────────────────────────────── */}
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-52 md:z-auto md:translate-x-0 md:flex ${
+          mobileFilterOpen ? "translate-x-0 flex" : "-translate-x-full md:flex hidden"
+        }`}>
+          <div className="p-3 border-b border-slate-100 flex items-center justify-between">
             <button
               onClick={() => setShowUpload(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 bg-navy-950 hover:bg-navy-800 text-white text-xs font-semibold rounded-lg transition-colors"
+              className="flex items-center justify-center gap-1.5 py-2 px-3 bg-navy-950 hover:bg-navy-800 text-white text-xs font-semibold rounded-lg transition-colors"
             >
               <Plus size={13} /> New Document
+            </button>
+            <button
+              onClick={() => setMobileFilterOpen(false)}
+              className="md:hidden p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+              aria-label="Close filters"
+            >
+              <X size={18} />
             </button>
           </div>
 
@@ -789,7 +809,7 @@ Provide a structured comparison covering:
 
             {/* All Documents */}
             <button
-              onClick={() => { setActiveSection("all"); setFilterCaseId(null); }}
+              onClick={() => { setActiveSection("all"); setFilterCaseId(null); setMobileFilterOpen(false); }}
               className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors ${
                 activeSection === "all"
                   ? "bg-navy-50 text-navy-900 font-semibold border-l-2 border-navy-600"
@@ -806,7 +826,7 @@ Provide a structured comparison covering:
 
             {/* Recent */}
             <button
-              onClick={() => { setActiveSection("recent"); setFilterCaseId(null); }}
+              onClick={() => { setActiveSection("recent"); setFilterCaseId(null); setMobileFilterOpen(false); }}
               className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors ${
                 activeSection === "recent"
                   ? "bg-navy-50 text-navy-900 font-semibold border-l-2 border-navy-600"
@@ -851,6 +871,7 @@ Provide a structured comparison covering:
                       onClick={() => {
                         setActiveSection("case_linked");
                         setFilterCaseId(c.id);
+                        setMobileFilterOpen(false);
                       }}
                       className={`w-full text-left px-2 py-1 rounded text-[11px] truncate transition-colors ${
                         filterCaseId === c.id
@@ -872,7 +893,7 @@ Provide a structured comparison covering:
             {SMART_COLLECTIONS.map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => { setActiveSection(key); setFilterCaseId(null); }}
+                onClick={() => { setActiveSection(key); setFilterCaseId(null); setMobileFilterOpen(false); }}
                 className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors ${
                   activeSection === key
                     ? "bg-navy-50 text-navy-900 font-semibold border-l-2 border-navy-600"
@@ -901,6 +922,14 @@ Provide a structured comparison covering:
         >
           {/* Search bar */}
           <div className="flex items-center gap-2 p-3 border-b border-slate-100">
+            {/* Mobile filter toggle */}
+            <button
+              onClick={() => setMobileFilterOpen(true)}
+              className="md:hidden p-2 text-slate-500 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+              aria-label="Open filters"
+            >
+              <Filter size={18} />
+            </button>
             <div className="flex-1 relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               {semanticLoading && (

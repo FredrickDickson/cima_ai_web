@@ -14,6 +14,20 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
 
+// Rendered inside AppLayout's SidebarProvider so useSidebar() works correctly
+function AppMenuButton() {
+  const { toggle } = useSidebar();
+  return (
+    <button
+      onClick={toggle}
+      className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-md transition-colors shrink-0"
+      aria-label="Open App Menu"
+    >
+      <Menu size={20} />
+    </button>
+  );
+}
+
 type AIConversation = {
   id: string;
   user_id: string;
@@ -114,7 +128,6 @@ function formatDate(d: string) {
 
 export default function AIAssistant() {
   const { user } = useAuth();
-  const { toggle } = useSidebar();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConv, setActiveConv] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -135,6 +148,7 @@ export default function AIAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     loadConversations();
@@ -355,17 +369,37 @@ export default function AIAssistant() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-hidden flex h-full bg-navy-950">
-        {/* ── Sidebar — hidden on mobile ── */}
-        <div className="hidden md:flex w-64 border-r border-navy-800 bg-navy-900 flex-col shrink-0">
+      <div className="flex-1 overflow-hidden flex h-full bg-navy-950 relative">
+        {/* Mobile sidebar overlay */}
+        {mobileSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        
+        {/* ── Sidebar — hidden on mobile, drawer on mobile ── */}
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-navy-800 bg-navy-900 flex-col overflow-y-auto transition-transform duration-300 md:static md:w-64 md:z-auto md:translate-x-0 md:flex ${
+          mobileSidebarOpen ? "translate-x-0 flex" : "-translate-x-full md:flex hidden"
+        }`}>
           <div className="flex items-center justify-between px-4 py-4 border-b border-navy-800">
             <div className="flex items-center gap-2">
               <Bot size={15} className="text-gold-400" />
               <span className="text-sm font-semibold text-white">AI Assistant</span>
             </div>
-            <button onClick={startNewConversation} className="p-1.5 text-slate-400 hover:text-white hover:bg-navy-800 rounded-lg transition-colors" title="New conversation">
-              <Plus size={15} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={startNewConversation} className="p-1.5 text-slate-400 hover:text-white hover:bg-navy-800 rounded-lg transition-colors" title="New conversation">
+                <Plus size={15} />
+              </button>
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="md:hidden p-1.5 text-slate-400 hover:text-white hover:bg-navy-800 rounded-lg transition-colors"
+                aria-label="Close sidebar"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
 
           {/* Context selector */}
@@ -414,17 +448,20 @@ export default function AIAssistant() {
         </div>
 
         {/* ── Chat Area ── */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-navy-800 bg-navy-900/60">
+          <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-navy-800 bg-navy-900/60 relative z-20">
+            <AppMenuButton />
+            
             <button
-              onClick={toggle}
+              onClick={() => setMobileSidebarOpen(true)}
               className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-md transition-colors shrink-0"
-              aria-label="Open navigation"
+              aria-label="Open Chat History"
             >
-              <Menu size={20} />
+              <MessageSquare size={20} />
             </button>
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gold-500/10 shrink-0">
+
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gold-500/10 shrink-0 ml-1">
               {contextInfo ? <contextInfo.icon size={15} className="text-gold-400" /> : <Bot size={15} className="text-gold-400" />}
             </div>
             <div className="flex-1 min-w-0">
