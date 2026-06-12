@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaContext, COUNTRY_MAP } from "../_shared/laws-africa.ts";
+import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,9 +59,16 @@ Deno.serve(async (req: Request) => {
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
-        messages: [{
+        messages: [
+          {
+            role: "system",
+            content: CIMA_SYSTEM_PROMPT +
+              `\n\nDETECTED JURISDICTION: ${jurisdiction ?? "Ghana"}` +
+              `\n\n===CRITICAL OVERRIDE — THIS TASK ONLY===\nThe RESPONSE FORMAT section above does NOT apply here. Do not follow the 7-step response format. Your entire response must be a single valid JSON object and nothing else. No prose, no markdown, no code fences, no text before or after the JSON. Failure to return pure JSON will break the application.`,
+          },
+          {
           role: "user",
-          content: `You are a senior legal reviewer specialising in ${jurisdiction ?? "Ghanaian"} law. Conduct a comprehensive document review and return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+          content: `Conduct a comprehensive document review and return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
 
 {
   "overall_risk_score": number 0-100,
@@ -81,6 +89,9 @@ Deno.serve(async (req: Request) => {
     {
       "clause_name": "short descriptive name",
       "start_phrase": "first 8-10 words of the provision verbatim from the text",
+      "full_clause_text": "the complete text of the clause/provision as it appears in the document (include the entire provision from start to end)",
+      "char_start": "the exact character position (0-indexed) where this clause begins in the original document text",
+      "char_end": "the exact character position (0-indexed) where this clause ends in the original document text",
       "risk_level": "low|medium|high|critical",
       "defect_type": "ambiguity|unenforceable|jurisdictional|missing_obligation|liability|arbitration|risk",
       "analysis": "what this provision does, the defect or risk it creates, and why it matters legally",
@@ -133,7 +144,8 @@ Requirements:
 
 DOCUMENT TEXT:
 ${excerpt}`,
-        }],
+          }
+        ],
         temperature: 0.1,
         max_tokens: 8192,
       }),
@@ -145,8 +157,16 @@ ${excerpt}`,
 
     let analysis: Record<string, unknown> = {};
     try {
+      // Strip markdown fences first
       const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      analysis = JSON.parse(cleaned);
+      // Try direct parse, fall back to extracting the first {...} block
+      try {
+        analysis = JSON.parse(cleaned);
+      } catch {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) analysis = JSON.parse(match[0]);
+        else throw new Error("No JSON object found in response");
+      }
     } catch {
       analysis = {
         overall_risk_score: 50,
@@ -179,6 +199,11 @@ ${excerpt}`,
       contract_text: text.slice(0, 50000),
       arbitration_clause_valid: Boolean(analysis.arbitration_clause_valid),
       arbitration_clause_issues: String(analysis.arbitration_clause_issues ?? ""),
+      arbitration_seat: String(analysis.arbitration_seat ?? ""),
+      arbitration_institution: String(analysis.arbitration_institution ?? ""),
+      arbitration_improved: String(analysis.arbitration_improved ?? ""),
+      detected_parties: analysis.detected_parties ?? null,
+      detected_document_type: String(analysis.detected_document_type ?? ""),
       governing_law_found: Boolean(analysis.governing_law_found),
       governing_law: String(analysis.governing_law ?? ""),
     }).select().maybeSingle();

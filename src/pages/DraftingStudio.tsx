@@ -784,7 +784,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
       const selText = !sel.empty ? editor.state.doc.textBetween(sel.from, sel.to, " ") : "";
       const userContent = selText
         ? `${instruction}\n\nApply this instruction to the following selected text and return ONLY the revised text, with no preamble or explanation:\n\n${selText}`
-        : `${instruction}\n\nReturn ONLY the resulting legal text, with no preamble or explanation.`;
+        : `${instruction}\n\nCurrent document context (first 500 chars):\n${draftContent.slice(0, 500)}\n\nReturn ONLY the new text/clause to add to the document. Do NOT return the full document. Do NOT include any preamble or explanation. Just the text that should be inserted.`;
       const result = await callAiChat([{ role: "user", content: userContent }], "drafting");
 
       versions.push(draftContent, "Before AI command");

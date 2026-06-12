@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -151,9 +152,7 @@ Deno.serve(async (req: Request) => {
 
     if (template_id && templateContent) {
       // Path 1: Template-based drafting (existing)
-      aiPrompt = `You are an expert legal drafter specialising in ${jurisdiction ?? "Ghanaian"} law and international commercial arbitration.
-
-Complete and enhance the following legal document template to create a polished, professional, and legally sound document. Fill in any remaining placeholders and ensure all provisions are complete and enforceable.
+      aiPrompt = `Complete and enhance the following legal document template to create a polished, professional, and legally sound document. Fill in any remaining placeholders and ensure all provisions are complete and enforceable.
 
 Template (partially filled):
 ${templateContent}
@@ -183,9 +182,7 @@ A plain-language explanation of this document written for a non-lawyer. Explain:
       const docTypeMatch = prompt.match(/^draft\s+(?:a\s+|an\s+)?(.+?)\s+(?:for|between|regarding|concerning|in|under|about)/i);
       const requestedDocType = docTypeMatch ? docTypeMatch[1].trim() : prompt.slice(0, 60);
 
-      aiPrompt = `You are an expert legal drafter specialising in ${jurisdiction ?? "Ghanaian"} law and international commercial arbitration.
-
-The user has requested the following document:
+      aiPrompt = `The user has requested the following document:
 "${prompt}"
 
 CRITICAL INSTRUCTIONS — READ CAREFULLY:
@@ -219,9 +216,7 @@ A plain-language explanation of this document written for a non-lawyer. Explain:
 
     } else {
       // Path 3: Freeform (existing fallback)
-      aiPrompt = `You are an expert legal drafter specialising in ${jurisdiction ?? "Ghanaian"} law and international commercial arbitration.
-
-Draft a complete, professional ${templateTitle} for the following:
+      aiPrompt = `Draft a complete, professional ${templateTitle} for the following:
 
 ${variableList ? `Details:\n${variableList}\n` : ""}
 Jurisdiction: ${jurisdiction ?? "Ghana"}
@@ -247,7 +242,13 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
-        messages: [{ role: "user", content: aiPrompt }],
+        messages: [
+          {
+            role: "system",
+            content: CIMA_SYSTEM_PROMPT + `\n\nDETECTED JURISDICTION: ${jurisdiction ?? "Ghana"}`,
+          },
+          { role: "user", content: aiPrompt },
+        ],
         temperature: 0.2,
         max_tokens: 8192,
       }),

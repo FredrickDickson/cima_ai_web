@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/laws-africa.ts";
+import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -229,9 +230,7 @@ Deno.serve(async (req: Request) => {
     // Fix 2: Jurisdiction-aware synthesis prompt that explicitly instructs the AI
     // to discard off-jurisdiction sources and fall back to training knowledge if needed
     const synthesisPrompt = (legislationBlock || otherSourcesBlock)
-      ? `You are CIMA AI, an expert legal intelligence assistant specialised in African law, international commercial arbitration, and comparative law.
-
-JURISDICTION: ${jurisdictionLabel}
+      ? `JURISDICTION: ${jurisdictionLabel}
 QUERY: ${query}
 
 INSTRUCTIONS:
@@ -241,9 +240,7 @@ INSTRUCTIONS:
 - If no retrieved sources are relevant, still provide a comprehensive analysis based on your training knowledge of ${jurisdictionLabel} law, and clearly state you are drawing on general legal knowledge
 - Structure your response with clear headers
 - Cite legislation by [L1], [L2] etc. and other sources by [1], [2] etc. — only when actually relevant${legislationBlock}${otherSourcesBlock}`
-      : `You are CIMA AI, an expert legal intelligence assistant specialised in African law and international commercial arbitration.
-
-JURISDICTION: ${jurisdictionLabel}
+      : `JURISDICTION: ${jurisdictionLabel}
 QUERY: ${query}
 
 No external sources were retrieved for this query. Provide a comprehensive legal analysis based on your training knowledge of ${jurisdictionLabel} law. Clearly indicate that you are drawing on general legal knowledge. Structure your response with clear headers and cite any specific legislation or case law from your training where relevant.`;
@@ -253,7 +250,13 @@ No external sources were retrieved for this query. Provide a comprehensive legal
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
-        messages: [{ role: "user", content: synthesisPrompt }],
+        messages: [
+          {
+            role: "system",
+            content: CIMA_SYSTEM_PROMPT + `\n\nDETECTED JURISDICTION: ${jurisdictionLabel}`,
+          },
+          { role: "user", content: synthesisPrompt },
+        ],
         temperature: 0.1,
         max_tokens: 4096,
       }),

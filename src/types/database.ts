@@ -257,10 +257,18 @@ export interface ContractAnalysis {
   missing_clauses: any;
   obligations: any;
   recommendations: string[];
+  negotiation_points?: string[];
+  ai_insights?: string;
   ai_summary: string;
+  industry_type?: string;
   contract_text: string;
   arbitration_clause_valid: boolean;
   arbitration_clause_issues: string;
+  arbitration_seat?: string;
+  arbitration_institution?: string;
+  arbitration_improved?: string;
+  detected_parties?: { party_a_name: string; party_b_name: string };
+  detected_document_type?: string;
   governing_law_found: boolean;
   governing_law: string;
   created_at: string;
@@ -336,6 +344,9 @@ export interface Template {
 export interface ContractClauseAnalysis {
   clause_name: string;
   start_phrase: string;
+  full_clause_text?: string;
+  char_start?: number;
+  char_end?: number;
   risk_level: "critical" | "high" | "medium" | "low";
   defect_type?: "ambiguity" | "unenforceable" | "jurisdictional" | "missing_obligation" | "liability" | "arbitration" | "risk";
   analysis: string;

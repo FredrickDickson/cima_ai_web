@@ -34,5 +34,128 @@ INSERT INTO templates (category, title, template_type, jurisdiction, framework, 
     {"name": "confidentiality", "label": "Confidentiality", "type": "select", "required": false, "options": ["The proceedings shall be confidential.", "The proceedings shall not be confidential."], "default": "The proceedings shall be confidential."},
     {"name": "tor_date", "label": "Date of Terms of Reference", "type": "date", "required": true}
   ]'::jsonb,
-  E'TERMS OF REFERENCE\n\nCase Reference: {{case_reference}}\nDate: {{tor_date}}\n\n---\n\n1. PARTIES\n\n1.1 CLAIMANT\n{{claimant_name}}\n{{claimant_address}}\n{{claimant_counsel}}\n\n1.2 RESPONDENT\n{{respondent_name}}\n{{respondent_address}}\n{{respondent_counsel}}\n\n1.3 ARBITRAL TRIBUNAL\n{{arbitrator_name}}\n{{arbitrator_address}}\n\n---\n\n2. BACKGROUND AND UNDERLYING CONTRACT\n\n2.1 This arbitration arises out of a dispute concerning {{underlying_contract}} entered into on {{contract_date}} between the Claimant and the Respondent (the "Contract").\n\n2.2 {{dispute_summary}}\n\n---\n\n3. SUMMARY OF CLAIMS AND DEFENCES\n\n3.1 The Claimant claims and seeks the following relief:\n{{claimant_claims}}\n\n3.2 The Respondent's position and defences (including any counterclaims) are as follows:\n{{respondent_defence}}\n\n---\n\n4. ISSUES FOR DETERMINATION\n\nWithout prejudice to the right of any party to raise additional issues in the course of the proceedings, the following issues are submitted to the Arbitral Tribunal for determination:\n\n{{issues_for_determination}}\n\n---\n\n5. APPLICABLE LAW AND RULES\n\n5.1 The arbitration shall be conducted in accordance with: {{applicable_rules}}.\n\n5.2 The substantive law governing the dispute and the Contract shall be the {{governing_law}}.\n\n5.3 The seat of arbitration shall be {{seat_of_arbitration}}.\n\n5.4 The language of the arbitration shall be {{language}}.\n\n---\n\n6. PROCEDURAL TIMETABLE\n\n6.1 Memorial / Statement of Claim: {{mem_of_claim_deadline}}\n\n6.2 Memorial / Statement of Defence: {{mem_of_defence_deadline}}\n\n6.3 Hearing: {{hearing_date}}\n\n6.4 The Arbitral Tribunal reserves the right to issue further procedural orders as the arbitration progresses.\n\n---\n\n7. PLACE OF HEARINGS\n\nUnless otherwise agreed by the parties or directed by the Tribunal, hearings shall take place at {{place_of_hearings}}.\n\n---\n\n8. CONFIDENTIALITY\n\n{{confidentiality}} All documents, submissions, awards, and information disclosed in or for the purpose of these proceedings shall be treated as confidential by the parties, their representatives, witnesses, and the Tribunal.\n\n---\n\n9. POWERS OF THE TRIBUNAL\n\n9.1 The Tribunal shall have full powers to conduct the arbitration, including: (a) deciding procedural matters; (b) granting interim measures; (c) determining its own jurisdiction; (d) ordering disclosure of documents; and (e) awarding costs.\n\n9.2 The Tribunal may issue further procedural orders as necessary.\n\n---\n\n10. COSTS\n\nThe costs of the arbitration, including the Tribunal''s fees and expenses, shall be determined and allocated by the Tribunal in the final award.\n\n---\n\n11. SIGNATURES\n\nThe parties and the Arbitral Tribunal agree to these Terms of Reference.\n\nFor and on behalf of the CLAIMANT:\n\nSignature: _________________________\nName: _________________________\nDate: _________________________\n\nFor and on behalf of the RESPONDENT:\n\nSignature: _________________________\nName: _________________________\nDate: _________________________\n\nARBITRAL TRIBUNAL:\n\nSignature: _________________________\nName: {{arbitrator_name}}\nDate: _________________________'
+  $$
+TERMS OF REFERENCE
+
+Case Reference: {{case_reference}}
+Date: {{tor_date}}
+
+---
+
+1. PARTIES
+
+1.1 CLAIMANT
+{{claimant_name}}
+{{claimant_address}}
+{{claimant_counsel}}
+
+1.2 RESPONDENT
+{{respondent_name}}
+{{respondent_address}}
+{{respondent_counsel}}
+
+1.3 ARBITRAL TRIBUNAL
+{{arbitrator_name}}
+{{arbitrator_address}}
+
+---
+
+2. BACKGROUND AND UNDERLYING CONTRACT
+
+2.1 This arbitration arises out of a dispute concerning {{underlying_contract}} entered into on {{contract_date}} between the Claimant and the Respondent (the "Contract").
+
+2.2 {{dispute_summary}}
+
+---
+
+3. SUMMARY OF CLAIMS AND DEFENCES
+
+3.1 The Claimant claims and seeks the following relief:
+{{claimant_claims}}
+
+3.2 The Respondent's position and defences (including any counterclaims) are as follows:
+{{respondent_defence}}
+
+---
+
+4. ISSUES FOR DETERMINATION
+
+Without prejudice to the right of any party to raise additional issues in the course of the proceedings, the following issues are submitted to the Arbitral Tribunal for determination:
+
+{{issues_for_determination}}
+
+---
+
+5. APPLICABLE LAW AND RULES
+
+5.1 The arbitration shall be conducted in accordance with: {{applicable_rules}}.
+
+5.2 The substantive law governing the dispute and the Contract shall be the {{governing_law}}.
+
+5.3 The seat of arbitration shall be {{seat_of_arbitration}}.
+
+5.4 The language of the arbitration shall be {{language}}.
+
+---
+
+6. PROCEDURAL TIMETABLE
+
+6.1 Memorial / Statement of Claim: {{mem_of_claim_deadline}}
+
+6.2 Memorial / Statement of Defence: {{mem_of_defence_deadline}}
+
+6.3 Hearing: {{hearing_date}}
+
+6.4 The Arbitral Tribunal reserves the right to issue further procedural orders as the arbitration progresses.
+
+---
+
+7. PLACE OF HEARINGS
+
+Unless otherwise agreed by the parties or directed by the Tribunal, hearings shall take place at {{place_of_hearings}}.
+
+---
+
+8. CONFIDENTIALITY
+
+{{confidentiality}} All documents, submissions, awards, and information disclosed in or for the purpose of these proceedings shall be treated as confidential by the parties, their representatives, witnesses, and the Tribunal.
+
+---
+
+9. POWERS OF THE TRIBUNAL
+
+9.1 The Tribunal shall have full powers to conduct the arbitration, including: (a) deciding procedural matters; (b) granting interim measures; (c) determining its own jurisdiction; (d) ordering disclosure of documents; and (e) awarding costs.
+
+9.2 The Tribunal may issue further procedural orders as necessary.
+
+---
+
+10. COSTS
+
+The costs of the arbitration, including the Tribunal's fees and expenses, shall be determined and allocated by the Tribunal in the final award.
+
+---
+
+11. SIGNATURES
+
+The parties and the Arbitral Tribunal agree to these Terms of Reference.
+
+For and on behalf of the CLAIMANT:
+
+Signature: _________________________
+Name: _________________________
+Date: _________________________
+
+For and on behalf of the RESPONDENT:
+
+Signature: _________________________
+Name: _________________________
+Date: _________________________
+
+ARBITRAL TRIBUNAL:
+
+Signature: _________________________
+Name: {{arbitrator_name}}
+Date: ________________
+$$
 );

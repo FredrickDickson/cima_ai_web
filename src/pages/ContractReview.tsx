@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
@@ -35,6 +35,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
+import RichTextEditor from "../components/ui/RichTextEditor";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
@@ -209,6 +210,41 @@ function escapeAttr(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function htmlToPlainText(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    // Remove heading markers but keep the heading text and line break
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove bold/italic markers, keep content
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "$1")   // ***bold italic***
+    .replace(/\*\*([^*]+)\*\*/g, "$1")        // **bold**
+    .replace(/\*([^*\n]+)\*/g, "$1")          // *italic* (not across lines)
+    .replace(/__([^_]+)__/g, "$1")            // __bold__
+    .replace(/_([^_\n]+)_/g, "$1")            // _italic_ (not across lines)
+    // Remove inline code but keep content
+    .replace(/`([^`\n]+)`/g, "$1")
+    // Remove fenced code blocks but keep content
+    .replace(/^```[^\n]*\n([\s\S]*?)^```/gm, "$1")
+    // Remove blockquote markers but keep text and indentation
+    .replace(/^>\s?/gm, "  ")
+    // Remove horizontal rules entirely (leave blank line)
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    // Remove link syntax but keep link text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    // Remove image syntax
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    // Tables: keep the | separators and cell text, just clean up the separator rows (|---|---|)
+    .replace(/^\|[-:| ]+\|$/gm, "")
+    // Keep bullet/numbered list markers (they help readability in plain text)
+    // Keep all line breaks, spacing, indentation, and signature blocks as-is
+    .trim();
+}
+
 function applyDocumentFormatting(html: string): string {
   const lines = html.split("\n");
   const processed: string[] = [];
@@ -245,24 +281,35 @@ function applyDocumentFormatting(html: string): string {
 
 function highlightText(text: string, clauses: ContractClauseAnalysis[], highlighted: string | null): string {
   let result = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  
   for (const clause of clauses) {
-    if (!clause.start_phrase) continue;
-    const escaped = clause.start_phrase
-      .trim()
-      .split(/\s+/)
-      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-      .join("\\s+");
     const bg = RISK_HIGHLIGHT[clause.risk_level] ?? "#fef9c3";
     const isHighlighted = highlighted === clause.clause_name;
     const style = isHighlighted
       ? `background:${bg};padding:1px 3px;border-radius:3px;outline:2px solid #1e3a5f;`
       : `background:${bg};padding:1px 2px;border-radius:2px;`;
-    try {
-      result = result.replace(
-        new RegExp(`(${escaped})`, "i"),
-        `<mark data-clause="${escapeAttr(clause.clause_name)}" style="${style}" title="${escapeAttr(clause.clause_name)}">$1</mark>`
-      );
-    } catch { /* bad regex — skip */ }
+    
+    // Use precise positioning if available
+    if (clause.char_start !== undefined && clause.char_end !== undefined && clause.full_clause_text) {
+      const before = result.slice(0, clause.char_start);
+      const clauseText = result.slice(clause.char_start, clause.char_end);
+      const after = result.slice(clause.char_end);
+      result = before + `<mark data-clause="${escapeAttr(clause.clause_name)}" style="${style}" title="${escapeAttr(clause.clause_name)}">${clauseText}</mark>` + after;
+    } 
+    // Fallback to regex-based highlighting using start_phrase
+    else if (clause.start_phrase) {
+      const escaped = clause.start_phrase
+        .trim()
+        .split(/\s+/)
+        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("\\s+");
+      try {
+        result = result.replace(
+          new RegExp(`(${escaped})`, "i"),
+          `<mark data-clause="${escapeAttr(clause.clause_name)}" style="${style}" title="${escapeAttr(clause.clause_name)}">$1</mark>`
+        );
+      } catch { /* bad regex — skip */ }
+    }
   }
   return applyDocumentFormatting(result);
 }
@@ -365,7 +412,7 @@ function ClauseCard({
                   <p className="text-xs font-semibold text-navy-700">{action?.label}</p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => navigator.clipboard.writeText(result)}
+                      onClick={() => navigator.clipboard.writeText(stripMarkdown(result))}
                       className="flex items-center gap-1 text-xs text-navy-500 hover:text-navy-800 font-medium"
                     >
                       <Copy size={10} /> Copy
@@ -428,14 +475,30 @@ export default function ContractReview() {
 
   // Redlines tab
   const [redlineText, setRedlineText] = useState("");
+  const [redlineInputMode, setRedlineInputMode] = useState<"upload" | "paste">("upload");
   const [comparingRedlines, setComparingRedlines] = useState(false);
   const [redlineResult, setRedlineResult] = useState<string | null>(null);
+  
+  // Redline overlay system
+  const [appliedRedlines, setAppliedRedlines] = useState<Set<string>>(new Set());
+  const [revisedContractText, setRevisedContractText] = useState<string | null>(null);
+  const [redlineModalOpen, setRedlineModalOpen] = useState<string | null>(null);
 
   // Export
   const [exportOpen, setExportOpen] = useState(false);
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+
+  useEffect(() => {
+    if (!user) return;
+    loadPastReviews().then(() => {
+      // Restore the last viewed analysis on page load
+      const lastId = localStorage.getItem("cima_last_review_id");
+      if (lastId && !analysis) loadPastAnalysis(lastId);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function getToken() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -485,6 +548,8 @@ export default function ContractReview() {
       arbitration_institution?: string;
       arbitration_improved?: string;
       industry_type?: string;
+      revised_contract_text?: string;
+      applied_redlines?: string[];
     };
     if (a.industry_type) setDocumentType(a.industry_type);
     
@@ -532,11 +597,30 @@ export default function ContractReview() {
     setGeneratedClauses(loadedGeneratedClauses);
     setRedlineText("");
     setRedlineResult(null);
+    
+    // Restore revised contract text and applied redlines if available
+    if (a.revised_contract_text && a.applied_redlines) {
+      setRevisedContractText(a.revised_contract_text);
+      setAppliedRedlines(new Set(a.applied_redlines));
+    } else {
+      setRevisedContractText(null);
+      setAppliedRedlines(new Set());
+    }
+    
+    localStorage.setItem("cima_last_review_id", id);
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowed = [".pdf", ".docx", ".txt", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    if (!allowed.includes(ext) && !allowed.includes(file.type)) {
+      setError("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+      e.target.value = "";
+      return;
+    }
+    setError("");
     setFileName(file.name);
     try {
       const text = await extractTextFromFile(file);
@@ -585,11 +669,12 @@ export default function ContractReview() {
 
     try {
       const token = await getToken();
+      const plainText = htmlToPlainText(contractText);
       const res = await fetch(`${supabaseUrl}/functions/v1/contract-analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
-          text: contractText,
+          text: plainText,
           document_id: uploadedDocId || undefined,
           case_id: linkedCaseId || undefined,
           user_id: user.id,
@@ -603,8 +688,8 @@ export default function ContractReview() {
         throw new Error((err as { error?: string }).error || "Analysis failed");
       }
 
-      const data = await res.json();
-      setAnalysis(data as AnalysisResult);
+      const data = await res.json() as AnalysisResult;
+      setAnalysis(data);
       setMode("analysis");
       setActiveTab("overview");
       setHighlightedClause(null);
@@ -612,6 +697,7 @@ export default function ContractReview() {
       setGeneratedClauses({});
       setRedlineText("");
       setRedlineResult(null);
+      if (data.id) localStorage.setItem("cima_last_review_id", data.id);
       // Refresh past reviews list
       setReviewsLoaded(false);
     } catch (err) {
@@ -665,9 +751,83 @@ export default function ContractReview() {
         };
         await supabase.from("contract_clause_actions").upsert(payload, { onConflict: "analysis_id,clause_name,action_id" });
       }
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error("Failed to generate clause:", err);
+      setError(err instanceof Error ? err.message : "Failed to generate clause. Please try again.");
+    } finally {
       setGeneratingClause(null);
     }
+  }
+
+  function handleRedlineClick(clause: ContractClauseAnalysis) {
+    setHighlightedClause(clause.clause_name);
+    setMobileView("document");
+    
+    // Scroll to the highlighted clause in document viewer
+    setTimeout(() => {
+      const element = document.querySelector(`[data-clause="${clause.clause_name}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }
+
+  function handleOpenRedlineModal(clause: ContractClauseAnalysis) {
+    setRedlineModalOpen(clause.clause_name);
+  }
+
+  function handleCloseRedlineModal() {
+    setRedlineModalOpen(null);
+  }
+
+  async function handleApplyRedline(clause: ContractClauseAnalysis) {
+    if (!analysis || !clause.redline_suggestion) return;
+    
+    // Replace the clause text with the suggestion
+    const newText = revisedContractText || analysis.contract_text;
+    let updatedText = newText;
+    
+    // Use precise positioning if available
+    if (clause.char_start !== undefined && clause.char_end !== undefined) {
+      const before = newText.slice(0, clause.char_start);
+      const after = newText.slice(clause.char_end);
+      updatedText = before + clause.redline_suggestion + after;
+    } 
+    // Fallback to string replacement using start_phrase
+    else if (clause.start_phrase) {
+      updatedText = newText.replace(clause.start_phrase, clause.redline_suggestion);
+    }
+    
+    const newAppliedRedlines = new Set([...appliedRedlines, clause.clause_name]);
+    
+    setRevisedContractText(updatedText);
+    setAppliedRedlines(newAppliedRedlines);
+    setRedlineModalOpen(null);
+    
+    // Save to database
+    if (analysis.id) {
+      try {
+        const { error } = await (supabase
+          .from("contract_analyses") as any)
+          .update({
+            revised_contract_text: updatedText,
+            applied_redlines: Array.from(newAppliedRedlines),
+          })
+          .eq("id", analysis.id);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to save revised contract:", err);
+      }
+    }
+  }
+
+  function handleRejectRedline(clause: ContractClauseAnalysis) {
+    setAppliedRedlines(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(clause.clause_name);
+      return newSet;
+    });
+    setRedlineModalOpen(null);
   }
 
   async function handleRedlineCompare() {
@@ -689,6 +849,7 @@ export default function ContractReview() {
   }
 
   function startNewReview() {
+    localStorage.removeItem("cima_last_review_id");
     setMode("input");
     setAnalysis(null);
     setContractText("");
@@ -828,9 +989,6 @@ export default function ContractReview() {
       <div>
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Past Reviews</p>
-          {!reviewsLoaded && (
-            <button onClick={loadPastReviews} className="text-xs text-navy-600 hover:text-navy-900 font-medium">Load</button>
-          )}
         </div>
         {loadingReviews ? (
           <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
@@ -898,9 +1056,7 @@ export default function ContractReview() {
 
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Past Reviews</p>
-                {!reviewsLoaded ? (
-                  <button onClick={loadPastReviews} className="text-xs text-navy-600 hover:text-navy-900 font-medium">Load reviews</button>
-                ) : loadingReviews ? (
+                {loadingReviews ? (
                   <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
                     <Loader2 size={11} className="animate-spin" /> Loading...
                   </div>
@@ -955,13 +1111,10 @@ export default function ContractReview() {
 
                 <div className="p-6">
                   {inputTab === "paste" ? (
-                    <textarea
-                      value={contractText}
-                      onChange={(e) => setContractText(e.target.value)}
-                      rows={10}
+                    <RichTextEditor
+                      content={contractText}
+                      onChange={setContractText}
                       placeholder="Paste the full document text here..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none leading-relaxed"
-                      style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
                     />
                   ) : (
                     <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-6 md:p-10 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
@@ -1033,11 +1186,32 @@ export default function ContractReview() {
             <div className="p-6 md:p-10 bg-slate-100 min-h-full" id="contract-text-viewer">
               {analysis && (
                 <div className="max-w-[680px] mx-auto bg-white shadow-sm rounded-lg px-10 py-12 border border-slate-200">
+                  {revisedContractText && appliedRedlines.size > 0 && (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={14} className="text-emerald-600" />
+                          <p className="text-xs font-medium text-emerald-700">
+                            {appliedRedlines.size} redline{appliedRedlines.size !== 1 ? 's' : ''} applied
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setRevisedContractText(null);
+                            setAppliedRedlines(new Set());
+                          }}
+                          className="text-xs text-emerald-600 hover:text-emerald-800 font-medium"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div
                     className="text-sm text-slate-700"
                     style={{ fontFamily: "'Georgia', 'Times New Roman', serif", lineHeight: 1.75 }}
                     dangerouslySetInnerHTML={{
-                      __html: highlightText(analysis.contract_text, analysis.clauses ?? [], highlightedClause),
+                      __html: highlightText(revisedContractText || analysis.contract_text, analysis.clauses ?? [], highlightedClause),
                     }}
                   />
                 </div>
@@ -1318,7 +1492,7 @@ export default function ContractReview() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigator.clipboard.writeText(generatedClauses[clause.clause_type])}
+                              onClick={() => navigator.clipboard.writeText(stripMarkdown(generatedClauses[clause.clause_type]))}
                               className="flex items-center gap-1.5 text-xs text-navy-600 hover:text-navy-900 font-medium transition-colors"
                             >
                               <Copy size={11} /> Copy
@@ -1365,16 +1539,42 @@ export default function ContractReview() {
                             </div>
                             <div className="grid grid-cols-1 gap-2">
                               {clause.start_phrase && (
-                                <div className="p-2 bg-red-50 border border-red-100 rounded text-xs text-red-800 line-through opacity-70">
+                                <button
+                                  onClick={() => handleRedlineClick(clause)}
+                                  className={`p-2 border rounded text-xs text-left transition-colors cursor-pointer ${
+                                    appliedRedlines.has(clause.clause_name)
+                                      ? "bg-emerald-50 border-emerald-200 text-emerald-800 line-through opacity-70"
+                                      : "bg-red-50 border-red-100 text-red-800 line-through opacity-70 hover:bg-red-100"
+                                  }`}
+                                  title={appliedRedlines.has(clause.clause_name) ? "Redline applied" : "Click to view in document"}
+                                >
                                   {clause.start_phrase}...
-                                </div>
+                                  {appliedRedlines.has(clause.clause_name) && (
+                                    <span className="ml-2 text-emerald-600 font-medium">✓ Applied</span>
+                                  )}
+                                </button>
                               )}
-                              <div className="p-2 bg-green-50 border border-green-200 rounded">
+                              <div className={`p-2 border rounded ${
+                                appliedRedlines.has(clause.clause_name)
+                                  ? "bg-emerald-50 border-emerald-200"
+                                  : "bg-green-50 border-green-200"
+                              }`}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <p className="text-xs font-medium text-green-700">Suggested</p>
-                                  <button onClick={() => navigator.clipboard.writeText(clause.redline_suggestion!)} className="text-xs text-green-600 hover:text-green-800">
-                                    <Copy size={10} />
-                                  </button>
+                                  <p className={`text-xs font-medium ${
+                                    appliedRedlines.has(clause.clause_name) ? "text-emerald-700" : "text-green-700"
+                                  }`}>
+                                    {appliedRedlines.has(clause.clause_name) ? "Applied" : "Suggested"}
+                                  </p>
+                                  <div className="flex items-center gap-1">
+                                    {!appliedRedlines.has(clause.clause_name) && (
+                                      <button onClick={() => handleOpenRedlineModal(clause)} className="text-xs text-green-600 hover:text-green-800" title="Apply this redline">
+                                        <CheckCircle2 size={10} />
+                                      </button>
+                                    )}
+                                    <button onClick={() => navigator.clipboard.writeText(stripMarkdown(clause.redline_suggestion!))} className="text-xs text-green-600 hover:text-green-800">
+                                      <Copy size={10} />
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="text-xs text-green-900 leading-relaxed">{clause.redline_suggestion}</p>
                               </div>
@@ -1387,31 +1587,57 @@ export default function ContractReview() {
 
                   {/* Version compare */}
                   <div className="bg-white rounded-xl border border-slate-200 p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <GitCompare size={13} className="text-navy-600" />
-                      <p className="text-xs font-bold text-navy-950">Compare Document Versions</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <GitCompare size={13} className="text-navy-600" />
+                        <p className="text-xs font-bold text-navy-950">Compare Document Versions</p>
+                      </div>
+                      {!redlineText && (
+                        <div className="flex rounded-md border border-slate-200 overflow-hidden">
+                          {(["upload", "paste"] as const).map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => setRedlineInputMode(m)}
+                              className={`px-2.5 py-1 text-xs font-medium transition-colors ${redlineInputMode === m ? "bg-navy-950 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                            >
+                              {m === "upload" ? "Upload" : "Paste"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-500 mb-4">Upload a revised version to compare against the original.</p>
+                    <p className="text-xs text-slate-500 mb-3">Provide a revised version to compare against the original.</p>
 
                     {!redlineText ? (
-                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-6 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
-                        <Upload size={20} className="text-slate-300 mb-2" />
-                        <p className="text-xs font-medium text-slate-500">Upload revised contract (PDF, DOCX, TXT)</p>
-                        <input type="file" accept=".txt,.docx,.pdf" onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            setRedlineText(await extractTextFromFile(file));
-                          } catch { /* ignore */ }
-                          setRedlineResult(null);
-                        }} className="hidden" />
-                      </label>
+                      redlineInputMode === "upload" ? (
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-6 cursor-pointer hover:border-navy-400 hover:bg-navy-50/30 transition-all">
+                          <Upload size={20} className="text-slate-300 mb-2" />
+                          <p className="text-xs font-medium text-slate-500">Upload revised contract (PDF, DOCX, TXT)</p>
+                          <input type="file" accept=".txt,.docx,.pdf" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              setRedlineText(await extractTextFromFile(file));
+                            } catch { /* ignore */ }
+                            setRedlineResult(null);
+                          }} className="hidden" />
+                        </label>
+                      ) : (
+                        <div className="space-y-2">
+                          <textarea
+                            placeholder="Paste the revised contract text here..."
+                            className="w-full h-40 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                            onChange={(e) => { if (e.target.value.trim()) { setRedlineText(e.target.value); setRedlineResult(null); } }}
+                          />
+                          <p className="text-xs text-slate-400">Start typing or paste text above — the field commits on blur or when you click Compare.</p>
+                        </div>
+                      )
                     ) : (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                           <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                          <p className="text-xs text-emerald-700 font-medium">Revised version loaded — {redlineText.length.toLocaleString()} chars</p>
-                          <button onClick={() => { setRedlineText(""); setRedlineResult(null); }} className="ml-auto text-xs text-slate-400 hover:text-slate-600">Remove</button>
+                          <p className="text-xs text-emerald-700 font-medium">Revised version ready — {redlineText.length.toLocaleString()} chars</p>
+                          <button onClick={() => { setRedlineText(""); setRedlineResult(null); }} className="ml-auto text-xs text-slate-400 hover:text-slate-600">Clear</button>
                         </div>
                         <button
                           onClick={handleRedlineCompare}
@@ -1480,7 +1706,7 @@ export default function ContractReview() {
                         <p className="text-xs font-bold text-navy-950">Suggested Improved Wording</p>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => navigator.clipboard.writeText(analysis.arbitration_improved!)}
+                            onClick={() => navigator.clipboard.writeText(stripMarkdown(analysis.arbitration_improved!))}
                             className="flex items-center gap-1 text-xs text-navy-600 hover:text-navy-900 font-medium"
                           >
                             <Copy size={11} /> Copy
@@ -1573,6 +1799,98 @@ export default function ContractReview() {
           </div>
         )}
       </div>
+
+      {/* Redline Modal */}
+      {redlineModalOpen && analysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={handleCloseRedlineModal}>
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-navy-950">Apply Redline</h2>
+              <button 
+                onClick={handleCloseRedlineModal}
+                className="p-1 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {(() => {
+                const clause = analysis.clauses?.find(c => c.clause_name === redlineModalOpen);
+                if (!clause) return null;
+                
+                return (
+                  <>
+                    <div>
+                      <p className="text-sm font-semibold text-navy-950 mb-2">{clause.clause_name}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize border ${RISK_COLORS[clause.risk_level]}`}>
+                        {clause.risk_level} Risk
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-2">Original Text</p>
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
+                          <p className="text-xs text-red-800 leading-relaxed whitespace-pre-wrap">
+                            {clause.full_clause_text || (clause.start_phrase ? `${clause.start_phrase}...` : "Original text not available")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-2">Suggested Replacement</p>
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-xs text-green-900 leading-relaxed whitespace-pre-wrap">
+                            {clause.redline_suggestion}
+                          </p>
+                        </div>
+                      </div>
+
+                      {clause.analysis && (
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Analysis</p>
+                          <p className="text-xs text-slate-700 leading-relaxed">{clause.analysis}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-200">
+              <button
+                onClick={handleCloseRedlineModal}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const clause = analysis.clauses?.find(c => c.clause_name === redlineModalOpen);
+                  if (clause) handleRejectRedline(clause);
+                }}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Reject
+              </button>
+              <button
+                onClick={() => {
+                  const clause = analysis.clauses?.find(c => c.clause_name === redlineModalOpen);
+                  if (clause) handleApplyRedline(clause);
+                }}
+                className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                Apply Redline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

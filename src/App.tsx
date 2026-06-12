@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ClassicLoader from "./components/ui/loader";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Dashboard from "./pages/Dashboard";
@@ -35,10 +36,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-navy-950 flex flex-col items-center justify-center gap-6">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ backgroundColor: 'var(--navy-950)' }}>
       {/* Logo mark */}
-      <div className="w-14 h-14 rounded-2xl bg-gold-500 flex items-center justify-center shadow-lg">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--accent-500)' }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
           <path d="M2 12l10 5 10-5" />
@@ -70,47 +71,49 @@ export default function App() {
   return (
     <ErrorBoundary>
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/login"
-            element={<RedirectIfAuth><Login /></RedirectIfAuth>}
-          />
-          <Route
-            path="/register"
-            element={<RedirectIfAuth><Register /></RedirectIfAuth>}
-          />
-          <Route
-            path="/"
-            element={<RequireAuth><Dashboard /></RequireAuth>}
-          />
-          <Route
-            path="/research"
-            element={<RequireAuth><Research /></RequireAuth>}
-          />
-          <Route
-            path="/cases"
-            element={<RequireAuth><Cases /></RequireAuth>}
-          />
-          <Route
-            path="/documents"
-            element={<RequireAuth><Documents /></RequireAuth>}
-          />
-          <Route
-            path="/assistant"
-            element={<RequireAuth><AIAssistant /></RequireAuth>}
-          />
-          <Route
-            path="/drafting"
-            element={<RequireAuth><DraftingStudio /></RequireAuth>}
-          />
-          <Route
-            path="/review"
-            element={<RequireAuth><ContractReview /></RequireAuth>}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/login"
+              element={<RedirectIfAuth><Login /></RedirectIfAuth>}
+            />
+            <Route
+              path="/register"
+              element={<RedirectIfAuth><Register /></RedirectIfAuth>}
+            />
+            <Route
+              path="/"
+              element={<RequireAuth><Dashboard /></RequireAuth>}
+            />
+            <Route
+              path="/research"
+              element={<RequireAuth><Research /></RequireAuth>}
+            />
+            <Route
+              path="/cases"
+              element={<RequireAuth><Cases /></RequireAuth>}
+            />
+            <Route
+              path="/documents"
+              element={<RequireAuth><Documents /></RequireAuth>}
+            />
+            <Route
+              path="/assistant"
+              element={<RequireAuth><AIAssistant /></RequireAuth>}
+            />
+            <Route
+              path="/drafting"
+              element={<RequireAuth><DraftingStudio /></RequireAuth>}
+            />
+            <Route
+              path="/review"
+              element={<RequireAuth><ContractReview /></RequireAuth>}
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
     </ErrorBoundary>
   );

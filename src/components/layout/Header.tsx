@@ -1,6 +1,8 @@
 import { Bell, Menu, Settings } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSidebar } from "../../contexts/SidebarContext";
+import { useState } from "react";
+import ThemeSwitcher from "../ui/ThemeSwitcher";
 
 interface HeaderProps {
   title: string;
@@ -11,6 +13,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const { user, profile } = useAuth();
   const { toggle } = useSidebar();
   const displayName = profile?.full_name || user?.email || "User";
+  const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
 
   return (
     <header className="relative z-20 flex items-center justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-b border-slate-200 shrink-0">
@@ -39,7 +42,11 @@ export default function Header({ title, subtitle }: HeaderProps) {
         <button className="p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors">
           <Bell size={18} />
         </button>
-        <button className="hidden sm:flex p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors">
+        <button 
+          onClick={() => setShowThemeSwitcher(true)}
+          className="hidden sm:flex p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+          aria-label="Theme settings"
+        >
           <Settings size={18} />
         </button>
         <div className="flex items-center gap-2 ml-1 md:ml-2 pl-2 md:pl-3 border-l border-slate-200">
@@ -54,6 +61,10 @@ export default function Header({ title, subtitle }: HeaderProps) {
           </div>
         </div>
       </div>
+
+      {showThemeSwitcher && (
+        <ThemeSwitcher onClose={() => setShowThemeSwitcher(false)} />
+      )}
     </header>
   );
 }

@@ -110,7 +110,7 @@
   font-size: 0.85em;
 }
 .prose-ai blockquote {
-  border-left: 3px solid #c9a227;
+  border-left: 3px solid var(--accent-hover);
   padding-left: 0.8em;
   margin: 0.5em 0;
   color: #94a3b8;
@@ -161,12 +161,12 @@
   background: rgba(148, 163, 184, 0.05);
 }
 .prose-ai a {
-  color: #c9a227;
+  color: var(--link-color);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .prose-ai a:hover {
-  color: #d4af37;
+  color: var(--link-hover);
 }
 .prose-ai > *:first-child {
   margin-top: 0;
@@ -244,7 +244,7 @@
   font-size: 0.85em;
 }
 .prose-doc blockquote {
-  border-left: 3px solid #c9a227;
+  border-left: 3px solid var(--accent-hover);
   padding-left: 0.8em;
   margin: 0.5em 0;
   color: #64748b;
@@ -295,16 +295,80 @@
   background: #f8fafc;
 }
 .prose-doc a {
-  color: #1e40af;
+  color: var(--link-color);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .prose-doc a:hover {
-  color: #1e3a8a;
+  color: var(--link-hover);
 }
 .prose-doc > *:first-child {
   margin-top: 0;
 }
 .prose-doc > *:last-child {
   margin-bottom: 0;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #94a3b8;
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  min-width: 1em;
+  border: 1px solid #e2e8f0;
+  padding: 3px 5px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.ProseMirror table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #f8fafc;
+}
+
+.ProseMirror table .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(200, 200, 255, 0.4);
+  pointer-events: none;
+}
+
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  z-index: 20;
+  background-color: #adf;
+  pointer-events: none;
+}
+
+.ProseMirror table p {
+  margin: 0;
 }
