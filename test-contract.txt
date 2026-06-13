@@ -1,0 +1,37 @@
+SERVICE AGREEMENT
+
+This Service Agreement is entered into on January 1, 2025 between:
+
+ABC Corporation ("Provider")
+and
+XYZ Company ("Client")
+
+1. SERVICES
+The Provider shall provide consulting services to the Client, including but not limited to strategic planning, market analysis, and technical advisory services.
+
+2. TERM
+This agreement shall commence on January 1, 2025 and continue for a period of 24 months, unless terminated earlier as provided herein.
+
+3. PAYMENT
+The Client shall pay the Provider $10,000 per month for the services rendered. Payment shall be made within 30 days of invoice.
+
+4. CONFIDENTIALITY
+Both parties agree to keep all information confidential and not to disclose any proprietary information to third parties without prior written consent.
+
+5. LIABILITY
+The Provider shall have unlimited liability for any breaches of this agreement, including but not limited to negligence, willful misconduct, and failure to perform services.
+
+6. GOVERNING LAW
+This agreement shall be governed by the laws of Ghana.
+
+7. DISPUTE RESOLUTION
+Any disputes arising from this agreement shall be resolved through arbitration in Accra, Ghana.
+
+8. TERMINATION
+Either party may terminate this agreement with 30 days written notice.
+
+9. FORCE MAJEURE
+This agreement is not currently subject to force majeure provisions.
+
+10. INDEMNIFICATION
+The Provider shall indemnify the Client against all claims, damages, and losses arising from the Provider's performance of services.
