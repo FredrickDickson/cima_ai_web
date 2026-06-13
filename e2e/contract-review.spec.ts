@@ -2,13 +2,12 @@ import { test, expect } from "@playwright/test";
 import { loginAsTestUser, TEST_EMAIL, TEST_PASSWORD } from "./helpers/auth";
 
 test.describe("Contract Review - End to End", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    // Clear cookies and storage to ensure clean state
+    await context.clearCookies();
+    await page.goto("/login");
     // Set viewport to desktop size to ensure sidebar is visible
     await page.setViewportSize({ width: 1280, height: 720 });
-    // Clear any existing state by going to review page first (will redirect to login if not auth)
-    await page.goto("/review");
-    // Navigate to login page
-    await page.goto("/login");
   });
 
   test("Authentication and navigation to Contract Review", async ({ page }) => {
@@ -23,6 +22,7 @@ test.describe("Contract Review - End to End", () => {
 
     // Navigate to Document Review via direct URL
     await page.goto("/review");
+    await page.waitForLoadState("networkidle");
     
     // Verify page loads
     await expect(page).toHaveURL(/\/review/);
@@ -102,7 +102,6 @@ Any disputes shall be resolved through arbitration in Accra.
 
   test("Document analysis flow", async ({ page }) => {
     // Login and navigate
-    await page.goto("/login");
     await page.getByPlaceholder("you@lawfirm.com").fill(TEST_EMAIL);
     await page.getByPlaceholder("••••••••").fill(TEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
@@ -197,7 +196,6 @@ This agreement shall be governed by the laws of Ghana.
 
   test("AI actions on clauses", async ({ page }) => {
     // Login and navigate
-    await page.goto("/login");
     await page.getByPlaceholder("you@lawfirm.com").fill(TEST_EMAIL);
     await page.getByPlaceholder("••••••••").fill(TEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
@@ -290,7 +288,6 @@ This agreement shall be governed by the laws of Ghana.
 
   test("All tabs are accessible", async ({ page }) => {
     // Login and navigate
-    await page.goto("/login");
     await page.getByPlaceholder("you@lawfirm.com").fill(TEST_EMAIL);
     await page.getByPlaceholder("••••••••").fill(TEST_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();

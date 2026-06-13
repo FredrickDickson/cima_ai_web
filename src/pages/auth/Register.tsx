@@ -19,6 +19,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -27,6 +28,10 @@ export default function Register() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (!acceptTerms) {
+      setError("You must accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     if (form.password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
@@ -122,6 +127,26 @@ export default function Register() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="acceptTerms"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-navy-600 focus:ring-navy-500"
+              />
+              <label htmlFor="acceptTerms" className="text-sm text-slate-600">
+                I agree to the{" "}
+                <Link to="/terms" className="text-navy-700 hover:text-gold-600 underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" className="text-navy-700 hover:text-gold-600 underline">
+                  Privacy Policy
+                </Link>
+              </label>
             </div>
 
             <button

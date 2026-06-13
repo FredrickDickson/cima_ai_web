@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Dashboard from "./pages/Dashboard";
 import Research from "./pages/Research";
 import Cases from "./pages/Cases";
@@ -81,6 +83,14 @@ export default function App() {
             <Route
               path="/register"
               element={<RedirectIfAuth><Register /></RedirectIfAuth>}
+            />
+            <Route
+              path="/terms"
+              element={<TermsOfService />}
+            />
+            <Route
+              path="/privacy"
+              element={<PrivacyPolicy />}
             />
             <Route
               path="/"

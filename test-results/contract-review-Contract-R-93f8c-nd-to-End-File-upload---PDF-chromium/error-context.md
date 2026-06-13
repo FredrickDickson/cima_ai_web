@@ -6,16 +6,20 @@
 
 # Test info
 
-- Name: contract-review.spec.ts >> Contract Review - End to End >> Authentication and navigation to Contract Review
-- Location: e2e\contract-review.spec.ts:13:3
+- Name: contract-review.spec.ts >> Contract Review - End to End >> File upload - PDF
+- Location: e2e\contract-review.spec.ts:38:3
 
 # Error details
 
 ```
-TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
-=========================== logs ===========================
-waiting for navigation to "/" until "load"
-============================================================
+Test timeout of 30000ms exceeded.
+```
+
+```
+Error: locator.click: Test timeout of 30000ms exceeded.
+Call log:
+  - waiting for getByText('Upload File')
+
 ```
 
 # Page snapshot
@@ -38,31 +42,28 @@ waiting for navigation to "/" until "load"
     - heading "Welcome back" [level=2] [ref=e30]
     - paragraph [ref=e31]: Sign in to your legal workspace
     - generic [ref=e32]:
-      - img [ref=e33]
-      - text: You must accept the Terms of Service and Privacy Policy to continue.
-    - generic [ref=e35]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: Email address
+        - textbox "you@lawfirm.com" [ref=e35]
       - generic [ref=e36]:
-        - generic [ref=e37]: Email address
-        - textbox "you@lawfirm.com" [ref=e38]: e2e-test@cima.dev
-      - generic [ref=e39]:
-        - generic [ref=e40]: Password
-        - generic [ref=e41]:
-          - textbox "••••••••" [ref=e42]: TestPassword123!
-          - button [ref=e43] [cursor=pointer]:
-            - img [ref=e44]
-      - generic [ref=e47]:
-        - checkbox "I agree to the Terms of Service and Privacy Policy" [ref=e48]
-        - generic [ref=e49]:
+        - generic [ref=e37]: Password
+        - generic [ref=e38]:
+          - textbox "••••••••" [ref=e39]
+          - button [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+      - generic [ref=e44]:
+        - checkbox "I agree to the Terms of Service and Privacy Policy" [ref=e45]
+        - generic [ref=e46]:
           - text: I agree to the
-          - link "Terms of Service" [ref=e50] [cursor=pointer]:
+          - link "Terms of Service" [ref=e47] [cursor=pointer]:
             - /url: /terms
           - text: and
-          - link "Privacy Policy" [ref=e51] [cursor=pointer]:
+          - link "Privacy Policy" [ref=e48] [cursor=pointer]:
             - /url: /privacy
-      - button "Sign in" [active] [ref=e52] [cursor=pointer]
-    - paragraph [ref=e53]:
+      - button "Sign in" [ref=e49] [cursor=pointer]
+    - paragraph [ref=e50]:
       - text: New to CIMA AI?
-      - link "Create an account" [ref=e54] [cursor=pointer]:
+      - link "Create an account" [ref=e51] [cursor=pointer]:
         - /url: /register
 ```
 
@@ -88,8 +89,7 @@ waiting for navigation to "/" until "load"
   17  |     await page.getByRole("button", { name: /sign in/i }).click();
   18  | 
   19  |     // Wait for navigation to dashboard
-> 20  |     await page.waitForURL("/", { timeout: 15000 });
-      |                ^ TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+  20  |     await page.waitForURL("/", { timeout: 15000 });
   21  |     await page.waitForTimeout(1000);
   22  | 
   23  |     // Navigate to Document Review via direct URL
@@ -119,7 +119,8 @@ waiting for navigation to "/" until "load"
   47  |     await page.goto("/review");
   48  | 
   49  |     // Switch to upload tab
-  50  |     await page.getByText("Upload File").click();
+> 50  |     await page.getByText("Upload File").click();
+      |                                         ^ Error: locator.click: Test timeout of 30000ms exceeded.
   51  | 
   52  |     // Create a simple test PDF content (as a text file for testing)
   53  |     const testContract = `
@@ -190,4 +191,34 @@ waiting for navigation to "/" until "load"
   118 | 1. SERVICES
   119 | The Provider shall provide consulting services.
   120 | 
+  121 | 2. TERM
+  122 | This agreement shall continue for 24 months.
+  123 | 
+  124 | 3. PAYMENT
+  125 | The Client shall pay $10,000 per month.
+  126 | 
+  127 | 4. LIABILITY
+  128 | The Provider shall have unlimited liability for any breaches.
+  129 | 
+  130 | 5. GOVERNING LAW
+  131 | This agreement shall be governed by the laws of Ghana.
+  132 | `;
+  133 | 
+  134 |     await page.locator("textarea").fill(testContract);
+  135 | 
+  136 |     // Select document type and jurisdiction
+  137 |     await page.getByRole("combobox").first().click();
+  138 |     await page.getByText("Commercial Contract").click();
+  139 |     
+  140 |     await page.getByRole("combobox").nth(1).click();
+  141 |     await page.getByText("Ghana").click();
+  142 | 
+  143 |     // Click analyze
+  144 |     await page.getByRole("button", { name: /analyse document/i }).click();
+  145 | 
+  146 |     // Wait for analysis to complete
+  147 |     await expect(page.getByText(/analyzing|parsing/i)).toBeVisible();
+  148 |     await page.waitForTimeout(15000); // Wait for AI analysis
+  149 | 
+  150 |     // Verify analysis results appear
 ```
