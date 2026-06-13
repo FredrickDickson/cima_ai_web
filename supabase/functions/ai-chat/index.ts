@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   detectJurisdiction,
   extractLegalQuery,
@@ -6,6 +7,27 @@ import {
   COUNTRY_NAMES,
 } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+
+async function fetchAccraRulesContext(query: string): Promise<string> {
+  if (!query) return "";
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return "";
+    const supabase = createClient(supabaseUrl, serviceKey);
+    const { data, error } = await supabase.rpc("search_legal_library_fts", {
+      search_query: query,
+      match_count: 4,
+    });
+    if (error || !data || data.length === 0) return "";
+    const entries = (data as Array<{ title: string; content: string; citation: string }>)
+      .slice(0, 4)
+      .map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
+    return `\n\nRelevant Accra Arbitration Rules 2025:\n${entries.join("\n\n")}`;
+  } catch {
+    return "";
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,11 +70,14 @@ Deno.serve(async (req: Request) => {
     );
     const jurisdictionLabel = COUNTRY_NAMES[jurisdictionCode]
       ?? (jurisdictionCode !== "gh" ? jurisdictionCode : "Ghana");
-    const lawsContext = userQuery
-      ? await fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode)
-      : "";
 
-    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel);
+    const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review"];
+    const [lawsContext, accraContext] = await Promise.all([
+      userQuery ? fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve(""),
+      (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesContext(userQuery) : Promise.resolve(""),
+    ]);
+
+    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel, accraContext);
 
     const allMessages: Message[] = [
       { role: "system", content: systemPrompt },
@@ -105,7 +130,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = "Ghana"): string {
+function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = "Ghana", accraContext = ""): string {
   const base = CIMA_SYSTEM_PROMPT + `\n\nDETECTED JURISDICTION: ${jurisdiction}\n\nAdditional citation principles:\n1. Always cite legal authority (statutes, case law, arbitration rules) when making legal claims — specific to ${jurisdiction} where applicable\n2. Distinguish clearly between legal analysis and your own opinion\n3. When Laws.Africa sources are provided below, treat them as primary authority and cite them where relevant\n4. Only cite sources that are directly relevant to the jurisdiction and question — if a source is from a different jurisdiction and not applicable as comparative law, do not cite it\n5. If you cannot find a relevant source, provide analysis based on your training knowledge and clearly state you are drawing on general legal knowledge\n6. Never fabricate citations — if uncertain about a case name or statute, say so explicitly\n7. When drafting, produce professional-grade legal language\n8. Structure responses clearly with headers when providing detailed analysis`;
 
   const contextMap: Record<string, string> = {
@@ -118,6 +143,6 @@ function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = 
     general: `\n\nProvide comprehensive, professional legal assistance under ${jurisdiction} law across all areas of legal practice.`,
   };
 
-  return base + (contextMap[context] ?? contextMap.general) + lawsContext;
+  return base + (contextMap[context] ?? contextMap.general) + lawsContext + accraContext;
 }
 

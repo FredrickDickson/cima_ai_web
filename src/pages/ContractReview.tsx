@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import DOMPurify from "dompurify";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
   ClipboardCheck,
@@ -488,6 +489,9 @@ export default function ContractReview() {
   const [exportOpen, setExportOpen] = useState(false);
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
 
+  // Ref to track step interval for cleanup
+  const stepIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 
   useEffect(() => {
@@ -499,6 +503,16 @@ export default function ContractReview() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Cleanup step interval on unmount
+  useEffect(() => {
+    return () => {
+      if (stepIntervalRef.current) {
+        clearInterval(stepIntervalRef.current);
+        stepIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   async function getToken() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -558,7 +572,7 @@ export default function ContractReview() {
     const loadedClauseResults: Record<string, Record<string, string>> = {};
     const loadedGeneratedClauses: Record<string, string> = {};
     if (actionsData) {
-      for (const action of actionsData as any[]) {
+      for (const action of actionsData) {
         if (action.action_id === "generate") {
           loadedGeneratedClauses[action.clause_name] = action.result_text;
         } else {
@@ -569,6 +583,21 @@ export default function ContractReview() {
         }
       }
     }
+
+    // Type guard for ContractClauseAnalysis
+    const isContractClauseAnalysis = (item: any): item is ContractClauseAnalysis => {
+      return item && typeof item.clause_name === 'string' && typeof item.risk_level === 'string';
+    };
+
+    // Type guard for MissingClause
+    const isMissingClause = (item: any): item is MissingClause => {
+      return item && typeof item.clause_type === 'string' && typeof item.importance === 'string';
+    };
+
+    // Type guard for obligations
+    const isValidObligations = (obj: any): obj is { party_a: string[]; party_b: string[] } => {
+      return obj && Array.isArray(obj.party_a) && Array.isArray(obj.party_b);
+    };
 
     setAnalysis({
       id: a.id,
@@ -582,9 +611,9 @@ export default function ContractReview() {
       governing_law_found: a.governing_law_found,
       governing_law: a.governing_law,
       detected_parties: a.detected_parties,
-      clauses: (a.clauses_data ?? []) as unknown as ContractClauseAnalysis[],
-      missing_clauses: (a.missing_clauses ?? []) as unknown as MissingClause[],
-      obligations: (a.obligations as { party_a: string[]; party_b: string[] }) ?? { party_a: [], party_b: [] },
+      clauses: (a.clauses_data ?? []).filter(isContractClauseAnalysis),
+      missing_clauses: (a.missing_clauses ?? []).filter(isMissingClause),
+      obligations: isValidObligations(a.obligations) ? a.obligations : { party_a: [], party_b: [] },
       recommendations: a.recommendations ?? [],
       negotiation_points: a.negotiation_points,
       ai_insights: a.ai_insights,
@@ -630,7 +659,11 @@ export default function ContractReview() {
         const fileExt = file.name.split('.').pop() || 'pdf';
         const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
         
-        await supabase.storage.from("documents").upload(filePath, file).catch(() => {});
+        const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
+        if (uploadError) {
+          console.error("File upload failed:", uploadError);
+          // Continue anyway - document analysis can still work without file storage
+        }
         
         const payload: any = {
           user_id: user.id,
@@ -649,7 +682,7 @@ export default function ContractReview() {
         const { data: docData, error: dbError } = await supabase.from("documents").insert(payload).select("id").single();
         
         if (!dbError && docData) {
-          setUploadedDocId((docData as any).id);
+          setUploadedDocId(docData.id);
         }
       }
     } catch (err) {
@@ -658,12 +691,12 @@ export default function ContractReview() {
   }
 
   async function handleAnalyze() {
-    if (!contractText.trim() || !user) return;
+    if (!contractText.trim() || !user || analyzing) return;
     setError("");
     setAnalyzing(true);
     setCurrentStep(0);
 
-    const stepInterval = setInterval(() => {
+    stepIntervalRef.current = setInterval(() => {
       setCurrentStep((s) => (s < STEPS.length - 1 ? s + 1 : s));
     }, 1800);
 
@@ -703,7 +736,10 @@ export default function ContractReview() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
     } finally {
-      clearInterval(stepInterval);
+      if (stepIntervalRef.current) {
+        clearInterval(stepIntervalRef.current);
+        stepIntervalRef.current = null;
+      }
       setAnalyzing(false);
       setCurrentStep(0);
     }
@@ -727,9 +763,16 @@ export default function ContractReview() {
           action_id: action.id,
           result_text: result,
         };
-        await supabase.from("contract_clause_actions").upsert(payload, { onConflict: "analysis_id,clause_name,action_id" });
+        const { error: saveError } = await supabase.from("contract_clause_actions").upsert(payload, { onConflict: "analysis_id,clause_name,action_id" });
+        if (saveError) {
+          console.error("Failed to save clause action:", saveError);
+          // Continue anyway - result is still displayed to user
+        }
       }
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error("Clause action failed:", err);
+      setError("Failed to perform AI action. Please try again.");
+    } finally {
       setClauseActionLoading(null);
     }
   }
@@ -841,7 +884,8 @@ export default function ContractReview() {
         `You are a legal reviewer. Compare these two document versions and identify all changes. Structure your response with these exact headings:\n\n## Added Provisions\n## Deleted Provisions\n## Modified Provisions\n## Risk Changes\n\nFor each item, note the provision name and describe the change. Flag any increase in risk, new liability exposure, or removal of protections prominently.\n\n---ORIGINAL DOCUMENT---\n${original}\n\n---REVISED DOCUMENT---\n${revised}`
       );
       setRedlineResult(result);
-    } catch {
+    } catch (err) {
+      console.error("Redline comparison failed:", err);
       setRedlineResult("Comparison failed. Please try again.");
     } finally {
       setComparingRedlines(false);
@@ -883,7 +927,7 @@ export default function ContractReview() {
     const lines: string[] = [];
     lines.push(`# Document Review Report`);
     lines.push(`**Risk Score:** ${a.overall_risk_score}/100`);
-    if (a.detected_parties) {
+    if (a.detected_parties?.party_a_name && a.detected_parties?.party_b_name) {
       lines.push(`**Parties:** ${a.detected_parties.party_a_name} / ${a.detected_parties.party_b_name}`);
     }
     lines.push(`**Governing Law:** ${a.governing_law || "Not found"}`);
@@ -900,11 +944,13 @@ export default function ContractReview() {
       lines.push(`\n### ${m.clause_type} [${m.importance.toUpperCase()}]`);
       lines.push(m.consequence_of_omission);
     }
-    lines.push(`\n## Obligations`);
-    lines.push(`**${partyA}:**`);
-    for (const o of a.obligations.party_a) lines.push(`- ${o}`);
-    lines.push(`\n**${partyB}:**`);
-    for (const o of a.obligations.party_b) lines.push(`- ${o}`);
+    if (a.detected_parties?.party_a_name && a.detected_parties?.party_b_name) {
+      lines.push(`\n## Obligations`);
+      lines.push(`**${a.detected_parties.party_a_name}:**`);
+      for (const o of a.obligations.party_a) lines.push(`- ${o}`);
+      lines.push(`\n**${a.detected_parties.party_b_name}:**`);
+      for (const o of a.obligations.party_b) lines.push(`- ${o}`);
+    }
     if (a.negotiation_points?.length) {
       lines.push(`\n## Negotiation Points`);
       a.negotiation_points.forEach((p, i) => lines.push(`${i + 1}. ${p}`));
@@ -915,32 +961,37 @@ export default function ContractReview() {
     return lines.join("\n");
   }
 
-  const partyA = analysis?.detected_parties?.party_a_name || "Party A";
-  const partyB = analysis?.detected_parties?.party_b_name || "Party B";
+  const partyA = analysis?.detected_parties?.party_a_name;
+  const partyB = analysis?.detected_parties?.party_b_name;
+  const hasParties = !!(partyA && partyB);
 
-  const riskBands = analysis
-    ? {
-        critical: analysis.clauses?.filter((c) => c.risk_level === "critical").length ?? 0,
-        high: analysis.clauses?.filter((c) => c.risk_level === "high").length ?? 0,
-        medium: analysis.clauses?.filter((c) => c.risk_level === "medium").length ?? 0,
-        low: analysis.clauses?.filter((c) => c.risk_level === "low").length ?? 0,
-      }
-    : null;
+  const riskBands = useMemo(() => {
+    if (!analysis) return null;
+    return {
+      critical: analysis.clauses?.filter((c) => c.risk_level === "critical").length ?? 0,
+      high: analysis.clauses?.filter((c) => c.risk_level === "high").length ?? 0,
+      medium: analysis.clauses?.filter((c) => c.risk_level === "medium").length ?? 0,
+      low: analysis.clauses?.filter((c) => c.risk_level === "low").length ?? 0,
+    };
+  }, [analysis]);
 
-  const riskClauses = analysis?.clauses.filter((c) => c.risk_level !== "low") ?? [];
+  const riskClauses = useMemo(() => {
+    return analysis?.clauses.filter((c) => c.risk_level !== "low") ?? [];
+  }, [analysis]);
 
-  const TABS: { id: AnalysisTab; label: string }[] = analysis
-    ? [
-        { id: "overview", label: "Overview" },
-        { id: "clauses", label: `Clauses (${analysis.clauses?.length ?? 0})` },
-        { id: "obligations", label: "Obligations" },
-        { id: "risks", label: `Risks (${riskClauses.length})` },
-        { id: "missing", label: `Missing (${analysis.missing_clauses?.length ?? 0})` },
-        { id: "redlines", label: "Redlines" },
-        { id: "arbitration", label: "Arbitration" },
-        { id: "ai_insights", label: "AI Insights" },
-      ]
-    : [];
+  const TABS = useMemo(() => {
+    if (!analysis) return [];
+    return [
+      { id: "overview" as AnalysisTab, label: "Overview" },
+      { id: "clauses" as AnalysisTab, label: `Clauses (${analysis.clauses?.length ?? 0})` },
+      { id: "obligations" as AnalysisTab, label: "Obligations" },
+      { id: "risks" as AnalysisTab, label: `Risks (${riskClauses.length})` },
+      { id: "missing" as AnalysisTab, label: `Missing (${analysis.missing_clauses?.length ?? 0})` },
+      { id: "redlines" as AnalysisTab, label: "Redlines" },
+      { id: "arbitration" as AnalysisTab, label: "Arbitration" },
+      { id: "ai_insights" as AnalysisTab, label: "AI Insights" },
+    ];
+  }, [analysis, riskClauses.length]);
 
   const renderConfigOptions = () => (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1211,7 +1262,7 @@ export default function ContractReview() {
                     className="text-sm text-slate-700"
                     style={{ fontFamily: "'Georgia', 'Times New Roman', serif", lineHeight: 1.75 }}
                     dangerouslySetInnerHTML={{
-                      __html: highlightText(revisedContractText || analysis.contract_text, analysis.clauses ?? [], highlightedClause),
+                      __html: DOMPurify.sanitize(highlightText(revisedContractText || analysis.contract_text, analysis.clauses ?? [], highlightedClause)),
                     }}
                   />
                 </div>
@@ -1297,7 +1348,7 @@ export default function ContractReview() {
               {activeTab === "overview" && (
                 <div className="space-y-3">
                   <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-                    {analysis.detected_parties && (
+                    {hasParties && (
                       <div className="flex items-start gap-3 p-3">
                         <Users size={13} className="text-navy-400 shrink-0 mt-0.5" />
                         <span className="text-xs text-slate-500 font-medium w-24 shrink-0">Parties</span>
@@ -1405,26 +1456,33 @@ export default function ContractReview() {
               {/* ── OBLIGATIONS ── */}
               {activeTab === "obligations" && (
                 <div className="space-y-4">
-                  {[
-                    { label: partyA, items: analysis.obligations?.party_a ?? [] },
-                    { label: partyB, items: analysis.obligations?.party_b ?? [] },
-                  ].map(({ label, items }) => (
-                    <div key={label} className="bg-white rounded-xl border border-slate-200 p-4">
-                      <p className="text-xs font-bold text-navy-950 mb-3">{label} — Obligations</p>
-                      {items.length === 0 ? (
-                        <p className="text-xs text-slate-400">None identified</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {items.map((item, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <Shield size={11} className="text-navy-400 mt-0.5 shrink-0" />
-                              <p className="text-xs text-slate-700 leading-relaxed">{item}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                  {hasParties ? (
+                    [
+                      { label: partyA, items: analysis.obligations?.party_a ?? [] },
+                      { label: partyB, items: analysis.obligations?.party_b ?? [] },
+                    ].map(({ label, items }) => (
+                      <div key={label} className="bg-white rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold text-navy-950 mb-3">{label} — Obligations</p>
+                        {items.length === 0 ? (
+                          <p className="text-xs text-slate-400">None identified</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {items.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <Shield size={11} className="text-navy-400 mt-0.5 shrink-0" />
+                                <p className="text-xs text-slate-700 leading-relaxed">{item}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                      <p className="text-xs font-bold text-navy-950 mb-3">Obligations</p>
+                      <p className="text-xs text-slate-400">No parties detected in this document</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
@@ -1618,7 +1676,10 @@ export default function ContractReview() {
                             if (!file) return;
                             try {
                               setRedlineText(await extractTextFromFile(file));
-                            } catch { /* ignore */ }
+                            } catch (err) {
+                              console.error("Failed to extract text from file:", err);
+                              setError("Failed to read file. Please try again.");
+                            }
                             setRedlineResult(null);
                           }} className="hidden" />
                         </label>

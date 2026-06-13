@@ -91,9 +91,16 @@ export default function SettlementTab({
         setIssuesError(error.message);
       } else {
         setIssues(data ?? []);
+        // Load any previously saved positions from case metadata
+        const { data: caseRow } = await supabase
+          .from("cases")
+          .select("metadata")
+          .eq("id", caseId)
+          .single();
+        const saved: Record<string, IssuePosition> = (caseRow?.metadata as { settlement_positions?: Record<string, IssuePosition> })?.settlement_positions ?? {};
         const initialPositions: Record<string, IssuePosition> = {};
         for (const issue of data ?? []) {
-          initialPositions[issue.id] = {
+          initialPositions[issue.id] = saved[issue.id] ?? {
             claimant: "",
             respondent: "",
             monetaryValue: "",
@@ -320,13 +327,22 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
     field: keyof IssuePosition,
     value: string
   ) {
-    setPositions((prev) => ({
-      ...prev,
-      [issueId]: {
-        ...(prev[issueId] ?? { claimant: "", respondent: "", monetaryValue: "" }),
-        [field]: value,
-      },
-    }));
+    setPositions((prev) => {
+      const updated = {
+        ...prev,
+        [issueId]: {
+          ...(prev[issueId] ?? { claimant: "", respondent: "", monetaryValue: "" }),
+          [field]: value,
+        },
+      };
+      // Persist to Supabase (fire-and-forget)
+      supabase
+        .from("cases")
+        .update({ metadata: { settlement_positions: updated } })
+        .eq("id", caseId)
+        .then(() => {});
+      return updated;
+    });
   }
 
   return (

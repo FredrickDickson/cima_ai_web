@@ -7,6 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { callCaseAI, type CaseContext } from "../caseAI";
+import ReactMarkdown from "react-markdown";
 
 type Case = CaseContext & {
   status: string;
@@ -74,7 +75,7 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
     // Fetch hearings, orders, and documents with extracted text
     const [{ data: hearings }, { data: orders }, { data: allDocs }] = await Promise.all([
       supabase.from("hearings").select("title, scheduled_at, notes").eq("case_id", caseData.id).order("scheduled_at"),
-      supabase.from("orders").select("title, order_date, content").eq("case_id", caseData.id).order("order_date"),
+      supabase.from("procedural_orders").select("title, issued_at, content").eq("case_id", caseData.id).order("issued_at"),
       supabase.from("documents").select("name, created_at, extracted_text").eq("case_id", caseData.id).not("extracted_text", "is", null).order("created_at").limit(5),
     ]);
     const parts: string[] = [];
@@ -82,7 +83,7 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
       parts.push("HEARINGS:\n" + (hearings ?? []).map(h => `${h.scheduled_at?.slice(0, 10) ?? "?"}: ${h.title}${h.notes ? ` — ${h.notes}` : ""}`).join("\n"));
     }
     if ((orders ?? []).length > 0) {
-      parts.push("PROCEDURAL ORDERS:\n" + (orders ?? []).map(o => `${o.order_date?.slice(0, 10) ?? "?"}: ${o.title}`).join("\n"));
+      parts.push("PROCEDURAL ORDERS:\n" + (orders ?? []).map(o => `${o.issued_at?.slice(0, 10) ?? "?"}: ${o.title}`).join("\n"));
     }
     if ((allDocs ?? []).length > 0) {
       parts.push("DOCUMENTS:\n" + (allDocs ?? []).map(d => `${d.created_at.slice(0, 10)}: ${d.name}\nExcerpt: ${(d.extracted_text ?? "").slice(0, 400)}`).join("\n\n"));
@@ -289,7 +290,9 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
             <Loader2 size={14} className="animate-spin" />Generating summary...
           </div>
         ) : aiSummary ? (
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+          <div className="prose prose-xs max-w-none prose-invert prose-p:text-slate-300 prose-headings:text-white prose-strong:text-white text-sm">
+            <ReactMarkdown>{aiSummary}</ReactMarkdown>
+          </div>
         ) : (
           <p className="text-xs text-slate-500">Click "Generate Summary" for an AI-powered overview of this matter.</p>
         )}
@@ -312,7 +315,9 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
             <Loader2 size={14} className="animate-spin" />Building timeline from documents, hearings & orders...
           </div>
         ) : chronology ? (
-          <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">{chronology}</div>
+          <div className="prose prose-xs max-w-none prose-invert prose-p:text-slate-300 prose-headings:text-white prose-strong:text-white text-sm">
+            <ReactMarkdown>{chronology}</ReactMarkdown>
+          </div>
         ) : (
           <p className="text-xs text-slate-500">Generate a unified chronological timeline extracted from documents, hearings, and procedural orders.</p>
         )}
@@ -335,7 +340,9 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
             <Loader2 size={14} className="animate-spin" />Analysing risks...
           </div>
         ) : aiRisks ? (
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{aiRisks}</p>
+          <div className="prose prose-xs max-w-none prose-invert prose-p:text-slate-300 prose-headings:text-white prose-strong:text-white text-sm">
+            <ReactMarkdown>{aiRisks}</ReactMarkdown>
+          </div>
         ) : (
           <p className="text-xs text-slate-500">Click "Analyse Risks" to identify case risks, evidentiary gaps, and strategic vulnerabilities.</p>
         )}

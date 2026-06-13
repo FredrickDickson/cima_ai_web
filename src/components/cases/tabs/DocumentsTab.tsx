@@ -19,17 +19,17 @@ const AI_DOC_ACTIONS = [
   {
     label: "Summarize",
     prompt: (doc: Doc) =>
-      `Summarize the following document titled "${doc.name}" in 3-5 clear paragraphs covering: purpose, key provisions, parties' obligations, important dates/deadlines, and any notable concerns.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+      `Summarize the following document titled "${doc.name}" in 3-5 clear paragraphs covering: purpose, key provisions, parties' obligations, important dates/deadlines, and any notable concerns.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
   {
     label: "Extract Issues",
     prompt: (doc: Doc) =>
-      `From the document titled "${doc.name}", identify and list all key legal issues, disputes, or contentious provisions. For each issue, explain why it is significant and what position each party may take.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+      `From the document titled "${doc.name}", identify and list all key legal issues, disputes, or contentious provisions. For each issue, explain why it is significant and what position each party may take.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
   {
     label: "Generate Timeline",
     prompt: (doc: Doc) =>
-      `Extract all dates, events, and deadlines from the document titled "${doc.name}" and present them as a chronological timeline. Format each entry as: [DATE] — [EVENT/OBLIGATION].\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+      `Extract all dates, events, and deadlines from the document titled "${doc.name}" and present them as a chronological timeline. Format each entry as: [DATE] — [EVENT/OBLIGATION].\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
 ];
 
@@ -45,12 +45,12 @@ const WITNESS_ACTIONS = [
 **4. Corroboration** — Identify which assertions are likely corroborated by documents or other witnesses, and which stand alone.
 **5. Cross-examination Points** — Suggest 5-7 targeted cross-examination questions to test the witness's credibility or weaken key assertions.
 
-Document:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+Document:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
   {
     label: "Credibility Assessment",
     prompt: (doc: Doc) =>
-      `Assess the credibility and reliability of the witness statement titled "${doc.name}". Evaluate: internal consistency, specificity of detail, alignment with documentary evidence, apparent bias or interest, and overall persuasiveness. Rate credibility as High / Medium / Low with reasons.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+      `Assess the credibility and reliability of the witness statement titled "${doc.name}". Evaluate: internal consistency, specificity of detail, alignment with documentary evidence, apparent bias or interest, and overall persuasiveness. Rate credibility as High / Medium / Low with reasons.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
 ];
 
@@ -67,12 +67,12 @@ const EXPERT_ACTIONS = [
 **5. Questions for Cross-examination** — Suggest 5-7 pointed questions to challenge the expert's methodology, assumptions, or conclusions.
 **6. Counter-expert Points** — Suggest what a counter-expert should address to rebut this report.
 
-Document:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+Document:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
   {
     label: "Methodology Review",
     prompt: (doc: Doc) =>
-      `Review the methodology applied in the expert report titled "${doc.name}". Assess whether the methodology is: (1) widely accepted in the relevant field, (2) correctly applied to the facts, (3) based on appropriate data, and (4) capable of supporting the conclusions reached. Note any departures from best practice.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 6000)}`,
+      `Review the methodology applied in the expert report titled "${doc.name}". Assess whether the methodology is: (1) widely accepted in the relevant field, (2) correctly applied to the facts, (3) based on appropriate data, and (4) capable of supporting the conclusions reached. Note any departures from best practice.\n\nDocument:\n${(doc.extracted_text ?? "").slice(0, 60000)}`,
   },
 ];
 

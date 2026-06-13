@@ -7,6 +7,7 @@ import {
   Briefcase,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Copy,
   ExternalLink,
@@ -197,6 +198,7 @@ export default function Documents() {
   });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Case linking ──────────────────────────────────────────────────────────
@@ -363,7 +365,7 @@ export default function Documents() {
         file_size: file.size,
         mime_type: file.type || "text/plain",
         status: "processing",
-        extracted_text: textContent.slice(0, 50000),
+        extracted_text: textContent.slice(0, 100000),
         ai_summary: "",
         risk_score: 0,
       };
@@ -378,6 +380,7 @@ export default function Documents() {
 
       setShowUpload(false);
       setUploadForm({ name: "", type: "document", caseId: "" });
+      setSelectedFileName("");
       if (fileRef.current) fileRef.current.value = "";
       setDocuments((prev) => [inserted, ...prev]);
 
@@ -495,7 +498,7 @@ Document name: ${viewerDoc.name}
 Document type: ${viewerDoc.type}
 
 Document text:
-${viewerDoc.extracted_text?.slice(0, 8000) ?? "[No text available]"}
+${viewerDoc.extracted_text?.slice(0, 60000) ?? "[No text available]"}
 
 Return 2-3 paragraphs covering: (1) what this document is and its purpose, (2) the key obligations or provisions, (3) any notable risks or issues.`,
         },
@@ -527,7 +530,7 @@ Return 2-3 paragraphs covering: (1) what this document is and its purpose, (2) t
 Document: "${viewerDoc.name}" (${viewerDoc.type})
 
 Text:
-${viewerDoc.extracted_text?.slice(0, 8000) ?? "[No text available]"}
+${viewerDoc.extracted_text?.slice(0, 60000) ?? "[No text available]"}
 
 Return a numbered list of legal issues. For each: **bold issue title**, then one sentence describing the issue and which party it affects. Return only the list, no preamble.`,
         },
@@ -551,7 +554,7 @@ Return a numbered list of legal issues. For each: **bold issue title**, then one
 Document: "${viewerDoc.name}" (${viewerDoc.type})
 
 Text:
-${viewerDoc.extracted_text?.slice(0, 8000) ?? "[No text available]"}
+${viewerDoc.extracted_text?.slice(0, 60000) ?? "[No text available]"}
 
 Return a structured list grouped by party. For each obligation:
 **[Party]**: obligation description, and any deadline or condition.
@@ -577,7 +580,7 @@ Return only the list, no preamble.`,
 Document: "${viewerDoc.name}"
 
 Text:
-${viewerDoc.extracted_text?.slice(0, 8000) ?? "[No text available]"}
+${viewerDoc.extracted_text?.slice(0, 60000) ?? "[No text available]"}
 
 Return a chronological list in this exact format:
 **[Date]** — [Event description]
@@ -605,7 +608,7 @@ Order from earliest to latest. If no date is specified, use "Date unknown".`,
 Source document: "${viewerDoc.name}" (${viewerDoc.type})
 
 Document content:
-${viewerDoc.extracted_text?.slice(0, 6000) ?? "[No text available]"}
+${viewerDoc.extracted_text?.slice(0, 50000) ?? "[No text available]"}
 
 Generate a professionally structured legal brief that:
 1. States the factual background
@@ -649,12 +652,12 @@ Use formal legal language appropriate for court or tribunal submission.`,
           content: `You are an expert legal analyst. Compare these two legal documents:
 
 DOCUMENT A: "${docA.name}" (${docA.type})
-${docA.extracted_text?.slice(0, 4000) ?? "[No text available]"}
+${docA.extracted_text?.slice(0, 25000) ?? "[No text available]"}
 
 ---
 
 DOCUMENT B: "${docB.name}" (${docB.type})
-${docB.extracted_text?.slice(0, 4000) ?? "[No text available]"}
+${docB.extracted_text?.slice(0, 25000) ?? "[No text available]"}
 
 ---
 
@@ -1638,8 +1641,8 @@ Provide a structured comparison covering:
 
       {/* ── Upload Modal ───────────────────────────────────────────────────────── */}
       {showUpload && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md my-4 sm:my-0">
             <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-lg bg-navy-50">
@@ -1651,6 +1654,7 @@ Provide a structured comparison covering:
                 onClick={() => {
                   setShowUpload(false);
                   setUploadError("");
+                  setSelectedFileName("");
                 }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
@@ -1731,19 +1735,28 @@ Provide a structured comparison covering:
                   File
                 </label>
                 <div
-                  className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-navy-400 transition-colors cursor-pointer"
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${selectedFileName ? "border-navy-400 bg-navy-50" : "border-slate-300 hover:border-navy-400"}`}
                   onClick={() => fileRef.current?.click()}
                 >
-                  <Upload size={20} className="text-slate-400 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">Click to select a file</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    PDF, DOCX, and TXT supported
-                  </p>
+                  {selectedFileName ? (
+                    <>
+                      <CheckCircle2 size={20} className="text-navy-600 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-navy-800 break-all">{selectedFileName}</p>
+                      <p className="text-xs text-slate-400 mt-1">Click to change file</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} className="text-slate-400 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Click to select a file</p>
+                      <p className="text-xs text-slate-400 mt-1">PDF, DOCX, and TXT supported</p>
+                    </>
+                  )}
                   <input
                     ref={fileRef}
                     type="file"
                     accept=".txt,.pdf,.docx"
                     className="hidden"
+                    onChange={(e) => setSelectedFileName(e.target.files?.[0]?.name ?? "")}
                   />
                 </div>
               </div>

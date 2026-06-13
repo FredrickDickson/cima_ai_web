@@ -138,7 +138,7 @@ ${excerpt}`,
       risk_score: riskScore,
       metadata,
       status: "ready",
-      extracted_text: text_content.slice(0, 10000),
+      extracted_text: text_content.slice(0, 100000),
     }).eq("id", document_id);
 
     return new Response(

@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fallbackName = email.split("@")[0].replace(/[._-]/g, " ") || "User";
       const { data: created } = await supabase
         .from("profiles")
-        .upsert({ id: userId, full_name: fallbackName, role: "lawyer", organization: "", jurisdiction: "" } as any)
+        .upsert({ id: userId, full_name: fallbackName, role: "lawyer", organization: "", jurisdiction: "", avatar_url: "" } as any)
         .select()
         .maybeSingle();
       if (created) setProfile(created);
@@ -119,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         organization: "",
         jurisdiction: "",
+        avatar_url: "",
       } as any);
       if (profileErr) {
         return { error: `Account created but profile setup failed: ${profileErr.message}` };

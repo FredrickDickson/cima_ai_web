@@ -114,9 +114,11 @@ export interface Database {
 export interface Profile {
   id: string;
   full_name: string;
-  role: string;
-  organization: string;
-  jurisdiction: string;
+  role: string | null;
+  organization: string | null;
+  jurisdiction: string | null;
+  avatar_url: string | null;
+  title: string | null;
   created_at: string;
   updated_at: string;
 }

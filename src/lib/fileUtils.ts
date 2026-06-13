@@ -1,10 +1,12 @@
+import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
 export async function extractTextFromFile(file: File): Promise<string> {
   const name = file.name.toLowerCase();
-  
+
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
     const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const pages: string[] = [];
@@ -22,8 +24,8 @@ export async function extractTextFromFile(file: File): Promise<string> {
       console.log("No embedded text found in PDF, falling back to OCR...");
       const Tesseract = await import("tesseract.js");
       const ocrPages: string[] = [];
-      
-      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Limit OCR to 10 pages for perf
+
+      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 2.0 });
         const canvas = document.createElement("canvas");
@@ -32,7 +34,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
         const ctx = canvas.getContext("2d");
         if (!ctx) continue;
         await page.render({ canvasContext: ctx, viewport }).promise;
-        
+
         const dataUrl = canvas.toDataURL("image/png");
         const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
         const { data: { text } } = await recognize(dataUrl, "eng");
@@ -43,12 +45,12 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
     return pages.join("\n\n");
   }
-  
+
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");
     const result = await mammoth.default.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     return result.value;
   }
-  
+
   return file.text();
 }

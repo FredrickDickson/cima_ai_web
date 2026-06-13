@@ -111,24 +111,36 @@ export default function Sidebar() {
 
       {/* Profile */}
       <div className="border-t border-navy-800 p-3 shrink-0">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gold-500/20 text-gold-400 text-sm font-semibold shrink-0">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
+        <button
+          onClick={() => navigate("/profile")}
+          className="flex items-center gap-3 px-2 py-2 w-full hover:bg-navy-800 rounded-lg transition-colors"
+        >
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gold-500/20 text-gold-400 text-sm font-semibold shrink-0">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">{displayName}</p>
             <p className="text-xs text-slate-500 capitalize truncate">
               {profile?.role || "Lawyer"}
             </p>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="p-1.5 text-slate-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors"
-            title="Sign out"
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
+        </button>
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-2 px-2 py-2 w-full text-slate-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors mt-1"
+          title="Sign out"
+        >
+          <LogOut size={15} />
+          <span className="text-sm">Sign out</span>
+        </button>
       </div>
     </aside>
   );

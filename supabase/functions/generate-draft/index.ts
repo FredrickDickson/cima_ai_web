@@ -15,6 +15,23 @@ const lawsAfricaCountryMap: Record<string, string> = {
   mauritius: "mu", eswatini: "sz", lesotho: "ls", mozambique: "mz",
 };
 
+async function fetchAccraRulesContext(query: string, supabase: ReturnType<typeof createClient>): Promise<string> {
+  if (!query) return "";
+  try {
+    const { data, error } = await supabase.rpc("search_legal_library_fts", {
+      search_query: query,
+      match_count: 4,
+    });
+    if (error || !data || data.length === 0) return "";
+    const entries = (data as Array<{ title: string; content: string; citation: string }>)
+      .slice(0, 4)
+      .map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
+    return `\n\nApplicable Arbitration Rules (Accra Arbitration Rules 2025):\n${entries.join("\n\n")}`;
+  } catch {
+    return "";
+  }
+}
+
 async function fetchLawsAfricaContext(query: string, apiKey: string, jurisdiction?: string): Promise<string> {
   if (!apiKey) return "";
   try {
@@ -141,11 +158,14 @@ Deno.serve(async (req: Request) => {
       ? Object.entries(variables).map(([k, v]) => `${k}: ${v}`).join("\n")
       : "";
 
-    // Fetch relevant legislation from Laws.Africa to ground the draft
+    // Fetch relevant legislation from Laws.Africa + Accra Arbitration Rules
     const searchQuery = prompt
       ? `${prompt} ${jurisdiction ?? "Ghana"} law`
       : `${templateTitle} ${jurisdiction ?? "Ghana"} law`;
-    const lawsContext = await fetchLawsAfricaContext(searchQuery, lawsAfricaKey, jurisdiction);
+    const [lawsContext, accraContext] = await Promise.all([
+      fetchLawsAfricaContext(searchQuery, lawsAfricaKey, jurisdiction),
+      fetchAccraRulesContext(prompt ?? templateTitle, supabase),
+    ]);
 
     // ---- Build the AI prompt based on input path ----
     let aiPrompt: string;
@@ -161,6 +181,7 @@ ${variableList ? `Variable values provided:\n${variableList}\n` : ""}
 ${matterContext ? `Use the following matter details to populate the document with accurate party names, dates, and case specifics:\n\n${matterContext}\n` : ""}
 ${custom_instructions ? `Special instructions: ${custom_instructions}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
+${accraContext ? `Reference the following Accra Arbitration Rules 2025 provisions where applicable:\n${accraContext}\n` : ""}
 Produce the complete final document in professional legal format.
 
 After the main document, add the following three sections exactly as labelled:
@@ -192,6 +213,7 @@ CRITICAL INSTRUCTIONS — READ CAREFULLY:
 
 ${matterContext ? `Use the following linked matter details for additional party names, dates, and case specifics:\n\n${matterContext}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
+${accraContext ? `Reference the following Accra Arbitration Rules 2025 provisions where applicable:\n${accraContext}\n` : ""}
 ${custom_instructions ? `Additional instructions: ${custom_instructions}\n` : ""}
 Jurisdiction: ${jurisdiction ?? "Ghana"}
 
@@ -223,6 +245,7 @@ Jurisdiction: ${jurisdiction ?? "Ghana"}
 ${matterContext ? `Matter context:\n${matterContext}\n` : ""}
 ${custom_instructions ? `Special instructions: ${custom_instructions}\n` : ""}
 ${lawsContext ? `Use the following legal sources to ensure the draft complies with applicable legislation:\n${lawsContext}\n` : ""}
+${accraContext ? `Reference the following Accra Arbitration Rules 2025 provisions where applicable:\n${accraContext}\n` : ""}
 Produce a complete document with all standard provisions, properly structured and formatted.
 
 After the main document, add the following three sections exactly as labelled:

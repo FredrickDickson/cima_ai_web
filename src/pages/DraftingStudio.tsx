@@ -50,6 +50,7 @@ import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
+import { getRelevantRulesContext } from "../lib/documentSearch";
 import type { Template, Case, Draft } from "../types/database";
 import LegalEditor from "../components/drafting/LegalEditor";
 import CommandBar from "../components/drafting/CommandBar";
@@ -524,10 +525,20 @@ export default function DraftingStudio() {
     setError("");
 
     try {
+      // Get relevant rules context for the AI
+      const rulesContext = await getRelevantRulesContext(textToProcess, 3);
       const isSelection = !!selText;
+      
+      // Build the prompt with rules context if available
+      let promptContent = actionPrompt;
+      if (rulesContext) {
+        promptContent += `\n\n${rulesContext}`;
+      }
+      promptContent += `\n\n${isSelection ? "Selected text" : "Full document"}:\n\n${textToProcess}\n\nReturn ONLY the modified text, no preamble or explanation.`;
+      
       const result = await callAiChat([{
         role: "user",
-        content: `${actionPrompt}\n\n${isSelection ? "Selected text" : "Full document"}:\n\n${textToProcess}\n\nReturn ONLY the modified text, no preamble or explanation.`,
+        content: promptContent,
       }]);
 
       if (isSelection && editor && sel) {

@@ -244,7 +244,7 @@ export default function AIAssistant() {
     const userText = input.trim() ? input : defaultDocPrompt;
 
     const messageContent = uploadedDocText
-      ? `[Attached document: ${uploadedDocName}]\n\n${uploadedDocText.slice(0, 8000)}\n\n---\n\n${userText}`
+      ? `[Attached document: ${uploadedDocName}]\n\n${uploadedDocText.slice(0, 120000)}\n\n---\n\n${userText}`
       : userText;
 
     const sentAttachmentName = uploadedDocName;
@@ -313,7 +313,7 @@ export default function AIAssistant() {
       }
 
       const data = await res.json();
-      const content: string = data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
+      const content: string = data.content ?? data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
 
       setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
       await supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "assistant", content } as any);

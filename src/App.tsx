@@ -14,6 +14,8 @@ import Documents from "./pages/Documents";
 import AIAssistant from "./pages/AIAssistant";
 import DraftingStudio from "./pages/DraftingStudio";
 import ContractReview from "./pages/ContractReview";
+import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -119,6 +121,14 @@ export default function App() {
             <Route
               path="/review"
               element={<RequireAuth><ContractReview /></RequireAuth>}
+            />
+            <Route
+              path="/profile"
+              element={<RequireAuth><Profile /></RequireAuth>}
+            />
+            <Route
+              path="/admin"
+              element={<RequireAuth><Admin /></RequireAuth>}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

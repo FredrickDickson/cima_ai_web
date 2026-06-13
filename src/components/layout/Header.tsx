@@ -2,6 +2,7 @@ import { Bell, Menu, Settings } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSidebar } from "../../contexts/SidebarContext";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ThemeSwitcher from "../ui/ThemeSwitcher";
 
 interface HeaderProps {
@@ -12,6 +13,7 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   const { user, profile } = useAuth();
   const { toggle } = useSidebar();
+  const navigate = useNavigate();
   const displayName = profile?.full_name || user?.email || "User";
   const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
 
@@ -49,17 +51,28 @@ export default function Header({ title, subtitle }: HeaderProps) {
         >
           <Settings size={18} />
         </button>
-        <div className="flex items-center gap-2 ml-1 md:ml-2 pl-2 md:pl-3 border-l border-slate-200">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-navy-100 text-navy-700 text-sm font-semibold shrink-0">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
+        <button
+          onClick={() => navigate("/profile")}
+          className="flex items-center gap-2 ml-1 md:ml-2 pl-2 md:pl-3 border-l border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+        >
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-navy-100 text-navy-700 text-sm font-semibold shrink-0">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="hidden sm:block">
             <p className="text-sm font-medium text-navy-900 leading-none">{displayName}</p>
             <p className="text-xs text-slate-500 mt-0.5 capitalize">
               {profile?.role || "Lawyer"}
             </p>
           </div>
-        </div>
+        </button>
       </div>
 
       {showThemeSwitcher && (

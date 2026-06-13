@@ -61,6 +61,7 @@ export default function AIInsightsTab({ caseData }: { caseData: Case }) {
   const [insights, setInsights] = useState<Record<string, InsightResult>>({});
   const [loadingInsight, setLoadingInsight] = useState<string | null>(null);
   const [extraCtx, setExtraCtx] = useState("");
+  const [expandedInsights, setExpandedInsights] = useState<Record<string, boolean>>({});
 
   const parties: { name: string; role: string }[] = Array.isArray(caseData.parties) ? caseData.parties : [];
 
@@ -153,9 +154,14 @@ export default function AIInsightsTab({ caseData }: { caseData: Case }) {
                 )}
                 {result && !isLoading && (
                   <div className="px-4 py-3 border-t border-navy-800/50">
-                    <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed line-clamp-6">{result.content}</p>
+                    <p className={`text-xs text-slate-300 whitespace-pre-wrap leading-relaxed ${expandedInsights[action.id] ? "" : "line-clamp-6"}`}>{result.content}</p>
                     {result.content.length > 400 && (
-                      <button className="text-xs text-gold-400 hover:text-gold-300 mt-2 transition-colors">Show more</button>
+                      <button
+                        onClick={() => setExpandedInsights(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+                        className="text-xs text-gold-400 hover:text-gold-300 mt-2 transition-colors"
+                      >
+                        {expandedInsights[action.id] ? "Show less" : "Show more"}
+                      </button>
                     )}
                   </div>
                 )}

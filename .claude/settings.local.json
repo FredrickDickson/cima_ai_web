@@ -18,7 +18,12 @@
       "Bash(curl *)",
       "Bash(node seed-demo.mjs)",
       "Bash(mkdir -p \"C:/Users/Administrator/Documents/projects/project/screenshots\")",
-      "Bash(node take-screenshots-final.mjs)"
+      "Bash(node take-screenshots-final.mjs)",
+      "Bash(node -e \"import\\('pdfjs-dist/package.json', {assert:{type:'json'}}\\).then\\(m=>console.log\\(m.default.version\\)\\).catch\\(\\(\\)=>require\\('./node_modules/pdfjs-dist/package.json'\\).version\\)\")",
+      "Bash(node scripts/ingest-cima-rules.mjs)",
+      "Bash(node -e \"import\\('pdfjs-dist/package.json', {assert:{type:'json'}}\\).then\\(m=>console.log\\(m.default.version\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const d=JSON.parse\\(fs.readFileSync\\('/dev/stdin','utf8'\\)\\); console.log\\(d.version\\)\")",
+      "Bash(findstr version:*)"
     ]
   }
 }

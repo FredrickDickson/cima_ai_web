@@ -283,7 +283,7 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
 
   return (
     <AppLayout>
-      <Header title="Legal Research" subtitle="RAG-powered semantic search across legal library, case law, and live sources" />
+      <Header title="Legal Research" subtitle="Semantic search across legal library, case law, and live sources" />
       <div className="flex-1 overflow-hidden flex">
         <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
