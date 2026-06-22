@@ -1,0 +1,11 @@
+{
+  "name": "cima-ai-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.6.114 preview",
+    "check": "npx --yes hyperframes@0.6.114 lint && npx --yes hyperframes@0.6.114 validate && npx --yes hyperframes@0.6.114 inspect",
+    "render": "npx --yes hyperframes@0.6.114 render",
+    "publish": "npx --yes hyperframes@0.6.114 publish"
+  }
+}

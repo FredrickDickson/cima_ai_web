@@ -1,0 +1,331 @@
+{
+  "mode": "forced",
+  "selected": {
+    "name": "neo-brutalism",
+    "label": "Neo-Brutalism"
+  },
+  "confidence": "forced",
+  "brand": {
+    "primary": "#082F49",
+    "secondary": "#FBBF24",
+    "accent": "#0369A1",
+    "source": "signals",
+    "confidence": "high",
+    "needs_review": false,
+    "screenshot": "capture\\screenshots\\scroll-000.png",
+    "candidates": [
+      {
+        "hex": "#082F49",
+        "score": 537.8,
+        "bgCount": 3,
+        "interactiveBg": 1,
+        "on_button": true
+      },
+      {
+        "hex": "#FBBF24",
+        "score": 141.5,
+        "bgCount": 4,
+        "interactiveBg": 0,
+        "on_button": false
+      },
+      {
+        "hex": "#F59E0B",
+        "score": 122.8,
+        "bgCount": 1,
+        "interactiveBg": 0,
+        "on_button": false
+      },
+      {
+        "hex": "#0369A1",
+        "score": 38.1,
+        "bgCount": 0,
+        "interactiveBg": 0,
+        "on_button": false
+      },
+      {
+        "hex": "#CBD5E1",
+        "score": 11.2,
+        "bgCount": 0,
+        "interactiveBg": 0,
+        "on_button": false
+      },
+      {
+        "hex": "#0F172A",
+        "score": 9.1,
+        "bgCount": 0,
+        "interactiveBg": 0,
+        "on_button": false
+      }
+    ]
+  },
+  "baseline_winner": {
+    "name": "8-bit-orbit",
+    "combined": 0.493
+  },
+  "top_candidates": [
+    {
+      "name": "8-bit-orbit",
+      "label": "8-Bit Orbit",
+      "raw": 0.4,
+      "normalized": 0.533,
+      "combined": 0.493,
+      "combined_pre_capability": 0.493,
+      "matched_signals": [
+        "high_sat_accent"
+      ],
+      "capabilities_missing": [],
+      "fingerprint": {
+        "shadow": "stacked-pixel-offset",
+        "border": "none",
+        "motion": "pixel-snap-twinkle",
+        "density": "atmospherically-loaded",
+        "contrast": "dark-neon",
+        "palette-mode": "closed"
+      },
+      "best_for": [
+        "gaming",
+        "cyberpunk",
+        "web3",
+        "indie tools",
+        "high-saturation brands",
+        "retro tech",
+        "arcade"
+      ],
+      "avoid_for": [
+        "light-canvas brands",
+        "minimalist pastel",
+        "low-saturation editorial"
+      ],
+      "sectionA_excerpt": "CRT cabinet meets editorial discipline. Tektur display sits on a strict 4px grid; Chakra Petch body reads at HUD distance; Space Mono labels feel like console readouts.\n\nDepth is **stacked hard offset shadows** in 4px increments — never blur. Hero text gets a two-layer shadow (brand-secondary at +4/+4, navy at +8/+8). Buttons get a six-piece stack (three navy steps + three brand-color halo steps).\n\n**Brand DNA drives color, preset drives structure.** Three site colors (`--brand-primary` / `--brand-secondary` / `--brand-accent`) ignite headlines, stat numerals, accent rules, and label fills. They **never** appear as body text. The dark base (`--canvas-void` / `--canvas-navy`) is mandatory — scanline and CRT vignette overlays are invisible without a blackpoint.\n\n**Color role contract**: one ",
+      "delta_from_winner": 0
+    },
+    {
+      "name": "emerald-editorial",
+      "label": "Emerald Editorial",
+      "raw": 0.3,
+      "normalized": 0.357,
+      "combined": 0.34,
+      "combined_pre_capability": 0.34,
+      "matched_signals": [
+        "minimal_decoration",
+        "high_sat_accent"
+      ],
+      "capabilities_missing": [],
+      "fingerprint": {
+        "edges": "strict-rectangle",
+        "shadow": "none",
+        "rules": "4px-ink-solid",
+        "ornament": "double-rule-playbill",
+        "type": "bodoni-900-extreme-scale",
+        "voice": "fashion-masthead",
+        "register": "literary-authoritative"
+      },
+      "best_for": [
+        "literary brands",
+        "strategy",
+        "planning",
+        "leadership decks",
+        "longform research",
+        "authoritative editorial"
+      ],
+      "avoid_for": [
+        "quiet institutional brands",
+        "restrained corporate decks",
+        "calm minimalist registers"
+      ],
+      "sectionA_excerpt": "A fashion-masthead / 19th-century theatrical-playbill register: one display serif at extreme scale (heavy Bodoni-style, weight 900, 92-460px), with negative tracking and tight leading, set against a saturated brand canvas with deep ink and a warm alt-tile surface. The signature is the **double-rule ornament** — a centered serif word framed by two stacked 4px horizontal rules on each side (3px between them), bracketing a connector (\"of\", \"and\", \"for\") between two display words like a printed playbill.\n\nDepth is flat printed ink. **Zero shadows, zero gradients, zero border-radius, zero blur.** Elevation is communicated through color-block inversion (an `--ink` tile on the canvas reads as \"elevated\") and 4px solid ink rules that separate every section, list row, and tile divider.\n\nClass prefi",
+      "delta_from_winner": 0.153
+    },
+    {
+      "name": "peoples-platform",
+      "label": "People's Platform",
+      "raw": 0.25,
+      "normalized": 0.313,
+      "combined": 0.294,
+      "combined_pre_capability": 0.294,
+      "matched_signals": [
+        "high_sat_accent",
+        "minimal_decoration"
+      ],
+      "capabilities_missing": [],
+      "fingerprint": {
+        "shadow": "triple-stamp",
+        "border": "cream-inset-frame",
+        "motion": "stamp-slam",
+        "density": "medium",
+        "voice": "manifesto"
+      },
+      "best_for": [
+        "manifesto launches",
+        "indie SaaS poster",
+        "editorial-stamp brands",
+        "people-first storytelling",
+        "campaign-style narratives"
+      ],
+      "avoid_for": [
+        "minimalist enterprise",
+        "quiet authority",
+        "fintech compliance pages",
+        "data-heavy dashboards",
+        "luxury / glass aesthetics"
+      ],
+      "sectionA_excerpt": "Stamped-poster atlas. Every focal headline carries the same **triple-offset shadow**: accent word in front, a mid-warm drop at 6-10px, a deep-warm drop at 12-20px — always lower-right. The shadow IS the system; nothing else needs to shout.\n\nOne **Caveat-script handwritten accent** threads through each plate, rotated −3°, in the deep-warm drop colour. Two voices alternate — Alfa Slab for declarations, Caveat Brush for the human aside — never a third. Cream frames isolate authority surfaces. Pill chrome marks volume.\n\n**Stance** (write into every scene; this is the brand's identity, not optional decoration):\n\n- _character_ — triple-stamped poster system. Every focal word casts the same drop.\n- _signal_ — single triple-stamp per plate. Reserve it for one phrase; never split focus.\n- _cadence_",
+      "delta_from_winner": 0.2
+    },
+    {
+      "name": "block-frame",
+      "label": "Block Frame",
+      "raw": 0.2,
+      "normalized": 0.25,
+      "combined": 0.235,
+      "combined_pre_capability": 0.235,
+      "matched_signals": [
+        "high_sat_accent",
+        "minimal_decoration"
+      ],
+      "capabilities_missing": [],
+      "fingerprint": {
+        "shadow": "hard-offset-black",
+        "border": "4px-solid-ink",
+        "palette": "saturated-pastel-cycle",
+        "motion": "tilt-and-snap",
+        "decoration": "tilted-puncture"
+      },
+      "best_for": [
+        "indie SaaS launches",
+        "agency credentials",
+        "creative reviews",
+        "brand redesigns",
+        "design-led product talks"
+      ],
+      "avoid_for": [
+        "regulated disclosures",
+        "formal legal briefs",
+        "institutional restraint",
+        "enterprise compliance"
+      ],
+      "sectionA_excerpt": "Block Frame is maximalist neobrutalism: every region wears a 4px solid ink\nborder, every elevated card carries an 8px hard offset shadow (zero blur,\nsolid ink), every corner is square, and the canvas cycles through five\nsaturated pastels — pink, blue, green, yellow, cream — plus off-white and\nink. Display is heavy uppercase Inter with negative tracking; chrome is\nwide-tracked Space Grotesk in caps. Decorative tilts (±2° to ±12°),\nstar-bursts, stripe blocks, and dot grids puncture the grid intentionally.\nDensity is the rule: empty surfaces feel timid.\n\nBrand-aware color contract: `--brand-primary` is the dominant pastel\nground, `--brand-secondary` is the colored-shadow accent (replaces the\ntemplate's signature yellow shadow on the close-frame), `--brand-accent`\nis the CTA fill. Class prefix",
+      "delta_from_winner": 0.258
+    },
+    {
+      "name": "editorial-forest",
+      "label": "Editorial Forest",
+      "raw": 0.2,
+      "normalized": 0.235,
+      "combined": 0.225,
+      "combined_pre_capability": 0.225,
+      "matched_signals": [
+        "minimal_decoration"
+      ],
+      "capabilities_missing": [],
+      "fingerprint": {
+        "voice": "literary-quarterly",
+        "type": "serif-500-with-opsz",
+        "chrome": "mono-uppercase-tracked",
+        "depth": "flat-paper-no-shadow",
+        "palette": "tri-tone-forest-pink-cream",
+        "motion": "quiet-committed"
+      },
+      "best_for": [
+        "warm unhurried product stories",
+        "research recaps",
+        "studio updates",
+        "literary brands",
+        "quiet annual reports"
+      ],
+      "avoid_for": [
+        "urgent sales-driven registers",
+        "punchy promo",
+        "high-energy launches",
+        "consumer hype"
+      ],
+      "sectionA_excerpt": "A serif voice committed to one face (Source Serif 4 at weight 500, with the optical-size axis engaged) and a mono chrome that frames every page (JetBrains Mono UPPERCASE with 0.14em–0.18em tracking). Depth is flat: no drop shadows, no glows, no gradients, ever. Elevation is communicated by color-block contrast, 2px hairline rules, and the difference between a filled tile and a bordered one. The palette maps to a tight tri-tone — deep forest green, dusty rose pink, oat cream paper — via `--brand-primary` / `--brand-secondary` / `--canvas`. Every scene carries a topbar (mono label + monogram or counter) as the editorial spine. Motion is quiet and committed: nothing bounces, nothing snaps; entries glide, emphasis settles, ambient layers breathe. **Class prefix: `ef-`.**",
+      "delta_from_winner": 0.269
+    }
+  ],
+  "capability_gated_presets": [
+    {
+      "name": "liquid-glass",
+      "label": "Liquid Glass",
+      "raw": 0.15,
+      "normalized": 0.333,
+      "combined": 0,
+      "combined_pre_capability": 0.278,
+      "matched_signals": [
+        "minimal_decoration"
+      ],
+      "capabilities_missing": [
+        {
+          "kind": "block_installed",
+          "block": "liquid-glass-widgets",
+          "missing_files": [
+            "hyperframes/compositions/liquid-glass-widgets.html",
+            "hyperframes/compositions/lib/liquid-glass.iife.js"
+          ],
+          "auto_install": "npx hyperframes add liquid-glass-widgets",
+          "alternates": [
+            "liquid-glass-notification",
+            "liquid-glass-context-menu",
+            "liquid-glass-media-controls",
+            "ios26-liquid-glass",
+            "macos-tahoe-liquid-glass",
+            "vfx-liquid-glass"
+          ]
+        },
+        {
+          "kind": "env_var_set",
+          "var": "PRODUCER_HEADLESS_SHELL_PATH",
+          "reason": "WebGPU-capable browser (Brave / Chrome Canary). Cannot auto-install — varies by OS / user environment.",
+          "auto_install": null
+        }
+      ],
+      "fingerprint": {
+        "shadow": "inset-highlight",
+        "border": "hairline-translucent",
+        "motion": "rise-and-settle",
+        "density": "low",
+        "contrast": "high-on-aurora"
+      },
+      "best_for": [
+        "premium SaaS",
+        "AI products",
+        "hardware launches",
+        "futuristic tech",
+        "consumer apps with depth"
+      ],
+      "avoid_for": [
+        "print-feel brands",
+        "low-power render targets",
+        "warm hand-crafted registers"
+      ],
+      "sectionA_excerpt": "Frosted glass over moving color. Surfaces are weightless — light passes\n**through** them, not off them. Type sits on glass; glass sits on aurora;\naurora carries the brand. No element is the canvas; depth is the canvas.\n\n**One reading layer at a time.** A scene has glass surfaces (panels, pills,\ncards) floating over an animated color field. The eye reads what's on the\nglass, not the glass itself. Decoration is reserved for the aurora — the\nsurfaces stay neutral, just specular highlight + edge-light + chromatic\nfringe at the rim.\n\n**Entry motion**: soft upward translate + scale 0.86→1.0 with `back.out(1.04)` — overshoot tiny on purpose. Hard cuts and bouncy springs break the wetness."
+    }
+  ],
+  "site_features": {
+    "shadow_zero_blur": false,
+    "thick_solid_border": false,
+    "medium_solid_border": false,
+    "hairline_border": false,
+    "condensed_display": false,
+    "serif_display": false,
+    "high_sat_accent": true,
+    "low_saturation": false,
+    "rotated_transform": false,
+    "bouncy_easing": false,
+    "generous_padding": false,
+    "minimal_decoration": true
+  },
+  "site_dna": {
+    "source": "https://cimaai.vercel.app",
+    "brand_name": "Cimaai",
+    "material": "flat",
+    "imagery": "flat-illustration",
+    "background_patterns": [],
+    "page_intent": "landing",
+    "section_role_counts": {},
+    "voice_tone": "direct",
+    "voice_heading_style": "Sentence case",
+    "voice_heading_length": "tight"
+  },
+  "generated_at": "2026-06-19T14:03:18.113Z"
+}

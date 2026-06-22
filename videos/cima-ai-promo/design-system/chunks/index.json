@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-06-19T14:03:38.205Z",
+  "source_url": "https://cimaai.vercel.app",
+  "preset": "neo-brutalism",
+  "tokens_file": "chunks/tokens.css",
+  "easings_file": "chunks/easings.js",
+  "voice_file": "chunks/voice.md",
+  "hints_file": "chunks/composition-hints.md",
+  "type_roles_file": "chunks/type-roles.md",
+  "caption_skin_file": "chunks/caption-skin.html",
+  "components": [
+    {
+      "id": "button",
+      "file": "chunks/components/button.html"
+    },
+    {
+      "id": "chip",
+      "file": "chunks/components/chip.html"
+    },
+    {
+      "id": "corner-pins",
+      "file": "chunks/components/corner-pins.html"
+    },
+    {
+      "id": "deco-green-circle",
+      "file": "chunks/components/deco-green-circle.html"
+    },
+    {
+      "id": "deco-pink-block",
+      "file": "chunks/components/deco-pink-block.html"
+    },
+    {
+      "id": "deco-yellow-bar",
+      "file": "chunks/components/deco-yellow-bar.html"
+    },
+    {
+      "id": "divider-loud",
+      "file": "chunks/components/divider-loud.html"
+    },
+    {
+      "id": "dot-grid-bg",
+      "file": "chunks/components/dot-grid-bg.html"
+    },
+    {
+      "id": "gradient-mesh-bg",
+      "file": "chunks/components/gradient-mesh-bg.html"
+    },
+    {
+      "id": "hero",
+      "file": "chunks/components/hero.html"
+    },
+    {
+      "id": "manifesto",
+      "file": "chunks/components/manifesto.html"
+    },
+    {
+      "id": "rules-do-dont",
+      "file": "chunks/components/rules-do-dont.html"
+    },
+    {
+      "id": "stat-counter",
+      "file": "chunks/components/stat-counter.html"
+    }
+  ]
+}

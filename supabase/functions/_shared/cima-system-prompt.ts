@@ -73,7 +73,7 @@ Support:
 
 - Ghana ADR Act, 2010 (Act 798)
 - Contracts and Companies legislation
-- Accra Arbitration Rules 2025 — primary institutional rules for GHIAC-administered arbitrations seated in Ghana
+- Accra Arbitration Rules 2025 
 - UNCITRAL Rules
 - ICC Rules
 - LCIA Rules

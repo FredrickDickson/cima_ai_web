@@ -21,6 +21,8 @@ import {
   Trash2,
   ShieldCheck,
   X,
+  Copy,
+  Check,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -156,6 +158,7 @@ export default function Research() {
   const [validityResult, setValidityResult] = useState("");
   const [validityLoading, setValidityLoading] = useState(false);
   const [showValidity, setShowValidity] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   function toggleType(type: string) {
     setSelectedTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
@@ -271,6 +274,53 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
 
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  }
+
+  async function copyAsRichText(markdown: string) {
+    try {
+      // Create a temporary div to render the markdown
+      const tempDiv = document.createElement("div");
+      tempDiv.style.position = "absolute";
+      tempDiv.style.left = "-9999px";
+      document.body.appendChild(tempDiv);
+
+      // Use ReactMarkdown to render the markdown to HTML
+      const { default: ReactMarkdown } = await import("react-markdown");
+      const { default: remarkGfm } = await import("remark-gfm");
+      const { createRoot } = await import("react-dom/client");
+      
+      const root = createRoot(tempDiv);
+      root.render(
+        <div className="prose-doc text-sm leading-relaxed">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+        </div>
+      );
+
+      // Wait for rendering to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const html = tempDiv.innerHTML;
+      
+      // Clean up
+      root.unmount();
+      document.body.removeChild(tempDiv);
+
+      // Copy as rich text (HTML)
+      const clipboardItem = new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([markdown], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([clipboardItem]);
+      
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy as rich text:", err);
+      // Fallback to plain text copy
+      await navigator.clipboard.writeText(markdown);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }
 
   const suggestions = [
@@ -415,14 +465,24 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
 
               {response.ai_analysis && (
                 <div>
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="p-1.5 rounded-lg bg-gold-50"><Sparkles size={14} className="text-gold-600" /></div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-navy-950">CIMA AI Analysis</h3>
-                      <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">
-                        <CheckCircle2 size={11} /> Grounded — {response.sources_count} source{response.sources_count !== 1 ? "s" : ""}
-                      </span>
+                  <div className="flex items-center justify-between gap-2.5 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-gold-50"><Sparkles size={14} className="text-gold-600" /></div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-navy-950">CIMA AI Analysis</h3>
+                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">
+                          <CheckCircle2 size={11} /> Grounded — {response.sources_count} source{response.sources_count !== 1 ? "s" : ""}
+                        </span>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => copyAsRichText(response.ai_analysis)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-navy-300 text-navy-700 hover:text-navy-900 rounded-lg text-xs font-medium transition-colors shrink-0"
+                      title="Copy as rich text"
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />}
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-6">
                     <div className="prose-doc text-sm leading-relaxed">

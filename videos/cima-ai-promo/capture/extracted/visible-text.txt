@@ -1,0 +1,19 @@
+[span] CIMA
+[blockquote] "AI-native legal intelligence for the modern arbitration practitioner."
+[span] Legal research in seconds, not hours
+[span] AI-powered contract review and risk analysis
+[span] Integrated arbitration case management
+[span] CIMA AI with legal domain expertise
+[p] Supporting Ghana ADR Act 2010 · ICC · UNCITRAL · LCIA · New York Convention
+[span] CIMA AI
+[h2] Welcome back
+[p] Sign in to your legal workspace
+[label] Email address
+[label] Password
+[label] I agree to the
+[a] Terms of Service
+[label] and
+[a] Privacy Policy
+[button] Sign in
+[p] New to CIMA AI?
+[a] Create an account

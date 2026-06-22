@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cimaai × Neo-Brutalism — design.html</title>
+<!--
+  AGENT NOTE — design.html (product-launch-video Phase 1b output)
+  Brand DNA from: https://cimaai.vercel.app
+  Style preset:   neo-brutalism (forced)
+  Generated:      2026-06-19T14:03:18.097Z
+
+  Downstream usage (Phase 4b scene workers):
+    - §2: grep <!-- ROOT-START --> .. <!-- ROOT-END --> → paste into scene <style>
+    - §4: grep <!-- MOTION-START --> .. <!-- MOTION-END --> → paste into <script>
+    - §5: grep <!-- VOICE-START --> .. <!-- VOICE-END --> → register for DOM text copy
+    - §H: grep <!-- HINTS-START --> .. <!-- HINTS-END --> → composition rules for plan agent
+    - §6: grep <!-- COMPONENT: <name> --> .. <!-- /COMPONENT --> → paste by name
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=Space+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- preset chromeFonts: native typography for doc chrome + .preset-native-scope -->
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Archivo+Black&amp;family=Inter:wght@400;500;700;800&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color: #0F172A;
+    background: #FFFFFF;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+  .ds-section { padding: 80px 0; border-top: 1px solid #e5e5e5; }
+  .ds-section:first-of-type { border-top: none; }
+  .eyebrow { font-family: 'Space Mono', ui-monospace, monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; opacity: 0.6; margin-bottom: 12px; }
+  h1, h2, h3 { font-family: 'Inter', serif; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+  h2 { font-size: clamp(36px, 4vw, 56px); margin-bottom: 16px; }
+  h3.ds-h3 { font-size: 18px; font-family: 'Inter', sans-serif; font-weight: 600; margin: 20px 0 12px; opacity: 0.85; }
+  .ds-prose { font-size: 16px; max-width: 62ch; margin: 12px 0; opacity: 0.85; }
+  .ds-prose code, code { font-family: 'Space Mono', monospace; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.92em; }
+  .ds-code { font-family: 'Space Mono', monospace; background: #0f1419; color: #e6edf3; padding: 20px 24px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 16px 0; white-space: pre; }
+  .ds-summary { cursor: pointer; padding: 8px 0; font-family: 'Space Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; }
+  details[open] .ds-summary { opacity: 1; }
+
+  /* Paste-ready source blocks — collapsed by default because the raw markdown / CSS
+     in <pre> doesn't render as a readable doc (it's machine-bound for emit-chunks).
+     The rendered version sits above each <details>. */
+  .ds-paste-ready { margin: 16px 0; padding: 12px 16px; border: 1px dashed #bbb; border-radius: 8px; background: #fafafa; }
+  .ds-paste-ready > .ds-summary { padding: 4px 0; font-size: 11px; opacity: 0.85; }
+  .ds-paste-ready > .ds-summary code { background: #eee; padding: 1px 5px; border-radius: 3px; font-size: 0.95em; }
+  .ds-paste-ready[open] > .ds-summary { margin-bottom: 8px; }
+  .ds-paste-ready > pre.ds-code { margin: 0; }
+
+  /* ── Title card */
+  .title-card { padding: 80px 0 64px; border-bottom: 1px solid #e5e5e5; }
+  .title-card-inner { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+  .brand-row { display: flex; gap: 12px; align-items: baseline; font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 24px; }
+  .brand-name { color: #082F49; font-weight: 700; }
+  .brand-x { opacity: 0.4; }
+  .style-name { color: #0369A1; font-weight: 700; }
+  .title-display { font-size: clamp(48px, 7vw, 96px); margin: 0; }
+  .title-meta { margin-top: 32px; font-family: 'Space Mono', monospace; font-size: 12px; opacity: 0.7; }
+  .title-meta strong { font-weight: 700; opacity: 0.9; }
+
+  /* ── §1 Brand DNA */
+  .dna-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+  .dna-grid-5 { grid-template-columns: repeat(5, 1fr); }
+  .dna-swatch { padding: 24px 20px; border-radius: 8px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; }
+  .dna-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.8; }
+  .dna-hex { font-family: 'Space Mono', monospace; font-size: 18px; font-weight: 700; }
+  .dna-desc { margin-top: 24px; font-size: 18px; line-height: 1.55; max-width: 60ch; opacity: 0.85; }
+  .dna-gradient { margin: 32px 0 0; }
+  .dna-gradient-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-bottom: 10px; }
+  .dna-gradient-bar { height: 96px; border-radius: 8px; }
+  .dna-gradient-code { display: block; margin-top: 10px; font-family: 'Space Mono', monospace; font-size: 12px; opacity: 0.7; word-break: break-all; }
+  @media (max-width: 900px) { .dna-grid-5 { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 720px) { .dna-grid { grid-template-columns: repeat(2, 1fr); } .dna-grid-5 { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ── §3 Typography */
+  .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0; }
+  .type-card { padding: 24px; border: 1px solid #e5e5e5; border-radius: 8px; }
+  .type-role { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; }
+  .type-name { font-size: 18px; font-weight: 600; margin: 4px 0; }
+  .type-note { font-family: 'Space Mono', monospace; font-size: 11px; opacity: 0.5; margin-bottom: 16px; }
+  .type-specimen { margin-top: 16px; }
+  @media (max-width: 720px) { .type-grid { grid-template-columns: 1fr; } }
+
+  /* ── §5 Voice */
+  .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin: 24px 0; }
+  .voice-dl dt { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-top: 16px; }
+  .voice-dl dd { font-size: 15px; margin-top: 4px; }
+  .voice-cta { display: inline-block; padding: 2px 10px; border: 1px solid #ddd; border-radius: 999px; font-size: 13px; margin: 2px 4px 2px 0; }
+  .voice-sample { font-size: 15px; opacity: 0.85; margin: 4px 0; }
+  .voice-pair { padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px; margin: 12px 0; }
+  .voice-tag { font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; opacity: 0.6; margin-right: 8px; }
+  .voice-in { margin-bottom: 8px; }
+  .voice-out { opacity: 0.7; }
+  @media (max-width: 720px) { .voice-grid { grid-template-columns: 1fr; } }
+
+  /* ── §6 Components */
+  .comp-card { padding: 0; border: 1px solid #e5e5e5; border-radius: 8px; margin: 16px 0; overflow: hidden; }
+  .comp-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #e5e5e5; }
+  .comp-name { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; }
+  .comp-marker { font-family: 'Space Mono', monospace; font-size: 11px; opacity: 0.6; }
+  /* Component preview: components are authored for 1920×1080 scenes. The doc
+     container is ~1056px wide, so wide components (mega-stat etc.) overflow.
+     Allow horizontal scroll so reviewers can pan; max-height caps vertical too. */
+  .comp-preview { padding: 32px; background: #FFFFFF; overflow: auto; max-height: 720px; }
+  .comp-preview::-webkit-scrollbar { height: 8px; width: 8px; }
+  .comp-preview::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
+  /* ── Markdown blocks (mdBlockToHtml output) */
+  .ds-prose-block { max-width: 80ch; margin: 16px 0; }
+  .ds-prose-block .ds-prose { margin: 0 0 12px; }
+  .ds-prose-block .ds-prose:last-child { margin-bottom: 0; }
+  .ds-prose-block .ds-h2 { font-family: 'Inter', serif; font-size: 24px; margin: 24px 0 12px; }
+  .ds-prose-block .ds-h3 { font-size: 16px; font-weight: 700; margin: 20px 0 8px; opacity: 0.9; }
+  .ds-prose-block .ds-h4 { font-size: 14px; font-weight: 700; margin: 18px 0 6px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ds-prose-block .ds-list { margin: 8px 0 16px; padding-left: 24px; }
+  .ds-prose-block .ds-list li { margin: 4px 0; line-height: 1.55; }
+  .ds-prose-block .ds-list li code { font-size: 0.92em; }
+  .ds-prose-block .ds-code { margin: 12px 0; }
+  .ds-table { border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  .ds-table th, .ds-table td { padding: 8px 12px; border: 1px solid #e5e5e5; vertical-align: top; text-align: left; }
+  .ds-table th { background: #fafafa; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ds-table td code { font-size: 0.92em; }
+  
+
+/* ── Preset §I page styling (from neo-brutalism.md) ── */
+/* ── Preset-native typography vars — doc chrome + .preset-native-scope (Anton + Inter + Space Mono). */
+:root {
+  --f-disp-native:
+    "Anton", "Archivo Black", "Oswald", "Impact", "Arial Black", "Helvetica Neue", sans-serif;
+  --f-body-native:
+    "Inter", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --f-script-native:
+    "Anton", "Archivo Black", "Oswald", "Impact", "Arial Black", "Helvetica Neue", sans-serif;
+  --f-mono-native:
+    "Space Mono", "JetBrains Mono", "IBM Plex Mono", "Menlo", ui-monospace, monospace;
+}
+
+/* .preset-native-scope: rebinds var(--font-*) to native families for §6 previews + §T atlas. */
+.preset-native-scope {
+  --font-display: var(--f-disp-native);
+  --font-body: var(--f-body-native);
+  --font-script: var(--f-script-native);
+  --font-mono: var(--f-mono-native);
+}
+
+/* Brutalist page chrome — applied to design.html itself */
+body {
+  background: var(--canvas);
+}
+.title-card {
+  background: var(--canvas);
+  border-bottom: var(--border-loud);
+  padding: 96px 0 80px;
+}
+.title-display {
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+}
+.brand-name,
+.style-name {
+  font-weight: 800;
+}
+
+.ds-section {
+  border-top: var(--border-loud);
+  padding: 80px 0;
+}
+
+/* Cards / panels get the brutalist treatment */
+.dna-swatch,
+.type-card,
+.voice-pair {
+  border: var(--border-bold) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--shadow-hard);
+}
+
+.comp-card {
+  border: var(--border-bold) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--shadow-hard);
+  margin: 32px 0 !important;
+  overflow: visible !important; /* don't crop shadows */
+}
+.comp-head {
+  background: var(--ink) !important;
+  color: var(--canvas);
+  border-bottom: var(--border-bold) !important;
+}
+.comp-head .comp-name,
+.comp-head .comp-marker {
+  color: var(--canvas);
+}
+
+.ds-code {
+  border: var(--border-bold);
+  border-radius: 0 !important;
+  box-shadow: var(--shadow-hard);
+}
+
+h2 {
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+}
+.eyebrow {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ── §T Type-role atlas container. */
+.ds-trole-box {
+  display: flex;
+  flex-direction: column;
+  border: var(--border-bold);
+  border-radius: 0;
+  background: var(--canvas);
+  box-shadow: var(--shadow-hard);
+  overflow: hidden;
+  margin-top: 24px;
+}
+.ds-trole-row {
+  padding: 32px;
+  border-bottom: 2px solid var(--ink);
+}
+.ds-trole-row:last-child {
+  border-bottom: 0;
+}
+.ds-trole-sample {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 960px) {
+  .ds-trole-row {
+    padding: 24px;
+  }
+}
+
+/* ── Type-role samples. var(--font-*) resolves to brand DNA; decoration vars are preset-native. */
+.t-trole-display-cover {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(120px, 16vw, 340px);
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-headline {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(72px, 9vw, 160px);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-statement {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--canvas);
+  border: var(--border-bold);
+  box-shadow: var(--shadow-hard);
+  padding: 24px 32px;
+  max-width: 22ch;
+}
+.t-trole-number-hero {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(96px, 14vw, 240px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(28px, 3.2vw, 48px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(24px, 1.8vw, 30px);
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-lead {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: clamp(28px, 2.6vw, 40px);
+  line-height: 1.4;
+  color: var(--ink);
+  max-width: 48ch;
+  margin: 0;
+}
+.t-trole-body {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: clamp(24px, 1.7vw, 30px);
+  line-height: 1.55;
+  color: var(--ink);
+  max-width: 60ch;
+  margin: 0;
+}
+.t-trole-caption {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(24px, 1.5vw, 28px);
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  margin: 0;
+}
+.t-trole-label-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(24px, 1.5vw, 28px);
+  line-height: 1.3;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.t-trole-chip-loud {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(26px, 2vw, 36px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--canvas);
+  border: 2px solid var(--ink);
+  padding: 10px 22px;
+  transform: rotate(var(--tilt-l));
+}
+.t-trole-cta-arrow {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 2.6vw, 44px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+</style>
+</head>
+<body>
+
+
+<section class="title-card">
+  <div class="title-card-inner">
+    <div class="brand-row">
+      <span class="brand-name">Cimaai</span>
+      <span class="brand-x">×</span>
+      <span class="style-name">Neo-Brutalism</span>
+    </div>
+    <h1 class="title-display">Cimaai</h1>
+    <p class="title-meta">
+      <strong>Source</strong> https://cimaai.vercel.app
+      &nbsp;·&nbsp;
+      <strong>Material</strong> flat
+      &nbsp;·&nbsp;
+      <strong>Intent</strong> landing
+      &nbsp;·&nbsp;
+      <strong>Style</strong> Neo-Brutalism (forced)
+    </p>
+  </div>
+</section>
+
+<main class="wrap">
+
+<section id="brand-dna" class="ds-section">
+  <div class="eyebrow">§1 · Brand DNA (from site)</div>
+  <h2>Cimaai in one glance</h2>
+  <div class="dna-grid dna-grid-5">
+    
+    <div class="dna-swatch" style="background: #082F49; color: #fff; ">
+      <div class="dna-label">Primary</div>
+      <div class="dna-hex">#082F49</div>
+    </div>
+    
+    <div class="dna-swatch" style="background: #FBBF24; color: #000; ">
+      <div class="dna-label">Secondary</div>
+      <div class="dna-hex">#FBBF24</div>
+    </div>
+    
+    <div class="dna-swatch" style="background: #0369A1; color: #fff; ">
+      <div class="dna-label">Accent</div>
+      <div class="dna-hex">#0369A1</div>
+    </div>
+    
+    <div class="dna-swatch" style="background: #FFFFFF; color: #000; border: 1px solid #eee;">
+      <div class="dna-label">Canvas</div>
+      <div class="dna-hex">#FFFFFF</div>
+    </div>
+    
+    <div class="dna-swatch" style="background: #0F172A; color: #fff; ">
+      <div class="dna-label">Ink</div>
+      <div class="dna-hex">#0F172A</div>
+    </div>
+  </div>
+
+  <div class="dna-gradient">
+    <div class="dna-gradient-label">Signature gradient</div>
+    <div class="dna-gradient-bar" style="background: linear-gradient(135deg, #082F49 0%, #FBBF24 50%, #0369A1 100%);"></div>
+    <code class="dna-gradient-code">linear-gradient(135deg, #082F49 0%, #FBBF24 50%, #0369A1 100%)</code>
+  </div>
+
+  <p class="dna-desc">AI-powered legal intelligence and arbitration management platform</p>
+</section>
+
+<section id="color-tokens" class="ds-section">
+  <div class="eyebrow">§2 · Color × Style overlay</div>
+  <h2>Color tokens + Neo-Brutalism decoration vars</h2>
+  <p class="ds-prose">Brand colors come from the site. Decoration variables come from the <strong>Neo-Brutalism</strong> preset. The <code>:root</code> block is live on this page (so §6 component previews render properly). The paste-ready source for <code>chunks/tokens.css</code> is collapsed below — open it to copy.</p>
+  <style>:root {
+  --brand-primary:   #082F49;
+  --brand-secondary: #FBBF24;
+  --brand-tertiary:  #0369A1;
+  --brand-accent:    #0369A1;
+  --brand-costume:   #FFFFFF;
+  --ink:             #0F172A;
+  --canvas:          #FFFFFF;
+  --brand-gradient:  linear-gradient(135deg, #082F49 0%, #FBBF24 50%, #0369A1 100%);
+  --deco-1:          #F7CB46;
+  --deco-2:          #99E885;
+  --deco-3:          #C0F7FE;
+  --deco-4:          #FE90E8;
+  --font-display:    'Inter', ui-monospace, monospace;
+  --font-body:       'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:       'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --shadow-hard: 8px 8px 0 var(--ink);
+  --shadow-hover: 11px 11px 0 var(--ink);
+  --border-bold: 4px solid var(--ink);
+  --border-loud: 6px solid var(--ink);
+  --tilt-l: -1deg;
+  --tilt-r: 1deg;
+  --gap-loud: 1.7vw; /* ~32px on a 1920 canvas */
+  }</style>
+  <details class="ds-paste-ready">
+    <summary class="ds-summary">▸ Paste-ready source → <code>chunks/tokens.css</code></summary>
+    <pre class="ds-code"><!-- ROOT-START -->:root {
+  --brand-primary:   #082F49;
+  --brand-secondary: #FBBF24;
+  --brand-tertiary:  #0369A1;
+  --brand-accent:    #0369A1;
+  --brand-costume:   #FFFFFF;
+  --ink:             #0F172A;
+  --canvas:          #FFFFFF;
+  --brand-gradient:  linear-gradient(135deg, #082F49 0%, #FBBF24 50%, #0369A1 100%);
+  --deco-1:          #F7CB46;
+  --deco-2:          #99E885;
+  --deco-3:          #C0F7FE;
+  --deco-4:          #FE90E8;
+  --font-display:    'Inter', ui-monospace, monospace;
+  --font-body:       'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:       'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --shadow-hard: 8px 8px 0 var(--ink);
+  --shadow-hover: 11px 11px 0 var(--ink);
+  --border-bold: 4px solid var(--ink);
+  --border-loud: 6px solid var(--ink);
+  --tilt-l: -1deg;
+  --tilt-r: 1deg;
+  --gap-loud: 1.7vw; /* ~32px on a 1920 canvas */
+}<!-- ROOT-END --></pre>
+  </details>
+</section>
+
+<section id="typography" class="ds-section">
+  <div class="eyebrow">§3 · Typography</div>
+  <h2>Type roles</h2>
+  <p class="ds-prose">Font families resolved by 4-step lookup: site name on Google Fonts → self-host local woff2 → preset §D fallback → final hard-coded fallback. Each card shows which step landed.</p>
+
+  <div class="type-grid">
+    
+    <div class="type-card">
+      <div class="type-role">Display</div>
+      <div class="type-name">Inter</div>
+      <div class="type-note">✓ from site (Google Fonts CDN)</div>
+      <div class="type-specimen" style="font-family: 'Inter', serif; font-size: 72px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;">Cimaai</div>
+    </div>
+    <div class="type-card">
+      <div class="type-role">Body</div>
+      <div class="type-name">Inter</div>
+      <div class="type-note">✓ from site (Google Fonts CDN)</div>
+      <div class="type-specimen" style="font-family: 'Inter', sans-serif; font-size: 22px; line-height: 1.5;">The quick brown fox jumps over the lazy dog.</div>
+    </div>
+    <div class="type-card">
+      <div class="type-role">Mono</div>
+      <div class="type-name">Space Mono</div>
+      <div class="type-note">site has no mono face → preset fallback</div>
+      <div class="type-specimen" style="font-family: 'Space Mono', ui-monospace, monospace; font-size: 18px;">font: Space Mono</div>
+    </div>
+  </div>
+
+  <h3 class="ds-h3" style="margin-top: 48px;">Type-role atlas</h3>
+  <div class="ds-trole-box">
+    
+    <div class="ds-trole-row" data-scale="display-cover" data-family="display" data-px-min="200" data-px-max="340" data-weight="800" data-leading="0.86" data-tracking="-0.04em" data-case="upper" data-purpose="cover hero at maximum scale — one huge thing per scene, ink on canvas">
+      <div class="ds-trole-sample"><div class="t-trole-display-cover">BRAND</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="headline" data-family="display" data-px-min="96" data-px-max="160" data-weight="800" data-leading="0.9" data-tracking="-0.03em" data-case="upper" data-purpose="primary slide headline — declarative manifesto voice">
+      <div class="ds-trole-sample"><div class="t-trole-headline">TEAMS. SHIP.</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="statement" data-family="display" data-px-min="56" data-px-max="96" data-weight="800" data-leading="1" data-tracking="-0.02em" data-case="upper" data-purpose="framed declarative quote on canvas — thick border + hard offset shadow">
+      <div class="ds-trole-sample"><div><span class="t-trole-statement">ONE HUGE THING. NO APOLOGY.</span></div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="number-hero" data-family="display" data-px-min="120" data-px-max="240" data-weight="800" data-leading="0.9" data-tracking="-0.04em" data-case="upper" data-purpose="hero statistic numeral — ink on canvas, no decoration">
+      <div class="ds-trole-sample"><div class="t-trole-number-hero">340%</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="h2" data-family="display" data-px-min="56" data-px-max="96" data-weight="800" data-leading="0.95" data-tracking="-0.03em" data-case="upper" data-purpose="secondary headline / section title">
+      <div class="ds-trole-sample"><div class="t-trole-h2">Section title</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="h3" data-family="display" data-px-min="32" data-px-max="48" data-weight="800" data-leading="1" data-tracking="-0.02em" data-case="upper" data-purpose="panel title / card heading">
+      <div class="ds-trole-sample"><div class="t-trole-h3">Sub-headline</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="eyebrow" data-family="body" data-px-min="24" data-px-max="30" data-weight="700" data-leading="1.2" data-tracking="0.18em" data-case="upper" data-purpose="eyebrow label above a headline — tracked uppercase Inter 700">
+      <div class="ds-trole-sample"><div class="t-trole-eyebrow">Vol. 01 — Manifesto</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="lead" data-family="body" data-px-min="28" data-px-max="40" data-weight="500" data-leading="1.4" data-tracking="0" data-case="sentence" data-purpose="lead paragraph / opening sentence (Inter 500)">
+      <div class="ds-trole-sample"><p class="t-trole-lead">Hard edges. Declarative typography. Shadow is weight, not depth.</p></div>
+    </div>
+    <div class="ds-trole-row" data-scale="body" data-family="body" data-px-min="24" data-px-max="30" data-weight="500" data-leading="1.55" data-tracking="0" data-case="sentence" data-purpose="default body paragraph (Inter 500)">
+      <div class="ds-trole-sample"><p class="t-trole-body">Body sits at Inter 500. Sentence case, terse. The manifesto is in the display; the body is the receipt.</p></div>
+    </div>
+    <div class="ds-trole-row" data-scale="caption" data-family="mono" data-px-min="24" data-px-max="28" data-weight="700" data-leading="1.4" data-tracking="0.04em" data-case="sentence" data-purpose="caption / source attribution (Space Mono 700)">
+      <div class="ds-trole-sample"><p class="t-trole-caption">Source: internal data, 2026.</p></div>
+    </div>
+    <div class="ds-trole-row" data-scale="label-mono" data-family="mono" data-px-min="24" data-px-max="28" data-weight="700" data-leading="1.3" data-tracking="0.16em" data-case="upper" data-purpose="tracked uppercase mono label — chrome bar, slide counter, chip metadata">
+      <div class="ds-trole-sample"><div class="t-trole-label-mono">01 / MANIFESTO</div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="chip-loud" data-family="display" data-px-min="26" data-px-max="36" data-weight="800" data-leading="1" data-tracking="0.04em" data-case="upper" data-purpose="ink pill chip — canvas text on ink fill, thick border, slight tilt">
+      <div class="ds-trole-sample"><div><span class="t-trole-chip-loud">SHIP IT</span></div></div>
+    </div>
+    <div class="ds-trole-row" data-scale="cta-arrow" data-family="display" data-px-min="28" data-px-max="44" data-weight="800" data-leading="1" data-tracking="-0.01em" data-case="upper" data-purpose="arrow-prefixed CTA — declarative imperative with hit-and-stick weight">
+      <div class="ds-trole-sample"><div class="t-trole-cta-arrow">→ JOIN THE DROP</div></div>
+    </div>
+  </div>
+
+  <details class="ds-paste-ready" style="margin-top: 32px;">
+    <summary class="ds-summary">▸ Paste-ready source → <code>chunks/type-roles.md</code> (scene worker reads on demand)</summary>
+    <pre class="ds-code"><!-- TYPE-ROLES-START -->
+# Type-roles atlas — Neo-Brutalism
+
+Phase 4b scene worker reads this when text outside §6 components is needed (hero displays, ledes, pill rows, CTA buttons, …). Workflow: pick role by id → paste the CSS rule into scene `&lt;style&gt;` with `s&lt;N&gt;-` prefix on the class names → wrap content using the prefixed class. Family tokens (`var(--font-*)`) resolve to brand DNA at scene-render time.
+
+## type-role: display-cover
+
+- family: display · px: 200–340 · weight: 800
+- leading: 0.86 · tracking: -0.04em · case: upper
+- purpose: cover hero at maximum scale — one huge thing per scene, ink on canvas
+
+```css
+.t-trole-display-cover {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(120px, 16vw, 340px);
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-display-cover&quot;&gt;BRAND&lt;/div&gt;
+```
+
+## type-role: headline
+
+- family: display · px: 96–160 · weight: 800
+- leading: 0.9 · tracking: -0.03em · case: upper
+- purpose: primary slide headline — declarative manifesto voice
+
+```css
+.t-trole-headline {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(72px, 9vw, 160px);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-headline&quot;&gt;TEAMS. SHIP.&lt;/div&gt;
+```
+
+## type-role: statement
+
+- family: display · px: 56–96 · weight: 800
+- leading: 1 · tracking: -0.02em · case: upper
+- purpose: framed declarative quote on canvas — thick border + hard offset shadow
+
+```css
+.t-trole-statement {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--canvas);
+  border: var(--border-bold);
+  box-shadow: var(--shadow-hard);
+  padding: 24px 32px;
+  max-width: 22ch;
+}
+```
+
+Sample:
+
+```html
+&lt;div&gt;&lt;span class=&quot;t-trole-statement&quot;&gt;ONE HUGE THING. NO APOLOGY.&lt;/span&gt;&lt;/div&gt;
+```
+
+## type-role: number-hero
+
+- family: display · px: 120–240 · weight: 800
+- leading: 0.9 · tracking: -0.04em · case: upper
+- purpose: hero statistic numeral — ink on canvas, no decoration
+
+```css
+.t-trole-number-hero {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(96px, 14vw, 240px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-number-hero&quot;&gt;340%&lt;/div&gt;
+```
+
+## type-role: h2
+
+- family: display · px: 56–96 · weight: 800
+- leading: 0.95 · tracking: -0.03em · case: upper
+- purpose: secondary headline / section title
+
+```css
+.t-trole-h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-h2&quot;&gt;Section title&lt;/div&gt;
+```
+
+## type-role: h3
+
+- family: display · px: 32–48 · weight: 800
+- leading: 1 · tracking: -0.02em · case: upper
+- purpose: panel title / card heading
+
+```css
+.t-trole-h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(28px, 3.2vw, 48px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-h3&quot;&gt;Sub-headline&lt;/div&gt;
+```
+
+## type-role: eyebrow
+
+- family: body · px: 24–30 · weight: 700
+- leading: 1.2 · tracking: 0.18em · case: upper
+- purpose: eyebrow label above a headline — tracked uppercase Inter 700
+
+```css
+.t-trole-eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(24px, 1.8vw, 30px);
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-eyebrow&quot;&gt;Vol. 01 — Manifesto&lt;/div&gt;
+```
+
+## type-role: lead
+
+- family: body · px: 28–40 · weight: 500
+- leading: 1.4 · tracking: 0 · case: sentence
+- purpose: lead paragraph / opening sentence (Inter 500)
+
+```css
+.t-trole-lead {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: clamp(28px, 2.6vw, 40px);
+  line-height: 1.4;
+  color: var(--ink);
+  max-width: 48ch;
+  margin: 0;
+}
+```
+
+Sample:
+
+```html
+&lt;p class=&quot;t-trole-lead&quot;&gt;Hard edges. Declarative typography. Shadow is weight, not depth.&lt;/p&gt;
+```
+
+## type-role: body
+
+- family: body · px: 24–30 · weight: 500
+- leading: 1.55 · tracking: 0 · case: sentence
+- purpose: default body paragraph (Inter 500)
+
+```css
+.t-trole-body {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: clamp(24px, 1.7vw, 30px);
+  line-height: 1.55;
+  color: var(--ink);
+  max-width: 60ch;
+  margin: 0;
+}
+```
+
+Sample:
+
+```html
+&lt;p class=&quot;t-trole-body&quot;&gt;Body sits at Inter 500. Sentence case, terse. The manifesto is in the display; the body is the receipt.&lt;/p&gt;
+```
+
+## type-role: caption
+
+- family: mono · px: 24–28 · weight: 700
+- leading: 1.4 · tracking: 0.04em · case: sentence
+- purpose: caption / source attribution (Space Mono 700)
+
+```css
+.t-trole-caption {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(24px, 1.5vw, 28px);
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  margin: 0;
+}
+```
+
+Sample:
+
+```html
+&lt;p class=&quot;t-trole-caption&quot;&gt;Source: internal data, 2026.&lt;/p&gt;
+```
+
+## type-role: label-mono
+
+- family: mono · px: 24–28 · weight: 700
+- leading: 1.3 · tracking: 0.16em · case: upper
+- purpose: tracked uppercase mono label — chrome bar, slide counter, chip metadata
+
+```css
+.t-trole-label-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(24px, 1.5vw, 28px);
+  line-height: 1.3;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-label-mono&quot;&gt;01 / MANIFESTO&lt;/div&gt;
+```
+
+## type-role: chip-loud
+
+- family: display · px: 26–36 · weight: 800
+- leading: 1 · tracking: 0.04em · case: upper
+- purpose: ink pill chip — canvas text on ink fill, thick border, slight tilt
+
+```css
+.t-trole-chip-loud {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(26px, 2vw, 36px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--canvas);
+  border: 2px solid var(--ink);
+  padding: 10px 22px;
+  transform: rotate(var(--tilt-l));
+}
+```
+
+Sample:
+
+```html
+&lt;div&gt;&lt;span class=&quot;t-trole-chip-loud&quot;&gt;SHIP IT&lt;/span&gt;&lt;/div&gt;
+```
+
+## type-role: cta-arrow
+
+- family: display · px: 28–44 · weight: 800
+- leading: 1 · tracking: -0.01em · case: upper
+- purpose: arrow-prefixed CTA — declarative imperative with hit-and-stick weight
+
+```css
+.t-trole-cta-arrow {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 2.6vw, 44px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+```
+
+Sample:
+
+```html
+&lt;div class=&quot;t-trole-cta-arrow&quot;&gt;→ JOIN THE DROP&lt;/div&gt;
+```
+<!-- TYPE-ROLES-END --></pre>
+  </details>
+  <details style="margin-top: 32px;">
+    <summary class="ds-summary">Font pairing recipe (preset §D)</summary>
+    <div class="ds-prose-block"><ul class="ds-list"><li><strong>display</strong>: <code>&#39;Anton&#39;</code> · <code>&#39;Archivo Black&#39;</code> · <code>&#39;Space Grotesk&#39;</code> wght 800</li><li><strong>body</strong>: <code>&#39;Inter&#39;</code> · <code>&#39;IBM Plex Sans&#39;</code> wght 500</li><li><strong>mono</strong>: <code>&#39;Space Mono&#39;</code> · <code>&#39;JetBrains Mono&#39;</code> wght 700</li></ul>
+<p class="ds-prose">If brand fonts ARE on Google Fonts, keep brand fonts — preset only overrides weight and tracking.</p></div>
+  </details>
+</section>
+
+<section id="motion" class="ds-section">
+  <div class="eyebrow">§4 · Motion (preset)</div>
+  <h2>Neo-Brutalism motion language</h2>
+  <div class="ds-prose-block"><p class="ds-prose">Hard edges. Declarative typography. Shadow is <strong>weight</strong>, not depth.<br>Hit-and-stick motion. No glide, no fade.<br>One huge thing per scene. Cut, don&#39;t crossfade.</p></div>
+  <details class="ds-paste-ready">
+    <summary class="ds-summary">▸ Paste-ready source → <code>chunks/easings.js</code> (paste at top of every scene's <code>&lt;script&gt;</code>)</summary>
+    <pre class="ds-code"><!-- MOTION-START -->
+const EASE = {
+  entry: &quot;back.out(2.4)&quot;, // bouncy slam-pop
+  emphasis: &quot;expo.out&quot;, // hard arrival
+  exit: &quot;power4.in&quot;, // dive off
+  drift: &quot;sine.inOut&quot;, // only for ambient breathing
+};
+const DUR = {
+  snap: 0.18,
+  med: 0.45,
+  slow: 0.9,
+};
+// RULE: never ease-in-out for primary motion. Hit-and-stick.
+<!-- MOTION-END --></pre>
+  </details>
+</section>
+
+<section id="voice" class="ds-section">
+  <div class="eyebrow">§5 · Voice (site × style transform)</div>
+  <h2>How to write on-screen copy in Neo-Brutalism register</h2>
+
+  <div class="voice-grid">
+    <div>
+      <h3 class="ds-h3">From the site (DNA)</h3>
+      <dl class="voice-dl">
+        <dt>Tone</dt><dd>direct</dd>
+        <dt>Heading style</dt><dd>Sentence case</dd>
+        
+        <dt>Sample headings</dt><dd><div class="voice-sample">Welcome back</div></dd>
+      </dl>
+    </div>
+    <div>
+      <h3 class="ds-h3">Transform recipe (preset §G)</h3>
+      <div class="ds-prose-block"><p class="ds-prose">Take the brand&#39;s product description / value prop. Transform with:</p>
+<ol class="ds-list"><li>Strip articles + connectives (the / a / of / and / with / to)</li><li>Break into noun-verb-noun fragments OR single dominant nouns</li><li>UPPERCASE all</li><li>Join with <code>.</code> + linebreak, OR em-dash for emphasis</li><li>End with brand name as one-word punchline</li></ol>
+<p class="ds-prose"><strong>Example:</strong></p>
+<ul class="ds-list"><li>IN: <code>Figma helps teams design products collaboratively in real time</code></li><li>OUT: <code>TEAMS. DESIGN. TOGETHER. — REAL-TIME. — FIGMA.</code></li></ul></div>
+    </div>
+  </div>
+
+  <h3 class="ds-h3" style="margin-top: 32px;">Try it on this site's voice</h3>
+  
+  <div class="voice-pair">
+    <div class="voice-in"><span class="voice-tag">IN (site)</span> AI-powered legal intelligence and arbitration management platform</div>
+    <div class="voice-out"><span class="voice-tag">OUT (Phase 4b applies recipe to DOM copy)</span> <em>worker writes register-shaped HTML text</em></div>
+  </div>
+  <div class="voice-pair">
+    <div class="voice-in"><span class="voice-tag">IN (site)</span> Welcome back</div>
+    <div class="voice-out"><span class="voice-tag">OUT (Phase 4b applies recipe to DOM copy)</span> <em>worker writes register-shaped HTML text</em></div>
+  </div>
+
+  <details class="ds-paste-ready" style="margin-top: 32px;">
+    <summary class="ds-summary">▸ Paste-ready source → <code>chunks/voice.md</code> (Phase 4b applies recipe to DOM text)</summary>
+    <pre class="ds-code"><!-- VOICE-START -->
+# Voice register: neo-brutalism
+
+## From the site (DNA)
+- Tone: direct
+- Heading style: Sentence case
+- Sample headings:
+  - Welcome back
+
+## Transform recipe
+
+Take the brand&#39;s product description / value prop. Transform with:
+
+1. Strip articles + connectives (the / a / of / and / with / to)
+2. Break into noun-verb-noun fragments OR single dominant nouns
+3. UPPERCASE all
+4. Join with `.` + linebreak, OR em-dash for emphasis
+5. End with brand name as one-word punchline
+
+**Example:**
+
+- IN: `Figma helps teams design products collaboratively in real time`
+- OUT: `TEAMS. DESIGN. TOGETHER. — REAL-TIME. — FIGMA.`
+
+&gt; Phase 4b scene workers: apply to DOM text only (headline / chip / button copy).
+&gt; Phase 2 narrator scripts are TTS-bound — do NOT uppercase or strip articles.
+<!-- VOICE-END --></pre>
+  </details>
+</section>
+
+<section id="hints" class="ds-section">
+  <div class="eyebrow">§H · Scene composition hints (plan agent reads these)</div>
+  <h2>Neo-Brutalism composition rules</h2>
+  <p class="ds-prose">Surface contracts, material composition rules, brand-color placement — anything that constrains <strong>which</strong> components a Phase 3 plan can mix in a single scene.</p>
+  <div class="ds-prose-block"><ul class="ds-list"><li><strong>One huge thing per scene</strong>. Display size 200-340px dominates frame.</li><li><strong>Use corner-pins on framed scenes</strong> (<code>&lt;!-- COMPONENT: corner-pins --&gt;</code>).</li><li><strong>Background</strong>: solid brand canvas OR dot-grid (<code>&lt;!-- COMPONENT: dot-grid-bg --&gt;</code>). Never gradient.</li><li><strong>Transitions between scenes</strong>: hard cut. No crossfade, no slide, no blur.</li><li><strong>Stagger</strong>: 100-150ms between elements.</li></ul></div>
+  <details class="ds-paste-ready">
+    <summary class="ds-summary">▸ Paste-ready source → <code>chunks/composition-hints.md</code> (plan agent reads this)</summary>
+    <pre class="ds-code"><!-- HINTS-START -->
+# Composition hints — Neo-Brutalism
+
+- **One huge thing per scene**. Display size 200-340px dominates frame.
+- **Use corner-pins on framed scenes** (`&lt;!-- COMPONENT: corner-pins --&gt;`).
+- **Background**: solid brand canvas OR dot-grid (`&lt;!-- COMPONENT: dot-grid-bg --&gt;`). Never gradient.
+- **Transitions between scenes**: hard cut. No crossfade, no slide, no blur.
+- **Stagger**: 100-150ms between elements.
+<!-- HINTS-END --></pre>
+  </details>
+</section>
+
+<section id="components" class="ds-section">
+  <div class="eyebrow">§6 · Components (paste-ready)</div>
+  <h2>Neo-Brutalism component library</h2>
+
+  
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">button</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: button --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-button {
+    background: var(--brand-accent);
+    color: var(--ink);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: 16px 32px;
+    font-size: clamp(26px, 1.8vw, 34px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .bn-button:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hover);
+  }
+</style>
+      <button class="bn-button">Get started</button>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: button --&gt;
+```html
+&lt;button class=&quot;bn-button&quot;&gt;{LABEL}&lt;/button&gt;
+&lt;style&gt;
+  .bn-button {
+    background: var(--brand-accent);
+    color: var(--ink);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: 16px 32px;
+    font-size: clamp(26px, 1.8vw, 34px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .bn-button:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hover);
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">chip</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: chip --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--brand-primary);
+    color: var(--ink);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+</style>
+      <span class="bn-chip">Get started</span>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: chip --&gt;
+```html
+&lt;span class=&quot;bn-chip&quot;&gt;{LABEL}&lt;/span&gt;
+&lt;style&gt;
+  .bn-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--brand-primary);
+    color: var(--ink);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">corner-pins</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: corner-pins --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-frame {
+    position: relative;
+    padding: 32px;
+  }
+  .bn-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: var(--ink);
+  }
+  .bn-tl {
+    top: 0;
+    left: 0;
+  }
+  .bn-tr {
+    top: 0;
+    right: 0;
+  }
+  .bn-bl {
+    bottom: 0;
+    left: 0;
+  }
+  .bn-br {
+    bottom: 0;
+    right: 0;
+  }
+</style>
+      <div class="bn-frame">
+  <span class="bn-corner bn-tl"></span>
+  <span class="bn-corner bn-tr"></span>
+  <span class="bn-corner bn-bl"></span>
+  <span class="bn-corner bn-br"></span>
+  <!-- content goes here -->
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: corner-pins --&gt;
+```html
+&lt;div class=&quot;bn-frame&quot;&gt;
+  &lt;span class=&quot;bn-corner bn-tl&quot;&gt;&lt;/span&gt;
+  &lt;span class=&quot;bn-corner bn-tr&quot;&gt;&lt;/span&gt;
+  &lt;span class=&quot;bn-corner bn-bl&quot;&gt;&lt;/span&gt;
+  &lt;span class=&quot;bn-corner bn-br&quot;&gt;&lt;/span&gt;
+  &lt;!-- content goes here --&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  .bn-frame {
+    position: relative;
+    padding: 32px;
+  }
+  .bn-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: var(--ink);
+  }
+  .bn-tl {
+    top: 0;
+    left: 0;
+  }
+  .bn-tr {
+    top: 0;
+    right: 0;
+  }
+  .bn-bl {
+    bottom: 0;
+    left: 0;
+  }
+  .bn-br {
+    bottom: 0;
+    right: 0;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">deco-green-circle</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: deco-green-circle --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-deco-green-circle {
+    display: inline-block;
+    width: 68px;
+    height: 68px;
+    background: var(--deco-2);
+    border: var(--border-bold);
+    border-radius: 50%;
+  }
+  .bn-deco-green-circle[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-green-circle[data-anchor="tl"] {
+    top: 60px;
+    left: 110px;
+  }
+  .bn-deco-green-circle[data-anchor="tr"] {
+    top: 60px;
+    right: 110px;
+  }
+  .bn-deco-green-circle[data-anchor="bl"] {
+    bottom: 60px;
+    left: 110px;
+  }
+  .bn-deco-green-circle[data-anchor="br"] {
+    bottom: 60px;
+    right: 110px;
+  }
+</style>
+      <!-- Inline by default; add data-anchor to pin as corner accent. -->
+<div class="bn-deco-green-circle"></div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: deco-green-circle --&gt;
+```html
+&lt;!-- Inline by default; add data-anchor to pin as corner accent. --&gt;
+&lt;div class=&quot;bn-deco-green-circle&quot;&gt;&lt;/div&gt;
+&lt;style&gt;
+  .bn-deco-green-circle {
+    display: inline-block;
+    width: 68px;
+    height: 68px;
+    background: var(--deco-2);
+    border: var(--border-bold);
+    border-radius: 50%;
+  }
+  .bn-deco-green-circle[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-green-circle[data-anchor=&quot;tl&quot;] {
+    top: 60px;
+    left: 110px;
+  }
+  .bn-deco-green-circle[data-anchor=&quot;tr&quot;] {
+    top: 60px;
+    right: 110px;
+  }
+  .bn-deco-green-circle[data-anchor=&quot;bl&quot;] {
+    bottom: 60px;
+    left: 110px;
+  }
+  .bn-deco-green-circle[data-anchor=&quot;br&quot;] {
+    bottom: 60px;
+    right: 110px;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">deco-pink-block</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: deco-pink-block --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-deco-pink-block {
+    width: 110px;
+    height: 110px;
+    background: var(--deco-4);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    transform: rotate(11deg);
+    display: inline-block;
+  }
+  .bn-deco-pink-block[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-pink-block[data-anchor="tl"] {
+    top: -34px;
+    left: 80px;
+  }
+  .bn-deco-pink-block[data-anchor="tr"] {
+    top: -34px;
+    right: 80px;
+  }
+  .bn-deco-pink-block[data-anchor="bl"] {
+    bottom: -34px;
+    left: 80px;
+  }
+  .bn-deco-pink-block[data-anchor="br"] {
+    bottom: -34px;
+    right: 80px;
+  }
+</style>
+      <!-- Default (no data-anchor): renders inline; preview-friendly.
+     With data-anchor="tl|tr|bl|br": becomes absolute-positioned sticker.
+     Drop into any container with position: relative when using anchor. -->
+<div class="bn-deco-pink-block"></div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: deco-pink-block --&gt;
+```html
+&lt;!-- Default (no data-anchor): renders inline; preview-friendly.
+     With data-anchor=&quot;tl|tr|bl|br&quot;: becomes absolute-positioned sticker.
+     Drop into any container with position: relative when using anchor. --&gt;
+&lt;div class=&quot;bn-deco-pink-block&quot;&gt;&lt;/div&gt;
+&lt;style&gt;
+  .bn-deco-pink-block {
+    width: 110px;
+    height: 110px;
+    background: var(--deco-4);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    transform: rotate(11deg);
+    display: inline-block;
+  }
+  .bn-deco-pink-block[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-pink-block[data-anchor=&quot;tl&quot;] {
+    top: -34px;
+    left: 80px;
+  }
+  .bn-deco-pink-block[data-anchor=&quot;tr&quot;] {
+    top: -34px;
+    right: 80px;
+  }
+  .bn-deco-pink-block[data-anchor=&quot;bl&quot;] {
+    bottom: -34px;
+    left: 80px;
+  }
+  .bn-deco-pink-block[data-anchor=&quot;br&quot;] {
+    bottom: -34px;
+    right: 80px;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">deco-yellow-bar</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: deco-yellow-bar --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-deco-yellow-bar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 280px;
+    height: 64px;
+    background: var(--deco-1);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    transform: rotate(-3deg);
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    z-index: 5;
+  }
+  .bn-deco-yellow-bar[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-yellow-bar[data-anchor="tl"] {
+    top: -22px;
+    left: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor="tr"] {
+    top: -22px;
+    right: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor="bl"] {
+    bottom: -22px;
+    left: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor="br"] {
+    bottom: -22px;
+    right: 80px;
+  }
+</style>
+      <!-- Inline by default; add data-anchor to pin as billboard strip. -->
+<div class="bn-deco-yellow-bar">▶ Get started</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: deco-yellow-bar --&gt;
+```html
+&lt;!-- Inline by default; add data-anchor to pin as billboard strip. --&gt;
+&lt;div class=&quot;bn-deco-yellow-bar&quot;&gt;▶ {LABEL}&lt;/div&gt;
+&lt;style&gt;
+  .bn-deco-yellow-bar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 280px;
+    height: 64px;
+    background: var(--deco-1);
+    border: var(--border-bold);
+    box-shadow: 4px 4px 0 var(--ink);
+    transform: rotate(-3deg);
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    z-index: 5;
+  }
+  .bn-deco-yellow-bar[data-anchor] {
+    position: absolute;
+  }
+  .bn-deco-yellow-bar[data-anchor=&quot;tl&quot;] {
+    top: -22px;
+    left: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor=&quot;tr&quot;] {
+    top: -22px;
+    right: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor=&quot;bl&quot;] {
+    bottom: -22px;
+    left: 80px;
+  }
+  .bn-deco-yellow-bar[data-anchor=&quot;br&quot;] {
+    bottom: -22px;
+    right: 80px;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">divider-loud</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: divider-loud --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-divider {
+    border: none;
+    height: 6px;
+    background: var(--ink);
+    margin: 48px 0;
+  }
+</style>
+      <hr class="bn-divider" />
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: divider-loud --&gt;
+```html
+&lt;hr class=&quot;bn-divider&quot; /&gt;
+&lt;style&gt;
+  .bn-divider {
+    border: none;
+    height: 6px;
+    background: var(--ink);
+    margin: 48px 0;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">dot-grid-bg</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: dot-grid-bg --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-grid-bg {
+    background-color: var(--canvas);
+    background-image: radial-gradient(var(--ink) 1.5px, transparent 1.5px);
+    background-size: 32px 32px;
+    min-height: 160px; /* preview only — remove or override when used full-bleed */
+  }
+</style>
+      <div class="bn-grid-bg"><!-- content --></div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: dot-grid-bg --&gt;
+```html
+&lt;div class=&quot;bn-grid-bg&quot;&gt;&lt;!-- content --&gt;&lt;/div&gt;
+&lt;style&gt;
+  .bn-grid-bg {
+    background-color: var(--canvas);
+    background-image: radial-gradient(var(--ink) 1.5px, transparent 1.5px);
+    background-size: 32px 32px;
+    min-height: 160px; /* preview only — remove or override when used full-bleed */
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">gradient-mesh-bg</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: gradient-mesh-bg --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  /* Brand-color blobs blurred behind solid black foreground frame. */
+  .bn-mesh {
+    position: relative;
+    overflow: hidden;
+    background: var(--canvas);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    min-height: 320px; /* preview only — drop when used full-bleed in scene */
+  }
+  .bn-mesh-blob {
+    position: absolute;
+    width: 60%;
+    height: 70%;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .bn-mesh-blob-1 {
+    background: var(--brand-primary);
+    top: -10%;
+    left: -10%;
+  }
+  .bn-mesh-blob-2 {
+    background: var(--brand-secondary);
+    bottom: -15%;
+    right: -10%;
+  }
+  .bn-mesh-blob-3 {
+    background: var(--brand-accent);
+    top: 30%;
+    left: 35%;
+    width: 40%;
+    height: 50%;
+  }
+  .bn-mesh-fg {
+    position: relative;
+    z-index: 1;
+    padding: clamp(48px, 6vw, 96px);
+    color: var(--ink);
+  }
+</style>
+      <div class="bn-mesh">
+  <div class="bn-mesh-blob bn-mesh-blob-1"></div>
+  <div class="bn-mesh-blob bn-mesh-blob-2"></div>
+  <div class="bn-mesh-blob bn-mesh-blob-3"></div>
+  <div class="bn-mesh-fg"><div style="font-family: 'Inter', serif; font-size: clamp(40px, 5vw, 88px); line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 16px;">Cimaai</div><div style="font-family: 'Inter', sans-serif; font-size: clamp(16px, 1.4vw, 20px); opacity: 0.85; max-width: 38ch;">Stamped. Signed. Framed.</div></div>
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: gradient-mesh-bg --&gt;
+```html
+&lt;div class=&quot;bn-mesh&quot;&gt;
+  &lt;div class=&quot;bn-mesh-blob bn-mesh-blob-1&quot;&gt;&lt;/div&gt;
+  &lt;div class=&quot;bn-mesh-blob bn-mesh-blob-2&quot;&gt;&lt;/div&gt;
+  &lt;div class=&quot;bn-mesh-blob bn-mesh-blob-3&quot;&gt;&lt;/div&gt;
+  &lt;div class=&quot;bn-mesh-fg&quot;&gt;{FOREGROUND_CONTENT}&lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  /* Brand-color blobs blurred behind solid black foreground frame. */
+  .bn-mesh {
+    position: relative;
+    overflow: hidden;
+    background: var(--canvas);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    min-height: 320px; /* preview only — drop when used full-bleed in scene */
+  }
+  .bn-mesh-blob {
+    position: absolute;
+    width: 60%;
+    height: 70%;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .bn-mesh-blob-1 {
+    background: var(--brand-primary);
+    top: -10%;
+    left: -10%;
+  }
+  .bn-mesh-blob-2 {
+    background: var(--brand-secondary);
+    bottom: -15%;
+    right: -10%;
+  }
+  .bn-mesh-blob-3 {
+    background: var(--brand-accent);
+    top: 30%;
+    left: 35%;
+    width: 40%;
+    height: 50%;
+  }
+  .bn-mesh-fg {
+    position: relative;
+    z-index: 1;
+    padding: clamp(48px, 6vw, 96px);
+    color: var(--ink);
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">hero</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: hero --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-hero {
+    background: var(--canvas);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: clamp(48px, 6vw, 96px);
+    transform: rotate(var(--tilt-l));
+  }
+  .bn-eyebrow {
+    font-size: clamp(24px, 1.6vw, 32px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .bn-display {
+    font-size: clamp(200px, 24vw, 340px);
+    letter-spacing: -0.04em;
+    font-weight: 800;
+    line-height: 0.95;
+  }
+  .bn-body {
+    font-size: clamp(24px, 2vw, 32px);
+    margin-top: 24px;
+    max-width: 50ch;
+  }
+</style>
+      <div class="bn-hero">
+  <span class="bn-eyebrow">Build faster</span>
+  <h1 class="bn-display">Cimaai</h1>
+  <p class="bn-body">Stamped. Signed. Framed.</p>
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: hero --&gt;
+```html
+&lt;div class=&quot;bn-hero&quot;&gt;
+  &lt;span class=&quot;bn-eyebrow&quot;&gt;{EYEBROW}&lt;/span&gt;
+  &lt;h1 class=&quot;bn-display&quot;&gt;{HEADLINE}&lt;/h1&gt;
+  &lt;p class=&quot;bn-body&quot;&gt;{SUBHEAD}&lt;/p&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  .bn-hero {
+    background: var(--canvas);
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: clamp(48px, 6vw, 96px);
+    transform: rotate(var(--tilt-l));
+  }
+  .bn-eyebrow {
+    font-size: clamp(24px, 1.6vw, 32px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .bn-display {
+    font-size: clamp(200px, 24vw, 340px);
+    letter-spacing: -0.04em;
+    font-weight: 800;
+    line-height: 0.95;
+  }
+  .bn-body {
+    font-size: clamp(24px, 2vw, 32px);
+    margin-top: 24px;
+    max-width: 50ch;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">manifesto</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: manifesto --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  /* Big declarative pull-quote. Wrap key words in <em> tags to get the
+   inverse-block highlight (black bg + accent color). */
+  .bn-manifesto {
+    background: var(--brand-accent);
+    border: var(--border-bold);
+    border-top: var(--border-loud);
+    border-bottom: var(--border-loud);
+    padding: clamp(40px, 6vw, 80px) clamp(32px, 5vw, 64px);
+    display: grid;
+    grid-template-columns: 10em 1fr;
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+  }
+  .bn-manifesto-num {
+    display: inline-block;
+    border: var(--border-bold);
+    background: var(--canvas);
+    padding: 6px 14px;
+    font-family: var(--font-mono);
+    font-size: 24px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .bn-manifesto-text {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 60px);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-transform: uppercase;
+    max-width: 22ch;
+  }
+  .bn-manifesto-text em {
+    font-style: normal;
+    background: var(--ink);
+    color: var(--brand-accent);
+    padding: 0 0.15em;
+  }
+  @media (max-width: 720px) {
+    .bn-manifesto {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+      <div class="bn-manifesto">
+  <span class="bn-manifesto-num">— MANIFESTO</span>
+  <p class="bn-manifesto-text">borders are <em>structural</em>. shadows are <em>weight</em>. tilt is <em>intent</em>.</p>
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: manifesto --&gt;
+```html
+&lt;div class=&quot;bn-manifesto&quot;&gt;
+  &lt;span class=&quot;bn-manifesto-num&quot;&gt;— MANIFESTO&lt;/span&gt;
+  &lt;p class=&quot;bn-manifesto-text&quot;&gt;{HEADLINE_WITH_EM}&lt;/p&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  /* Big declarative pull-quote. Wrap key words in &lt;em&gt; tags to get the
+   inverse-block highlight (black bg + accent color). */
+  .bn-manifesto {
+    background: var(--brand-accent);
+    border: var(--border-bold);
+    border-top: var(--border-loud);
+    border-bottom: var(--border-loud);
+    padding: clamp(40px, 6vw, 80px) clamp(32px, 5vw, 64px);
+    display: grid;
+    grid-template-columns: 10em 1fr;
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+  }
+  .bn-manifesto-num {
+    display: inline-block;
+    border: var(--border-bold);
+    background: var(--canvas);
+    padding: 6px 14px;
+    font-family: var(--font-mono);
+    font-size: 24px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .bn-manifesto-text {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 60px);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-transform: uppercase;
+    max-width: 22ch;
+  }
+  .bn-manifesto-text em {
+    font-style: normal;
+    background: var(--ink);
+    color: var(--brand-accent);
+    padding: 0 0.15em;
+  }
+  @media (max-width: 720px) {
+    .bn-manifesto {
+      grid-template-columns: 1fr;
+    }
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">rules-do-dont</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: rules-do-dont --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-rules {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(16px, 2vw, 32px);
+  }
+  .bn-rules-col {
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: clamp(24px, 3vw, 32px);
+  }
+  .bn-rules-do {
+    background: var(--deco-2);
+    transform: rotate(var(--tilt-l));
+  }
+  .bn-rules-dont {
+    background: var(--canvas);
+    transform: rotate(var(--tilt-r));
+  }
+  .bn-rules-col h3 {
+    font-size: clamp(36px, 5vw, 64px);
+    margin: 0 0 20px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .bn-rules-col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bn-rules-col li {
+    display: grid;
+    grid-template-columns: 2em 1fr;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--canvas);
+    border: 3px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+    font-size: 24px;
+    line-height: 1.45;
+    font-weight: 500;
+  }
+  .bn-rules-dont li {
+    background: var(--brand-primary);
+  }
+  .bn-rules-col li::before {
+    font-size: 28px;
+    font-weight: 900;
+    align-self: center;
+    text-align: center;
+    width: 1.6em;
+    height: 1.6em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--ink);
+  }
+  .bn-rules-do li::before {
+    content: "✓";
+    background: var(--brand-accent);
+  }
+  .bn-rules-dont li::before {
+    content: "✗";
+    background: var(--deco-4);
+  }
+  @media (max-width: 720px) {
+    .bn-rules {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+      <div class="bn-rules">
+  <div class="bn-rules-col bn-rules-do">
+    <h3>DO.</h3>
+    <ul>
+      <li>Use accent on exactly one element per scene</li>
+      <li>Keep display weight at 800, body at 500</li>
+      <li>Cut between scenes — never crossfade</li>
+    </ul>
+  </div>
+  <div class="bn-rules-col bn-rules-dont">
+    <h3>DON'T.</h3>
+    <ul>
+      <li>Don&#39;t add a second accent color</li>
+      <li>Don&#39;t use body text under 24px in video</li>
+      <li>Don&#39;t blur shadows — offset only</li>
+    </ul>
+  </div>
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: rules-do-dont --&gt;
+```html
+&lt;div class=&quot;bn-rules&quot;&gt;
+  &lt;div class=&quot;bn-rules-col bn-rules-do&quot;&gt;
+    &lt;h3&gt;DO.&lt;/h3&gt;
+    &lt;ul&gt;
+      &lt;li&gt;{DO_1}&lt;/li&gt;
+      &lt;li&gt;{DO_2}&lt;/li&gt;
+      &lt;li&gt;{DO_3}&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;bn-rules-col bn-rules-dont&quot;&gt;
+    &lt;h3&gt;DON&#39;T.&lt;/h3&gt;
+    &lt;ul&gt;
+      &lt;li&gt;{DONT_1}&lt;/li&gt;
+      &lt;li&gt;{DONT_2}&lt;/li&gt;
+      &lt;li&gt;{DONT_3}&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  .bn-rules {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(16px, 2vw, 32px);
+  }
+  .bn-rules-col {
+    border: var(--border-bold);
+    box-shadow: var(--shadow-hard);
+    padding: clamp(24px, 3vw, 32px);
+  }
+  .bn-rules-do {
+    background: var(--deco-2);
+    transform: rotate(var(--tilt-l));
+  }
+  .bn-rules-dont {
+    background: var(--canvas);
+    transform: rotate(var(--tilt-r));
+  }
+  .bn-rules-col h3 {
+    font-size: clamp(36px, 5vw, 64px);
+    margin: 0 0 20px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .bn-rules-col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bn-rules-col li {
+    display: grid;
+    grid-template-columns: 2em 1fr;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--canvas);
+    border: 3px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+    font-size: 24px;
+    line-height: 1.45;
+    font-weight: 500;
+  }
+  .bn-rules-dont li {
+    background: var(--brand-primary);
+  }
+  .bn-rules-col li::before {
+    font-size: 28px;
+    font-weight: 900;
+    align-self: center;
+    text-align: center;
+    width: 1.6em;
+    height: 1.6em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--ink);
+  }
+  .bn-rules-do li::before {
+    content: &quot;✓&quot;;
+    background: var(--brand-accent);
+  }
+  .bn-rules-dont li::before {
+    content: &quot;✗&quot;;
+    background: var(--deco-4);
+  }
+  @media (max-width: 720px) {
+    .bn-rules {
+      grid-template-columns: 1fr;
+    }
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+  <div class="comp-card">
+    <div class="comp-head">
+      <span class="comp-name">stat-counter</span>
+      <span class="comp-marker">&lt;!-- COMPONENT: stat-counter --&gt;</span>
+    </div>
+    <div class="comp-preview preset-native-scope">
+      <style>
+  .bn-stat {
+    background: var(--canvas);
+    border: var(--border-bold);
+    padding: 32px 24px;
+    text-align: left;
+  }
+  .bn-stat-num {
+    font-size: clamp(96px, 12vw, 180px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .bn-stat-label {
+    font-size: clamp(24px, 1.5vw, 28px);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-top: 12px;
+  }
+</style>
+      <div class="bn-stat">
+  <div class="bn-stat-num">4M</div>
+  <div class="bn-stat-label">Get started</div>
+</div>
+    </div>
+    <details>
+      <summary class="ds-summary">Source</summary>
+      <pre class="ds-code">&lt;!-- COMPONENT: stat-counter --&gt;
+```html
+&lt;div class=&quot;bn-stat&quot;&gt;
+  &lt;div class=&quot;bn-stat-num&quot;&gt;{NUM}&lt;/div&gt;
+  &lt;div class=&quot;bn-stat-label&quot;&gt;{LABEL}&lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  .bn-stat {
+    background: var(--canvas);
+    border: var(--border-bold);
+    padding: 32px 24px;
+    text-align: left;
+  }
+  .bn-stat-num {
+    font-size: clamp(96px, 12vw, 180px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .bn-stat-label {
+    font-size: clamp(24px, 1.5vw, 28px);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-top: 12px;
+  }
+&lt;/style&gt;
+```
+&lt;!-- /COMPONENT --&gt;</pre>
+    </details>
+  </div>
+</section>
+
+<section id="captions" class="ds-section">
+  <div class="eyebrow">§C · Captions (preset-local skin)</div>
+  <h2>Word <em>by word.</em></h2>
+  <p class="ds-prose">Live preview of <code>caption-skin.html</code> — this preset's own caption look. The same file is copied to <code>chunks/caption-skin.html</code> and filled with real word timings by the caption builder (Phase 4a.5); the demo words and loop here are preview-only.</p>
+  <div style="position: relative; width: 100%; max-width: 960px; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #e5e5e5; border-radius: 8px; margin: 24px 0; background: #fff;">
+    <iframe title="caption-skin preview" loading="lazy" style="position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform: scale(0.5); transform-origin: top left;" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=1920, height=1080&quot; /&gt;
+    &lt;title&gt;Neo-Brutalism — Captions&lt;/title&gt;
+    &lt;!--
+      Neo-Brutalism caption skin (preset-local source — second caption source).
+
+      A pre-baked, brand-token-strict caption sub-composition. emit-chunks copies this to
+      design-system/chunks/caption-skin.html for the chosen preset; build-captions-html.mjs
+      then fills three reserved holes and writes compositions/captions.html:
+        - the empty GROUPS array       → engine's scene-aware, non-overlapping word groups
+        - the 0 DURATION + data-duration → real total_duration_s
+        - the empty brand-tokens style → the project's tokens.css
+      (the filler asserts each hole appears exactly once, so this note avoids the literals)
+
+      Contract (so ONE generic fill works for every preset's skin — no per-skin transform):
+        · root carries data-composition-id=&quot;captions&quot;; timeline registers window.__timelines[&quot;captions&quot;]
+        · canonical hooks .caption-group / .caption-word (+ states .is-active / .is-spoken)
+        · all colors are var(--*) / color-mix over tokens — brand-strict by construction
+        · no &lt;video&gt;, no Google Fonts, no placeholder transcript, no window.&lt;native&gt;() calls
+        · state changes use gsap.set({className}) (applied on seek) — NOT .call callbacks
+          (callbacks don't fire on the engine's frame-by-frame seek)
+
+      Visual: thick ink-bordered block, square corners, hard zero-blur offset shadow, −1°
+      hand-stamped tilt; the current word is a solid brand-primary stamp-block (zero radius,
+      its own hard ink offset), spoken words go solid ink — uppercase condensed display via
+      var(--font-display). Hit-and-stick, no glide. The brutalist counterpart to the registry
+      default caption-pill-karaoke (soft rounded SaaS pill).
+    --&gt;
+    &lt;script src=&quot;https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js&quot;&gt;&lt;/script&gt;
+
+    &lt;!-- build-captions-html.mjs injects the project's tokens.css here --&gt;
+    &lt;style data-brand-tokens&gt;
+
+:root {
+  --brand-primary:   #082F49;
+  --brand-secondary: #FBBF24;
+  --brand-tertiary:  #0369A1;
+  --brand-accent:    #0369A1;
+  --brand-costume:   #FFFFFF;
+  --ink:             #0F172A;
+  --canvas:          #FFFFFF;
+  --brand-gradient:  linear-gradient(135deg, #082F49 0%, #FBBF24 50%, #0369A1 100%);
+  --deco-1:          #F7CB46;
+  --deco-2:          #99E885;
+  --deco-3:          #C0F7FE;
+  --deco-4:          #FE90E8;
+  --font-display:    'Inter', ui-monospace, monospace;
+  --font-body:       'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:       'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --shadow-hard: 8px 8px 0 var(--ink);
+  --shadow-hover: 11px 11px 0 var(--ink);
+  --border-bold: 4px solid var(--ink);
+  --border-loud: 6px solid var(--ink);
+  --tilt-l: -1deg;
+  --tilt-r: 1deg;
+  --gap-loud: 1.7vw; /* ~32px on a 1920 canvas */
+}&lt;/style&gt;
+
+    &lt;style&gt;
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      #captions-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+        pointer-events: none;
+      }
+
+      /* neo-brutalism · captions · thick ink block, square corners, hard zero-blur shadow */
+      .caption-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        pointer-events: none;
+      }
+      .caption-stage {
+        position: absolute;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        width: 1600px;
+        height: 200px;
+      }
+      .caption-group {
+        /* every group is absolutely positioned over the SAME band — exactly one is shown
+           at a time via opacity. Must be absolute: if groups stay in-flow, N groups lay
+           out side-by-side (opacity:0 hides but still occupies space). */
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+      }
+
+      /* THE block — thick ink border, hard zero-blur offset shadow, square corners, −1° tilt */
+      .caption-pill {
+        max-width: 1600px;
+        padding: 14px 36px 18px;
+        background: var(--canvas);
+        border: var(--border-bold);
+        border-radius: 0;
+        box-shadow: var(--shadow-hard);
+        transform: rotate(var(--tilt-l));
+      }
+      .caption-line {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.14em 0.34em;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(40px, 4.4vw, 56px);
+        line-height: 1.04;
+        letter-spacing: -0.02em;
+        text-transform: uppercase;
+      }
+
+      /* upcoming — faint ink, no block */
+      .caption-word {
+        display: inline-block;
+        border-radius: 0;
+        color: color-mix(in srgb, var(--ink) 36%, var(--canvas));
+      }
+      /* current word — THE brand-primary stamp-block: solid fill (box-shadow spread = block
+         w/o layout shift) + its own hard zero-blur ink offset. Square corners, hit-and-stick. */
+      .caption-word.is-active {
+        color: var(--ink);
+        background: var(--brand-primary);
+        box-shadow:
+          0 0 0 0.1em var(--brand-primary),
+          4px 4px 0 var(--ink);
+      }
+      /* already spoken — solid ink, block cleared */
+      .caption-word.is-spoken {
+        color: var(--ink);
+        background: transparent;
+        box-shadow: none;
+      }
+
+      /* optional per-word accents (dormant until a word-classer tags them) */
+      .caption-word.cap-brand {
+        color: var(--brand-secondary);
+      }
+      .caption-word.cap-brand.is-active {
+        color: var(--canvas);
+        background: var(--brand-secondary);
+        box-shadow:
+          0 0 0 0.1em var(--brand-secondary),
+          4px 4px 0 var(--ink);
+      }
+      .caption-word.cap-num {
+        color: color-mix(in srgb, var(--ink) 70%, var(--canvas));
+      }
+      .caption-word.cap-cta {
+        text-decoration: underline;
+        text-decoration-thickness: 6px;
+        text-decoration-color: var(--brand-secondary);
+        text-underline-offset: 0.06em;
+      }
+
+      @media (max-aspect-ratio: 9/16) {
+        .caption-stage {
+          bottom: 100px;
+          width: 92%;
+        }
+        .caption-line {
+          font-size: clamp(34px, 5.4vw, 46px);
+        }
+      }
+    &lt;/style&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;div
+      id=&quot;captions-root&quot;
+      data-composition-id=&quot;captions&quot;
+      data-timeline-locked
+      data-start=&quot;0&quot;
+      data-duration=&quot;6.6&quot;
+      data-fps=&quot;30&quot;
+      data-width=&quot;1920&quot;
+      data-height=&quot;1080&quot;
+    &gt;
+      &lt;div class=&quot;caption-layer&quot; aria-hidden=&quot;true&quot;&gt;
+        &lt;div id=&quot;caption-stage&quot; class=&quot;caption-stage&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;script&gt;
+      // build-captions-html.mjs injects the engine's scene-aware groups + real duration.
+      var GROUPS = [{&quot;start&quot;:0.3,&quot;end&quot;:2.1,&quot;words&quot;:[{&quot;text&quot;:&quot;WRITE&quot;,&quot;start&quot;:0.3,&quot;end&quot;:0.9},{&quot;text&quot;:&quot;HTML,&quot;,&quot;start&quot;:0.9,&quot;end&quot;:1.4},{&quot;text&quot;:&quot;RENDER&quot;,&quot;start&quot;:1.4,&quot;end&quot;:2.1}]},{&quot;start&quot;:2.5,&quot;end&quot;:4.3,&quot;words&quot;:[{&quot;text&quot;:&quot;VIDEO.&quot;,&quot;start&quot;:2.5,&quot;end&quot;:3.1},{&quot;text&quot;:&quot;NO&quot;,&quot;start&quot;:3.1,&quot;end&quot;:3.5},{&quot;text&quot;:&quot;TIMELINE.&quot;,&quot;start&quot;:3.5,&quot;end&quot;:4.3}]},{&quot;start&quot;:4.7,&quot;end&quot;:6.2,&quot;words&quot;:[{&quot;text&quot;:&quot;JUST&quot;,&quot;start&quot;:4.7,&quot;end&quot;:5.1},{&quot;text&quot;:&quot;CODE.&quot;,&quot;start&quot;:5.1,&quot;end&quot;:5.9}]}];
+      var DURATION = 6.6;
+
+      (function () {
+        var stage = document.getElementById(&quot;caption-stage&quot;);
+
+        // build DOM: one .caption-group per group, .caption-word per word
+        GROUPS.forEach(function (group, g) {
+          var groupEl = document.createElement(&quot;div&quot;);
+          groupEl.className = &quot;caption-group&quot;;
+          groupEl.id = &quot;caption-group-&quot; + g;
+          var pill = document.createElement(&quot;div&quot;);
+          pill.className = &quot;caption-pill&quot;;
+          var line = document.createElement(&quot;div&quot;);
+          line.className = &quot;caption-line&quot;;
+          (group.words || []).forEach(function (w, i) {
+            var span = document.createElement(&quot;span&quot;);
+            span.className = &quot;caption-word&quot;;
+            span.id = &quot;caption-word-&quot; + g + &quot;-&quot; + i;
+            span.textContent = String(w.text).toUpperCase();
+            line.appendChild(span);
+          });
+          pill.appendChild(line);
+          groupEl.appendChild(pill);
+          stage.appendChild(groupEl);
+        });
+
+        window.__timelines = window.__timelines || {};
+        var tl = gsap.timeline({ paused: true });
+
+        GROUPS.forEach(function (group, g) {
+          var groupEl = document.getElementById(&quot;caption-group-&quot; + g);
+          var words = group.words || [];
+          var next = GROUPS[g + 1];
+          var isLast = g === GROUPS.length - 1;
+          var start = Math.max(0, Number(group.start));
+          var end = isLast ? DURATION : Math.min(Number(next.start), Number(group.end) + 0.3);
+          if (end &lt;= start) end = start + 0.01;
+
+          // group on/off — exactly one group visible at a time
+          tl.set(groupEl, { opacity: 1 }, start);
+          tl.set(groupEl, { opacity: 0 }, end);
+
+          // 3-state karaoke via className SETS — seek-safe (gsap.set applies on the
+          // engine's frame-by-frame seek; .call callbacks would NOT fire).
+          words.forEach(function (w, i) {
+            var el = document.getElementById(&quot;caption-word-&quot; + g + &quot;-&quot; + i);
+            var at = Math.max(start, Number(w.start));
+            tl.set(el, { className: &quot;caption-word&quot; }, start); // upcoming (also resets on reverse-seek)
+            tl.set(el, { className: &quot;caption-word is-active&quot; }, at); // current
+            tl.fromTo(el, { scale: 0.9 }, { scale: 1, duration: 0.14, ease: &quot;back.out(2.6)&quot; }, at);
+            if (i + 1 &lt; words.length) {
+              var nextAt = Math.max(start, Number(words[i + 1].start));
+              tl.set(el, { className: &quot;caption-word is-spoken&quot; }, nextAt); // demote when next stamps
+            }
+          });
+          if (words.length) {
+            var lastEl = document.getElementById(&quot;caption-word-&quot; + g + &quot;-&quot; + (words.length - 1));
+            var lastSpoken = Math.min(end, Number(words[words.length - 1].end) + 0.1);
+            tl.set(lastEl, { className: &quot;caption-word is-spoken&quot; }, lastSpoken);
+          }
+        });
+
+        // full-span anchor so the sub-comp timeline spans the whole video
+        tl.to({}, { duration: DURATION }, 0);
+        window.__timelines[&quot;captions&quot;] = tl;
+      })();
+    &lt;/script&gt;
+    &lt;script&gt;
+    (function () {
+      var t = window.__timelines &amp;&amp; window.__timelines[&quot;captions&quot;];
+      if (t &amp;&amp; t.duration()) t.repeat(-1).repeatDelay(0.5).play();
+    })();
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+  </div>
+</section>
+</main>
+
+</body>
+</html>
