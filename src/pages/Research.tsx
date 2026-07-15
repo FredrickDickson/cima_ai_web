@@ -2,12 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
-  BookOpen,
   Gavel,
   Globe,
   Clock,
   Bookmark,
-  ChevronRight,
   Loader2,
   AlertCircle,
   FileText,
@@ -17,7 +15,6 @@ import {
   Library,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
   Trash2,
   ShieldCheck,
   X,
@@ -224,14 +221,15 @@ export default function Research() {
   async function loadSession(sessionId: string) {
     const { data } = await supabase.from("research_sessions").select("*").eq("id", sessionId).single();
     if (!data) return;
-    setQuery(data.query);
-    setJurisdiction(data.jurisdiction || "");
+    const sessionData = data as { query: string; jurisdiction: string; results: RetrievedSource[]; ai_analysis: string };
+    setQuery(sessionData.query);
+    setJurisdiction(sessionData.jurisdiction || "");
     setActiveSessionId(sessionId);
     setResponse({
-      sources: data.results ?? [],
-      ai_analysis: data.ai_analysis ?? "",
+      sources: sessionData.results ?? [],
+      ai_analysis: sessionData.ai_analysis ?? "",
       tavily_results: [],
-      sources_count: (data.results ?? []).length,
+      sources_count: (sessionData.results ?? []).length,
     });
     setError("");
   }
@@ -470,9 +468,9 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
                       <div className="p-1.5 rounded-lg bg-gold-50"><Sparkles size={14} className="text-gold-600" /></div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-navy-950">CIMA AI Analysis</h3>
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">
+                        {/* <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">
                           <CheckCircle2 size={11} /> Grounded — {response.sources_count} source{response.sources_count !== 1 ? "s" : ""}
-                        </span>
+                        </span> */}
                       </div>
                     </div>
                     <button

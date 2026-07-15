@@ -572,7 +572,7 @@ export default function ContractReview() {
     const loadedClauseResults: Record<string, Record<string, string>> = {};
     const loadedGeneratedClauses: Record<string, string> = {};
     if (actionsData) {
-      for (const action of actionsData) {
+      for (const action of actionsData as { action_id: string; clause_name: string; result_text: string }[]) {
         if (action.action_id === "generate") {
           loadedGeneratedClauses[action.clause_name] = action.result_text;
         } else {
@@ -682,7 +682,7 @@ export default function ContractReview() {
         const { data: docData, error: dbError } = await supabase.from("documents").insert(payload).select("id").single();
         
         if (!dbError && docData) {
-          setUploadedDocId(docData.id);
+          setUploadedDocId((docData as { id: string }).id);
         }
       }
     } catch (err) {
