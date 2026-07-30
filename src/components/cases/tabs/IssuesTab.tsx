@@ -144,9 +144,9 @@ Keep each section concise and professionally worded in the third person. This is
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-slate-400">{issues.filter(i => i.status === "open").length} open / {issues.length} total</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={generateMatrix} disabled={matrixLoading || issues.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-blue-400 hover:border-blue-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
             {matrixLoading ? <Loader2 size={13} className="animate-spin" /> : <LayoutList size={13} />}Issue Matrix
           </button>

@@ -5,14 +5,18 @@ import {
   Paperclip, X, Briefcase, ShieldAlert,
   PenTool, HandshakeIcon, Award, Target, Menu, Upload, Copy, Check,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import { FileAttachment } from "../components/ui/FileAttachment";
+import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { extractTextFromFile } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
+import { CitedMarkdown, type CitedSource } from "../lib/citations";
+import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { MentionPopup } from "../components/ui/MentionPopup";
+import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
+import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
 
 // Rendered inside AppLayout's SidebarProvider so useSidebar() works correctly
 function AppMenuButton() {
@@ -45,6 +49,7 @@ type AIMessage = {
   created_at: string;
   attachmentName?: string;
   attachmentSize?: number;
+  cited_sources?: CitedSource[];
 };
 
 const CONTEXTS = [
@@ -149,6 +154,7 @@ export default function AIAssistant() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const mentions = useAuthorityMentions({ text: input, setText: setInput, textareaRef, userId: user?.id });
 
   useEffect(() => {
     loadConversations();
@@ -177,7 +183,7 @@ export default function AIAssistant() {
     setActiveConv(conv);
     setContext(conv.context ?? "general");
     const { data } = await supabase.from("ai_messages").select("*").eq("conversation_id", conv.id).order("created_at");
-    setMessages(data ?? []);
+    setMessages((data ?? []).map((m) => ({ ...m, cited_sources: (m as { metadata?: { cited_sources?: CitedSource[] } }).metadata?.cited_sources })));
   }
 
 
@@ -268,7 +274,11 @@ export default function AIAssistant() {
     setUploadedDocText(null);
 
     // Save user message to DB (non-blocking)
-    supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "user", content: userMsg.content } as any)
+    const sentTaggedAuthorities = mentions.activeTaggedAuthorities;
+    supabase.from("ai_messages").insert({
+      conversation_id: conv.id, role: "user", content: userMsg.content,
+      ...(sentTaggedAuthorities.length > 0 ? { metadata: { tagged_authorities: sentTaggedAuthorities } } : {}),
+    } as any)
       .then(({ error }) => { if (error) console.error("Failed to save message:", error.message); });
 
     setStreaming(true);
@@ -300,6 +310,9 @@ export default function AIAssistant() {
       };
       if (attachedCase) body.case_id = attachedCase.id;
       if (attachedDoc) body.document_id = attachedDoc.id;
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(mentions.activeTaggedAuthorities);
+      if (libraryDocIds.length > 0) body.library_doc_ids = libraryDocIds;
+      if (documentIds.length > 0) body.document_ids = documentIds;
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
         method: "POST",
@@ -314,9 +327,15 @@ export default function AIAssistant() {
 
       const data = await res.json();
       const content: string = data.content ?? data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
+      const citedSources: CitedSource[] | undefined = data.cited_sources;
 
-      setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
-      await supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "assistant", content } as any);
+      setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content, cited_sources: citedSources } : m));
+      await supabase.from("ai_messages").insert({
+        conversation_id: conv.id,
+        role: "assistant",
+        content,
+        ...(citedSources && citedSources.length > 0 ? { metadata: { cited_sources: citedSources } } : {}),
+      } as any);
 
       const newTitle = messages.length === 0 ? sentInput.slice(0, 60) : conv.title;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -337,7 +356,8 @@ export default function AIAssistant() {
     if (activeConv?.id === id) { setActiveConv(null); setMessages([]); }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentions.handleTextareaKeyDown(e)) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
@@ -524,7 +544,7 @@ export default function AIAssistant() {
                         </div>
                       ) : msg.role === "assistant" ? (
                         <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          <CitedMarkdown text={msg.content} sources={msg.cited_sources} />
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -645,6 +665,14 @@ export default function AIAssistant() {
                 )}
               </div>
             )}
+            {mentions.activeTaggedAuthorities.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {mentions.activeTaggedAuthorities.map((tag: TaggedAuthority) => (
+                  <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => mentions.removeTag(tag.id)} variant="dark" />
+                ))}
+                <span className="text-[11px] text-gold-400/80 font-medium">Answering only from tagged sources</span>
+              </div>
+            )}
             <div className="flex items-end gap-2 bg-navy-800 border border-navy-700 rounded-2xl px-3 py-2.5 focus-within:border-gold-500/40 transition-all">
               <button onClick={() => setShowAttach(p => !p)}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 ${showAttach || attachedCase || attachedDoc ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"}`}
@@ -658,10 +686,28 @@ export default function AIAssistant() {
                 title="Upload document for AI context">
                 {extractingFile ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
               </button>
-              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}...`}
-                className="flex-1 text-sm text-slate-200 placeholder-slate-600 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
-                style={{ minHeight: "24px" }} />
+              <VoiceInputButton
+                onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
+                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                title="Dictate your message"
+              />
+              <div className="relative flex-1">
+                <textarea ref={textareaRef} value={input} onChange={mentions.handleTextareaChange} onKeyDown={handleKeyDown}
+                  rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}... (type @ to tag a source)`}
+                  className="w-full text-sm text-slate-200 placeholder-slate-600 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
+                  style={{ minHeight: "24px" }} />
+                {mentions.popupOpen && (
+                  <MentionPopup
+                    results={mentions.popupResults}
+                    loading={mentions.popupLoading}
+                    activeIndex={mentions.activeIndex}
+                    onHover={mentions.setActiveIndex}
+                    onSelect={mentions.selectSuggestion}
+                    variant="dark"
+                    direction="up"
+                  />
+                )}
+              </div>
               <button onClick={handleSend} disabled={(!input.trim() && !uploadedDocText) || streaming || extractingFile}
                 className="flex items-center justify-center w-8 h-8 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                 {streaming ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

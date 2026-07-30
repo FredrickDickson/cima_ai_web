@@ -159,9 +159,9 @@ Output ONLY the ITEM lines — no explanation, no headers, no other text.`;
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-slate-400">{deadlines.filter(d => d.status !== "completed").length} pending</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {caseData && (
             <>
               <button onClick={generateChecklist} disabled={checklistLoading}

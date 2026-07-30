@@ -204,8 +204,22 @@ DRAFTING INSTRUCTIONS:
           </button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-0 px-6 py-3 border-b border-navy-800 overflow-x-auto">
+        {/* Step indicator — compact on mobile */}
+        <div className="sm:hidden px-6 py-3 border-b border-navy-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white">{STEPS[step]}</span>
+            <span className="text-xs text-slate-500">Step {step + 1} of {STEPS.length}</span>
+          </div>
+          <div className="h-1 rounded-full bg-navy-800 overflow-hidden">
+            <div
+              className="h-full bg-gold-500 rounded-full transition-all"
+              style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Step indicator — full labels on sm+ */}
+        <div className="hidden sm:flex items-center gap-0 px-6 py-3 border-b border-navy-800 overflow-x-auto">
           {STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-0 shrink-0">
               <div className="flex items-center gap-2">
@@ -283,7 +297,7 @@ DRAFTING INSTRUCTIONS:
                         <p className="text-sm font-medium text-white">{issue.description}</p>
                       </div>
                       {(issue.claimant_position || issue.respondent_position) && (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {issue.claimant_position && (
                             <div className="bg-gold-500/5 border border-gold-500/15 rounded-lg p-2">
                               <p className="text-xs font-medium text-gold-400 mb-0.5">Claimant</p>
@@ -331,7 +345,7 @@ DRAFTING INSTRUCTIONS:
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-300 block mb-1.5">Interest Rate (% p.a.)</label>
                   <input

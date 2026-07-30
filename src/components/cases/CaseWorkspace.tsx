@@ -154,7 +154,7 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
                 ? "bg-gold-500/10 text-gold-400 border border-gold-500/20"
                 : "text-slate-400 hover:text-white hover:bg-navy-800"
             }`}>
-            <tab.icon size={13} /><span className="hidden sm:inline">{tab.label}</span>
+            <tab.icon size={13} /><span className={activeTab === tab.id ? "inline" : "hidden sm:inline"}>{tab.label}</span>
           </button>
         ))}
       </div>

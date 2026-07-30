@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Research from "./pages/Research";
 import Cases from "./pages/Cases";
 import Documents from "./pages/Documents";
+import Library from "./pages/Library";
+import LibraryDocument from "./pages/LibraryDocument";
 import AIAssistant from "./pages/AIAssistant";
 import DraftingStudio from "./pages/DraftingStudio";
 import ContractReview from "./pages/ContractReview";
@@ -109,6 +111,14 @@ export default function App() {
             <Route
               path="/documents"
               element={<RequireAuth><Documents /></RequireAuth>}
+            />
+            <Route
+              path="/library"
+              element={<RequireAuth><Library /></RequireAuth>}
+            />
+            <Route
+              path="/library/:docId"
+              element={<RequireAuth><LibraryDocument /></RequireAuth>}
             />
             <Route
               path="/assistant"

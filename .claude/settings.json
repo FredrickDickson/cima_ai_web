@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase --version)",
+      "Bash(supabase projects *)",
+      "Bash(supabase link *)",
+      "Bash(supabase migration *)",
+      "Bash(supabase db *)",
+      "Bash(node scripts/_check_schema_tmp.mjs)",
+      "Bash(npm install *)",
+      "Bash(rm -rf node_modules package-lock.json.bak)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Read(//tmp/**)",
+      "Bash(node -e \"console.log\\(Object.keys\\(process.env\\).filter\\(k => k.includes\\('SUPABASE'\\)\\)\\)\")",
+      "Bash(node scripts/_check_counts_tmp.mjs)",
+      "Bash(rm -f scripts/_check_counts_tmp.mjs)",
+      "Bash(export CIMA_APP_URL=\"https://oojiqylyojckcxezrjfz.supabase.co\")",
+      "Bash(export CIMA_APP_SERVICE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vamlxeWx5b2pja2N4ZXpyamZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQ2MTc0NywiZXhwIjoyMDk1MDM3NzQ3fQ.qbVHPXf5Eq5pX0fKYbs7XTaUAKxia_CWGXQuWhXjn1U\")",
+      "Bash(node -e ' *)",
+      "Bash(npm view *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(node scripts/ingest-law-reports.mjs --dry-run --only=\"COURT OF APPEAL\\\\1975\")",
+      "Bash(node scripts/_test_upload_tmp.mjs)",
+      "Bash(node scripts/_check_trigger_tmp.mjs)",
+      "Bash(node scripts/ingest-law-reports.mjs --limit=5 --only=\"COURT OF APPEAL\\\\1975\")",
+      "Bash(node --max-old-space-size=4096 scripts/ingest-law-reports.mjs --limit=5 --only=\"COURT OF APPEAL\\\\1975\")",
+      "Bash(timeout 120 node scripts/_test_embed_tmp.mjs)",
+      "Bash(timeout 60 node scripts/_test_extract_tmp.mjs)",
+      "Bash(timeout 90 node scripts/_test_combo_tmp.mjs)",
+      "Bash(node --max-old-space-size=4096 scripts/ingest-law-reports.mjs --limit=1 --only=\"COURT OF APPEAL\\\\1975\")",
+      "Bash(DEBUG_INGEST=1 node --max-old-space-size=3072 scripts/ingest-law-reports.mjs --limit=1 --only=\"COURT OF APPEAL\\\\1975\" --force)",
+      "Bash(timeout 60 node --max-old-space-size=3072 scripts/_test_chunk_tmp.mjs)",
+      "Bash(timeout 30 node scripts/_test_charchunk_tmp.mjs)",
+      "Bash(node scripts/ingest-law-reports.mjs --limit=5 --only=\"COURT OF APPEAL\\\\1975\" --force)",
+      "Bash(node scripts/_verify_tmp.mjs)",
+      "Bash(rm -f \"c:\\\\Users\\\\Fredrick\\\\Documents\\\\projects\\\\cima_ai_web\\\\scripts\\\\_verify_tmp.mjs\")",
+      "Bash(node scripts/ingest-law-reports.mjs --limit=3 --only=\"Court Of Appeal Cases A\\\\1959\")",
+      "Bash(node scripts/ingest-law-reports.mjs --limit=3 --only=\"C I WORK 4TH\")",
+      "Bash(node scripts/ingest-law-reports.mjs --limit=3 --only=\"2000 pdf\")",
+      "Bash(xargs grep -l \"export function cn\")"
+    ]
+  }
+}

@@ -41,6 +41,11 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } from "../types/database";
+import { CitedMarkdown, type CitedSource } from "../lib/citations";
+import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { MentionPopup } from "../components/ui/MentionPopup";
+import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
+import { splitTaggedAuthorityIds } from "../lib/mentions";
 
 interface AnalysisResult {
   id?: string;
@@ -62,6 +67,7 @@ interface AnalysisResult {
   negotiation_points?: string[];
   ai_insights?: string;
   contract_text: string;
+  cited_sources?: CitedSource[];
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -527,7 +533,7 @@ export default function ContractReview() {
       body: JSON.stringify({ messages: [{ role: "user", content }], context: "review" }),
     });
     const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? "";
+    return data.content ?? data.choices?.[0]?.message?.content ?? "";
   }
 
   async function loadCases() {

@@ -41,5 +41,5 @@ ${caseData.description ? `Description: ${caseData.description}.` : ""}${extraCon
     }
   );
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "No response received.";
+  return data.content ?? data.choices?.[0]?.message?.content ?? "No response received.";
 }

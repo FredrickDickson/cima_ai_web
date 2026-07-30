@@ -141,7 +141,7 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
   return (
     <div className="space-y-6">
       {/* Status cards */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: "Status", value: caseData.status.charAt(0).toUpperCase() + caseData.status.slice(1), color: "text-emerald-400" },
           { label: "Type", value: caseData.type.charAt(0).toUpperCase() + caseData.type.slice(1), color: "text-gold-400" },

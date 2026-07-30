@@ -138,6 +138,10 @@ function charChunk(text, titlePrefix, size = 1000, overlap = 150) {
       });
       idx++;
     }
+    // Once we've reached the end of the text, stop — otherwise `end` stays
+    // pinned at text.length and `start = end - overlap` recomputes to the
+    // same value forever (infinite loop).
+    if (end >= text.length) break;
     start = end - overlap;
   }
   return chunks;

@@ -3,30 +3,55 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   detectJurisdiction,
   extractLegalQuery,
-  fetchLawsAfricaContext,
+  fetchLawsAfricaSources,
   COUNTRY_NAMES,
+  type LawsAfricaSource,
 } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 
-async function fetchAccraRulesContext(query: string): Promise<string> {
-  if (!query) return "";
+interface CitedSource {
+  marker: string;
+  source_name: string;
+  citation?: string;
+  source_type?: string;
+  jurisdiction?: string;
+  content: string;
+  url?: string;
+  doc_id?: string;
+}
+
+interface AccraRuleRow {
+  id: string;
+  title: string;
+  content: string;
+  citation: string;
+  doc_id?: string;
+}
+
+async function fetchAccraRulesRows(query: string): Promise<AccraRuleRow[]> {
+  if (!query) return [];
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return "";
+    if (!supabaseUrl || !serviceKey) return [];
     const supabase = createClient(supabaseUrl, serviceKey);
     const { data, error } = await supabase.rpc("search_legal_library_fts", {
       search_query: query,
       match_count: 4,
     });
-    if (error || !data || data.length === 0) return "";
-    const entries = (data as Array<{ title: string; content: string; citation: string }>)
-      .slice(0, 4)
-      .map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
-    return `\n\nRelevant Accra Arbitration Rules 2025:\n${entries.join("\n\n")}`;
+    if (error || !data) return [];
+    return (data as AccraRuleRow[]).slice(0, 4);
   } catch {
-    return "";
+    return [];
   }
+}
+
+function formatAccraRulesContext(rows: AccraRuleRow[]): string {
+  if (rows.length === 0) return "";
+  const entries = rows.map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
+  return `\n\nRelevant Accra Arbitration Rules 2025:\n${entries.join("\n\n")}`;
 }
 
 const corsHeaders = {
@@ -44,6 +69,11 @@ interface ChatRequest {
   messages: Message[];
   context?: string;
   stream?: boolean;
+  /** @deprecated superseded by library_doc_ids; still merged in for in-flight clients. */
+  library_doc_id?: string;
+  library_doc_ids?: string[];
+  document_ids?: string[];
+  user_id?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,8 +91,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const LAWS_AFRICA_API_KEY = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { messages, context = "general", stream = false }: ChatRequest = await req.json();
+    const {
+      messages, context = "general", stream = false,
+      library_doc_id, library_doc_ids, document_ids, user_id,
+    }: ChatRequest = await req.json();
 
     const userQuery = extractLegalQuery(messages);
     const jurisdictionCode = detectJurisdiction(
@@ -71,13 +107,58 @@ Deno.serve(async (req: Request) => {
     const jurisdictionLabel = COUNTRY_NAMES[jurisdictionCode]
       ?? (jurisdictionCode !== "gh" ? jurisdictionCode : "Ghana");
 
-    const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review"];
-    const [lawsContext, accraContext] = await Promise.all([
-      userQuery ? fetchLawsAfricaContext(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve(""),
-      (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesContext(userQuery) : Promise.resolve(""),
-    ]);
+    // Strict grounding: when the user has @-tagged specific cases/legislation/
+    // documents (or opened a single Legal Library document, the older
+    // library_doc_id path), skip the general Laws.Africa/Accra Rules lookups
+    // and answer only from the tagged sources.
+    const mergedLibraryDocIds = [
+      ...(library_doc_id ? [library_doc_id] : []),
+      ...(library_doc_ids ?? []),
+    ];
+    const taggedContext = (mergedLibraryDocIds.length > 0 || (document_ids?.length ?? 0) > 0)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, mergedLibraryDocIds, document_ids)
+      : null;
 
-    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel, accraContext);
+    const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review"];
+    const [lawsSources, accraRows]: [LawsAfricaSource[], AccraRuleRow[]] = taggedContext
+      ? [[], []]
+      : await Promise.all([
+          userQuery ? fetchLawsAfricaSources(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve([]),
+          (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesRows(userQuery) : Promise.resolve([]),
+        ]);
+
+    const lawsContext = lawsSources.length > 0
+      ? `\n\nRelevant Laws.Africa Legal Sources:\n${lawsSources
+          .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}\n${s.content}`)
+          .join("\n\n")}`
+      : "";
+    const accraContext = formatAccraRulesContext(accraRows);
+
+    const citedSources: CitedSource[] = [
+      ...lawsSources.map((s, i) => ({
+        marker: `${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+      })),
+      ...accraRows.map((r, i) => ({
+        marker: `R${i + 1}`,
+        source_name: r.title,
+        citation: r.citation,
+        content: r.content,
+        doc_id: r.doc_id,
+      })),
+      ...(taggedContext?.citedSources ?? []),
+    ];
+
+    const strictGroundingBlock = taggedContext
+      ? buildStrictGroundingBlock(taggedContext.titles, taggedContext.context)
+      : "";
+
+    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel, accraContext) + strictGroundingBlock;
 
     const allMessages: Message[] = [
       { role: "system", content: systemPrompt },
@@ -119,7 +200,7 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content ?? "";
-    return new Response(JSON.stringify({ content }), {
+    return new Response(JSON.stringify({ content, cited_sources: citedSources }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
@@ -143,6 +224,10 @@ function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = 
     general: `\n\nProvide comprehensive, professional legal assistance under ${jurisdiction} law across all areas of legal practice.`,
   };
 
-  return base + (contextMap[context] ?? contextMap.general) + lawsContext + accraContext;
+  const citationFormatNote = (lawsContext || accraContext)
+    ? `\n\nWhen citing the sources listed below, use the exact bracket marker shown before each source (e.g. "[1]", "[R1]") inline in your answer — these markers are matched back to the real source and rendered as verifiable links, so do not invent marker numbers beyond what is listed.`
+    : "";
+
+  return base + (contextMap[context] ?? contextMap.general) + citationFormatNote + lawsContext + accraContext;
 }
 

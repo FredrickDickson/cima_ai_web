@@ -47,13 +47,19 @@ import remarkGfm from "remark-gfm";
 import { useSearchParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
+import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import { getRelevantRulesContext } from "../lib/documentSearch";
 import type { Template, Case, Draft } from "../types/database";
+import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import LegalEditor from "../components/drafting/LegalEditor";
 import CommandBar from "../components/drafting/CommandBar";
+import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { MentionPopup } from "../components/ui/MentionPopup";
+import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
+import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
 import type { Editor } from "@tiptap/react";
 
 // ---------------------------------------------------------------------------
@@ -127,6 +133,7 @@ interface ResearchSource {
   content: string;
   similarity?: number;
   url?: string;
+  doc_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +249,7 @@ export default function DraftingStudio() {
   const [outputTab, setOutputTab] = useState<"full" | "short" | "plain">("full");
   const [wordCount, setWordCount] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftCitedSources, setDraftCitedSources] = useState<CitedSource[]>([]);
 
   // Editor state (Feature 1) — Tiptap rich-text legal editor
   const [selectedText, setSelectedText] = useState("");
@@ -261,6 +269,7 @@ export default function DraftingStudio() {
   const [researchQuery, setResearchQuery] = useState("");
   const [researchSources, setResearchSources] = useState<ResearchSource[]>([]);
   const [researchAnalysis, setResearchAnalysis] = useState("");
+  const [researchCitedSources, setResearchCitedSources] = useState<CitedSource[]>([]);
   const [researchLoading, setResearchLoading] = useState(false);
   const [validityLoading, setValidityLoading] = useState(false);
   const [validityResult, setValidityResult] = useState("");
@@ -288,7 +297,8 @@ export default function DraftingStudio() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const nlInputRef = useRef<HTMLTextAreaElement>(null);
-  
+  const mentions = useAuthorityMentions({ text: nlPrompt, setText: setNlPrompt, textareaRef: nlInputRef, userId: user?.id });
+
   // Mobile UI state
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
@@ -384,6 +394,7 @@ export default function DraftingStudio() {
     setSelectedTemplate(null);
     setNlPrompt("");
     setDraftId(null);
+    setDraftCitedSources([]);
     setSaved(false);
     setError("");
     setShowVersionHistory(false);
@@ -391,6 +402,7 @@ export default function DraftingStudio() {
     setReviewItems([]);
     setResearchSources([]);
     setResearchAnalysis("");
+    setResearchCitedSources([]);
     setRightTab("assistant");
     versions.clear();
     setMode("prompt");
@@ -444,10 +456,16 @@ export default function DraftingStudio() {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const { data: { session } } = await supabase.auth.getSession();
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(mentions.activeTaggedAuthorities);
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ prompt: nlPrompt, jurisdiction: nlJurisdiction, case_id: nlLinkedCaseId || undefined, user_id: user.id }),
+        body: JSON.stringify({
+          prompt: nlPrompt, jurisdiction: nlJurisdiction, case_id: nlLinkedCaseId || undefined, user_id: user.id,
+          ...(libraryDocIds.length > 0 ? { library_doc_ids: libraryDocIds } : {}),
+          ...(documentIds.length > 0 ? { document_ids: documentIds } : {}),
+          ...(mentions.activeTaggedAuthorities.length > 0 ? { tagged_authorities: mentions.activeTaggedAuthorities } : {}),
+        }),
       });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || "Generation failed"); }
       const data = await res.json();
@@ -455,6 +473,7 @@ export default function DraftingStudio() {
       setLegalNotes(data.legal_notes ?? "");
       setShortForm(data.short_form ?? "");
       setPlainEnglish(data.plain_english ?? "");
+      setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
       loadDrafts();
@@ -500,6 +519,7 @@ export default function DraftingStudio() {
       setLegalNotes(data.legal_notes ?? "");
       setShortForm(data.short_form ?? "");
       setPlainEnglish(data.plain_english ?? "");
+      setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
       loadDrafts();
@@ -628,6 +648,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
     setResearchLoading(true);
     setResearchSources([]);
     setResearchAnalysis("");
+    setResearchCitedSources([]);
     setRightTab("research");
     setError("");
 
@@ -643,6 +664,7 @@ Return ONLY a valid JSON array. No markdown, no code fences, no explanation.`,
       const data = await res.json();
       setResearchSources(data.sources ?? []);
       setResearchAnalysis(data.ai_analysis ?? "");
+      setResearchCitedSources(data.cited_sources ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Research failed");
     } finally {
@@ -764,18 +786,60 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
     setValidityLoading(true);
     setShowValidity(false);
     setValidityResult("");
-    const sourceList = researchSources
-      .map((s, i) => {
-        const parts = [`${i + 1}. ${s.source_name}`];
-        if (s.citation) parts.push(`Citation: ${s.citation}`);
-        if (s.jurisdiction) parts.push(`Jurisdiction: ${s.jurisdiction}`);
-        return parts.join(" | ");
-      })
-      .join("\n");
-    const prompt = `You are a legal research assistant. For each authority listed below, provide its current validity status on a single line in this format:\n<Number>. <Name> — <Status> <Icon> — <One-sentence reason>\n\nStatus options:\n- Good Law ✓ (still valid and followed)\n- Caution ⚠ (limited, distinguished, or questioned)\n- Overruled ✗ (explicitly overruled or superseded)\n- Unable to verify (insufficient information)\n\nAuthorities:\n${sourceList}\n\nRespond with only the numbered list, no preamble.`;
+
+    const withDocId = researchSources.filter((s) => s.doc_id);
+    const withoutDocId = researchSources.filter((s) => !s.doc_id);
+    const sections: string[] = [];
+
     try {
-      const result = await callAiChat([{ role: "user", content: prompt }], "drafting");
-      setValidityResult(result);
+      // Sources that exist in our Legal Library get a real, grounded citator
+      // run instead of an LLM guess.
+      if (withDocId.length > 0) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+        const { data: { session } } = await supabase.auth.getSession();
+        const lines = await Promise.all(
+          withDocId.map(async (s) => {
+            try {
+              const res = await fetch(`${supabaseUrl}/functions/v1/case-citator`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+                body: JSON.stringify({ doc_id: s.doc_id }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Citator check failed");
+              const citations = (data.citations ?? []) as { treatment: string }[];
+              const positive = citations.filter((c) => c.treatment === "followed" || c.treatment === "applied").length;
+              const negative = citations.filter((c) => c.treatment === "overruled" || c.treatment === "disapproved").length;
+              const summary =
+                citations.length === 0
+                  ? `No later case in our library discusses this decision (checked against ${data.run?.corpus_doc_count ?? 0} case documents). This does not confirm the case remains good law.`
+                  : `${positive} positive and ${negative} negative treatment record(s) found among ${citations.length} citing case(s) in our library.`;
+              return `**${s.source_name}** — Verified via Smart Citator ✓\n${summary}`;
+            } catch {
+              return `**${s.source_name}** — Smart Citator check failed. Open this case in the Library to retry.`;
+            }
+          }),
+        );
+        sections.push(`### Verified via Smart Citator (grounded in our Legal Library)\n\n${lines.join("\n\n")}`);
+      }
+
+      // Everything else (external sources not in our corpus) falls back to
+      // an honestly-labeled, ungrounded LLM assessment.
+      if (withoutDocId.length > 0) {
+        const sourceList = withoutDocId
+          .map((s, i) => {
+            const parts = [`${i + 1}. ${s.source_name}`];
+            if (s.citation) parts.push(`Citation: ${s.citation}`);
+            if (s.jurisdiction) parts.push(`Jurisdiction: ${s.jurisdiction}`);
+            return parts.join(" | ");
+          })
+          .join("\n");
+        const prompt = `You are a legal research assistant. None of the authorities below are in our verified Legal Library corpus, so this is an unverified estimate based on your training knowledge, not a grounded check. For each authority, provide its current validity status on a single line in this format:\n<Number>. <Name> — <Status> <Icon> — <One-sentence reason>\n\nStatus options:\n- Good Law ✓ (still valid and followed)\n- Caution ⚠ (limited, distinguished, or questioned)\n- Overruled ✗ (explicitly overruled or superseded)\n- Unable to verify (insufficient information)\n\nAuthorities:\n${sourceList}\n\nRespond with only the numbered list, no preamble.`;
+        const result = await callAiChat([{ role: "user", content: prompt }], "drafting");
+        sections.push(`### AI assessment — not verified against our library\n\n${result}`);
+      }
+
+      setValidityResult(sections.join("\n\n---\n\n"));
       setShowValidity(true);
     } finally {
       setValidityLoading(false);
@@ -1077,10 +1141,34 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
 
                 <form onSubmit={handleNlGenerate} className="w-full max-w-2xl">
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <textarea ref={nlInputRef} value={nlPrompt} onChange={(e) => setNlPrompt(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleNlGenerate(); }}
-                      rows={4} placeholder="e.g., Draft a Notice of Arbitration for a construction dispute involving delayed payment under a FIDIC contract between Accra Builders Ltd and Ministry of Roads..."
-                      className="w-full px-5 py-4 text-sm text-navy-950 placeholder-slate-400 focus:outline-none resize-none border-0" />
+                    <div className="relative">
+                      <textarea ref={nlInputRef} value={nlPrompt} onChange={mentions.handleTextareaChange}
+                        onKeyDown={(e) => { if (mentions.handleTextareaKeyDown(e)) return; if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleNlGenerate(); }}
+                        rows={4} placeholder="e.g., Draft a Notice of Arbitration for a construction dispute... Type @ to tag specific cases, legislation, or documents."
+                        className="w-full px-5 py-4 pr-11 text-sm text-navy-950 placeholder-slate-400 focus:outline-none resize-none border-0" />
+                      <VoiceInputButton
+                        onTranscript={(text) => setNlPrompt((prev) => (prev ? `${prev} ${text}` : text))}
+                        className="absolute top-3 right-3"
+                        title="Dictate your instructions"
+                      />
+                      {mentions.popupOpen && (
+                        <MentionPopup
+                          results={mentions.popupResults}
+                          loading={mentions.popupLoading}
+                          activeIndex={mentions.activeIndex}
+                          onHover={mentions.setActiveIndex}
+                          onSelect={mentions.selectSuggestion}
+                        />
+                      )}
+                    </div>
+                    {mentions.activeTaggedAuthorities.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-t border-slate-100">
+                        {mentions.activeTaggedAuthorities.map((tag: TaggedAuthority) => (
+                          <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => mentions.removeTag(tag.id)} />
+                        ))}
+                        <span className="text-[11px] text-navy-600 font-medium">Answering only from tagged sources</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
@@ -1299,9 +1387,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                             </span>
                           </div>
                           <div className="prose-doc text-sm leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {outputTab === "short" ? shortForm : plainEnglish}
-                            </ReactMarkdown>
+                            <CitedMarkdown text={outputTab === "short" ? shortForm : plainEnglish} sources={draftCitedSources} />
                           </div>
                         </div>
                       ) : (
@@ -1327,7 +1413,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                                 <span className="text-xs font-bold text-amber-800 uppercase tracking-wide">Legal Notes</span>
                               </div>
                               <div className="prose-doc text-xs leading-relaxed text-amber-900">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{legalNotes}</ReactMarkdown>
+                                <CitedMarkdown text={legalNotes} sources={draftCitedSources} />
                               </div>
                             </div>
                           )}
@@ -1505,6 +1591,10 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                             <input value={researchQuery} onChange={(e) => setResearchQuery(e.target.value)}
                               placeholder="Search legal authorities..."
                               className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600" />
+                            <VoiceInputButton
+                              onTranscript={(text) => setResearchQuery((prev) => (prev ? `${prev} ${text}` : text))}
+                              title="Dictate your search"
+                            />
                             <button type="submit" disabled={researchLoading || !researchQuery.trim()}
                               className="px-3 py-2 bg-navy-950 hover:bg-navy-800 text-white rounded-lg transition-colors disabled:opacity-50">
                               {researchLoading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
@@ -1527,7 +1617,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                                 <span className="text-xs font-bold text-gold-800">AI Analysis</span>
                               </div>
                               <div className="prose-doc text-xs leading-relaxed text-gold-900 max-h-40 overflow-y-auto">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{researchAnalysis.slice(0, 1500)}</ReactMarkdown>
+                                <CitedMarkdown text={researchAnalysis.slice(0, 1500)} sources={researchCitedSources} />
                               </div>
                             </div>
                           </div>
@@ -1563,12 +1653,17 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                                     className="flex items-center gap-1 text-xs text-navy-600 hover:text-navy-800 font-medium transition-colors">
                                     <ArrowDown size={10} /> Insert
                                   </button>
-                                  {source.url && (
+                                  {source.doc_id ? (
+                                    <a href={`/library/${source.doc_id}`} target="_blank" rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors">
+                                      <ExternalLink size={10} /> View in Library
+                                    </a>
+                                  ) : source.url ? (
                                     <a href={source.url} target="_blank" rel="noopener noreferrer"
                                       className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors">
                                       <ExternalLink size={10} /> Source
                                     </a>
-                                  )}
+                                  ) : null}
                                   <span className={`ml-auto text-xs px-1.5 py-0.5 rounded-full capitalize border ${
                                     source.source_type === "case" ? "bg-blue-50 text-blue-600 border-blue-200" :
                                     source.source_type === "statute" ? "bg-teal-50 text-teal-600 border-teal-200" :

@@ -528,7 +528,7 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
               </button>
               {batnaOpen && (
                 <div className="border-t border-emerald-500/20 px-5 py-4">
-                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 [&_h2]:text-emerald-300 [&_h3]:text-emerald-200 [&_strong]:text-white">
+                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 overflow-x-auto [&_h2]:text-emerald-300 [&_h3]:text-emerald-200 [&_strong]:text-white">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {batnaResult}
                     </ReactMarkdown>
@@ -559,7 +559,7 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
               </button>
               {rangeOpen && (
                 <div className="border-t border-blue-500/20 px-5 py-4">
-                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 [&_h2]:text-blue-300 [&_h3]:text-blue-200 [&_strong]:text-white">
+                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 overflow-x-auto [&_h2]:text-blue-300 [&_h3]:text-blue-200 [&_strong]:text-white">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {rangeResult}
                     </ReactMarkdown>
@@ -590,7 +590,7 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
               </button>
               {briefOpen && (
                 <div className="border-t border-amber-500/20 px-5 py-4">
-                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 [&_h2]:text-amber-300 [&_h3]:text-amber-200 [&_strong]:text-white">
+                  <div className="prose prose-sm prose-invert max-w-none text-slate-300 overflow-x-auto [&_h2]:text-amber-300 [&_h3]:text-amber-200 [&_strong]:text-white">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {briefResult}
                     </ReactMarkdown>
@@ -709,7 +709,7 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
 
           {scheduleResult && (
             <div className="rounded-xl border border-navy-600 bg-white/5 p-5">
-              <div className="prose prose-sm prose-invert max-w-none text-slate-200 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-slate-400 [&_th]:uppercase [&_th]:tracking-wide [&_td]:text-sm [&_td]:text-slate-300 [&_table]:border-collapse [&_th]:border [&_th]:border-navy-600 [&_th]:px-3 [&_th]:py-2 [&_td]:border [&_td]:border-navy-700 [&_td]:px-3 [&_td]:py-2">
+              <div className="prose prose-sm prose-invert max-w-none text-slate-200 overflow-x-auto [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-slate-400 [&_th]:uppercase [&_th]:tracking-wide [&_td]:text-sm [&_td]:text-slate-300 [&_table]:border-collapse [&_th]:border [&_th]:border-navy-600 [&_th]:px-3 [&_th]:py-2 [&_td]:border [&_td]:border-navy-700 [&_td]:px-3 [&_td]:py-2">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {scheduleResult}
                 </ReactMarkdown>

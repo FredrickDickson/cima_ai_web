@@ -2,6 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +35,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { query, jurisdiction, source_types, user_id } = await req.json();
+    const { query, jurisdiction, source_types, user_id, library_doc_ids, document_ids } = await req.json();
     if (!query) throw new Error("query is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -46,6 +48,61 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Strict grounding: when the user has @-tagged specific cases/legislation/
+    // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
+    // and answer only from the tagged sources.
+    if ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0) {
+      const tagged = await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids);
+      if (tagged) {
+        const groundedSources = tagged.citedSources.map((s) => ({
+          id: s.doc_id ?? s.marker,
+          source_name: s.source_name,
+          citation: s.citation,
+          source_type: s.source_type ?? "document",
+          jurisdiction: s.jurisdiction,
+          content: s.content,
+          doc_id: s.doc_id,
+        }));
+
+        const jurisdictionLabel = COUNTRY_NAMES[COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh"] ?? jurisdiction ?? "Ghana";
+        const synthesisPrompt = `JURISDICTION: ${jurisdictionLabel}
+QUERY: ${query}
+
+Answer the query using only the tagged authority text provided below. Cite each tagged authority using its exact marker (e.g. "[T1]") inline.${buildStrictGroundingBlock(tagged.titles, tagged.context)}`;
+
+        const dsRes = await fetch("https://api.deepseek.com/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: CIMA_SYSTEM_PROMPT },
+              { role: "user", content: synthesisPrompt },
+            ],
+            temperature: 0.1,
+            max_tokens: 4096,
+          }),
+        });
+
+        let aiAnalysis = "";
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          aiAnalysis = dsData.choices?.[0]?.message?.content ?? "";
+        }
+
+        return new Response(
+          JSON.stringify({
+            sources: groundedSources,
+            ai_analysis: aiAnalysis,
+            tavily_results: [],
+            sources_count: groundedSources.length,
+            cited_sources: tagged.citedSources,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const sources: {
       id: string;
       source_name: string;
@@ -55,6 +112,7 @@ Deno.serve(async (req: Request) => {
       content: string;
       similarity?: number;
       url?: string;
+      doc_id?: string;
     }[] = [];
 
     // Fetch Laws.Africa legislation first — guaranteed slots in AI context
@@ -95,6 +153,7 @@ Deno.serve(async (req: Request) => {
           jurisdiction: r.jurisdiction,
           content: r.content,
           similarity: r.similarity,
+          doc_id: r.doc_id ?? undefined,
         });
       }
 
@@ -129,6 +188,7 @@ Deno.serve(async (req: Request) => {
           source_type: r.source_type,
           jurisdiction: r.jurisdiction,
           content: r.content,
+          doc_id: r.doc_id ?? undefined,
         });
       }
     }
@@ -220,12 +280,36 @@ Deno.serve(async (req: Request) => {
           .join("\n\n")}`
       : "";
 
-    const otherSourcesBlock = relevantSources.length > 0
-      ? `\n\nAdditional Sources:\n${relevantSources
-          .slice(0, 8)
+    const cappedOtherSources = relevantSources.slice(0, 8);
+    const otherSourcesBlock = cappedOtherSources.length > 0
+      ? `\n\nAdditional Sources:\n${cappedOtherSources
           .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}:\n${s.content.slice(0, 600)}`)
           .join("\n\n")}`
       : "";
+
+    // Mirrors the exact numbering used in legislationBlock/otherSourcesBlock above
+    // so [L1]/[1] markers in ai_analysis can be resolved back to a real source.
+    const citedSources = [
+      ...lawsSources.map((s, i) => ({
+        marker: `L${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+      })),
+      ...cappedOtherSources.map((s, i) => ({
+        marker: `${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+        doc_id: s.doc_id,
+      })),
+    ];
 
     // Fix 2: Jurisdiction-aware synthesis prompt that explicitly instructs the AI
     // to discard off-jurisdiction sources and fall back to training knowledge if needed
@@ -269,7 +353,13 @@ No external sources were retrieved for this query. Provide a comprehensive legal
     }
 
     return new Response(
-      JSON.stringify({ sources: allSources, ai_analysis: aiAnalysis, tavily_results: tavilyResults, sources_count: allSources.length }),
+      JSON.stringify({
+        sources: allSources,
+        ai_analysis: aiAnalysis,
+        tavily_results: tavilyResults,
+        sources_count: allSources.length,
+        cited_sources: citedSources,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

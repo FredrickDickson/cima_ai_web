@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchLawsAfricaSources, COUNTRY_MAP, type LawsAfricaSource } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,52 +11,49 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const lawsAfricaCountryMap: Record<string, string> = {
-  ghana: "gh", kenya: "ke", "south africa": "za", nigeria: "ng",
-  uganda: "ug", tanzania: "tz", zambia: "zm", zimbabwe: "zw",
-  malawi: "mw", namibia: "na", botswana: "bw", rwanda: "rw",
-  mauritius: "mu", eswatini: "sz", lesotho: "ls", mozambique: "mz",
-};
+interface CitedSource {
+  marker: string;
+  source_name: string;
+  citation?: string;
+  source_type?: string;
+  jurisdiction?: string;
+  content: string;
+  url?: string;
+  doc_id?: string;
+}
 
-async function fetchAccraRulesContext(query: string, supabase: ReturnType<typeof createClient>): Promise<string> {
-  if (!query) return "";
+interface AccraRuleRow {
+  id: string;
+  title: string;
+  content: string;
+  citation: string;
+  doc_id?: string;
+}
+
+async function fetchAccraRulesRows(query: string, supabase: ReturnType<typeof createClient>): Promise<AccraRuleRow[]> {
+  if (!query) return [];
   try {
     const { data, error } = await supabase.rpc("search_legal_library_fts", {
       search_query: query,
       match_count: 4,
     });
-    if (error || !data || data.length === 0) return "";
-    const entries = (data as Array<{ title: string; content: string; citation: string }>)
-      .slice(0, 4)
-      .map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
-    return `\n\nApplicable Arbitration Rules (Accra Arbitration Rules 2025):\n${entries.join("\n\n")}`;
+    if (error || !data) return [];
+    return (data as AccraRuleRow[]).slice(0, 4);
   } catch {
-    return "";
+    return [];
   }
 }
 
-async function fetchLawsAfricaContext(query: string, apiKey: string, jurisdiction?: string): Promise<string> {
-  if (!apiKey) return "";
-  try {
-    const countryCode = lawsAfricaCountryMap[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-    const res = await fetch(
-      `https://api.laws.africa/v3/search/?q=${encodeURIComponent(query)}&country=${countryCode}&page_size=3`,
-      { headers: { "Authorization": `Token ${apiKey}` } }
-    );
-    if (!res.ok) return "";
-    const data = await res.json();
-    const results = (data.results ?? []).slice(0, 3);
-    if (results.length === 0) return "";
-    const entries = results.map((item: { title?: string; citation?: string; snippet?: string; content?: string }, i: number) => {
-      const title = item.title ?? "Untitled";
-      const citation = item.citation ?? "";
-      const snippet = item.snippet ?? item.content ?? "";
-      return `[${i + 1}] ${title}${citation ? ` (${citation})` : ""}\n${snippet}`;
-    });
-    return `\n\nRelevant Laws.Africa Legal Sources:\n${entries.join("\n\n")}`;
-  } catch {
-    return "";
-  }
+function formatAccraRulesContext(rows: AccraRuleRow[]): string {
+  if (rows.length === 0) return "";
+  const entries = rows.map((r, i) => `[R${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 400)}`);
+  return `\n\nApplicable Arbitration Rules (Accra Arbitration Rules 2025):\n${entries.join("\n\n")}`;
+}
+
+function formatLawsAfricaContext(sources: LawsAfricaSource[]): string {
+  if (sources.length === 0) return "";
+  const entries = sources.map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}\n${s.content}`);
+  return `\n\nRelevant Laws.Africa Legal Sources:\n${entries.join("\n\n")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { prompt, template_type, jurisdiction, variables, custom_instructions, case_id, user_id, template_id } = await req.json();
+    const {
+      prompt, template_type, jurisdiction, variables, custom_instructions, case_id, user_id, template_id,
+      library_doc_ids, document_ids, tagged_authorities,
+    } = await req.json();
     if (!user_id) throw new Error("user_id is required");
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
@@ -158,14 +161,47 @@ Deno.serve(async (req: Request) => {
       ? Object.entries(variables).map(([k, v]) => `${k}: ${v}`).join("\n")
       : "";
 
+    // Strict grounding: when the user has @-tagged specific cases/legislation/
+    // documents, skip the Laws.Africa/Accra Rules lookup entirely and draft
+    // only from the tagged sources.
+    const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      : null;
+
     // Fetch relevant legislation from Laws.Africa + Accra Arbitration Rules
     const searchQuery = prompt
       ? `${prompt} ${jurisdiction ?? "Ghana"} law`
       : `${templateTitle} ${jurisdiction ?? "Ghana"} law`;
-    const [lawsContext, accraContext] = await Promise.all([
-      fetchLawsAfricaContext(searchQuery, lawsAfricaKey, jurisdiction),
-      fetchAccraRulesContext(prompt ?? templateTitle, supabase),
-    ]);
+    const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+    const [lawsSources, accraRows] = taggedContext
+      ? [[], []]
+      : await Promise.all([
+          fetchLawsAfricaSources(searchQuery, lawsAfricaKey, countryCode),
+          fetchAccraRulesRows(prompt ?? templateTitle, supabase),
+        ]);
+    const lawsContext = taggedContext
+      ? buildStrictGroundingBlock(taggedContext.titles, taggedContext.context)
+      : formatLawsAfricaContext(lawsSources);
+    const accraContext = taggedContext ? "" : formatAccraRulesContext(accraRows);
+    const citedSources: CitedSource[] = [
+      ...lawsSources.map((s, i) => ({
+        marker: `${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+      })),
+      ...accraRows.map((r, i) => ({
+        marker: `R${i + 1}`,
+        source_name: r.title,
+        citation: r.citation,
+        content: r.content,
+        doc_id: r.doc_id,
+      })),
+      ...(taggedContext?.citedSources ?? []),
+    ];
 
     // ---- Build the AI prompt based on input path ----
     let aiPrompt: string;
@@ -304,6 +340,7 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
       content: mainContent,
       jurisdiction: jurisdiction ?? "ghana",
       status: "draft",
+      tagged_authorities: tagged_authorities ?? [],
     }).select().maybeSingle();
 
     return new Response(
@@ -317,6 +354,7 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
         word_count: wordCount,
         template_title: templateTitle,
         jurisdiction: jurisdiction ?? "ghana",
+        cited_sources: citedSources,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
