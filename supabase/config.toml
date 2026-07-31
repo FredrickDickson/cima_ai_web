@@ -1,7 +1,7 @@
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "extensions"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 
 [db]
@@ -16,6 +16,11 @@ port = 54323
 enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/reset-password"]
+
+[auth.email]
+# Pinned explicitly so future `config push` runs don't silently depend on
+# whatever the CLI's own default happens to be for this security setting.
+double_confirm_changes = true
 
 [storage]
 enabled = true

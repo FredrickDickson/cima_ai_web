@@ -33,8 +33,7 @@ Case/matter management, document storage/browsing, and Legal Library browsing ar
 - **Target**: law students, researchers, evaluators, and the top of the funnel
 
 ### Professional — the core paid tier, individual practitioners
-- Illustrative price: **$39/month, or $390/year** (2 months free on annual billing — standard ~17% discount)
-- **Regional pricing**: a Ghana/West-Africa local rate around **$25/month equivalent in GHS**, with the full $39–49 for diaspora/international users. Purchasing-power-adjusted geographic pricing is standard practice here and materially affects local adoption.
+- Illustrative price: **$29/month, or $290/year** (2 months free on annual billing — standard ~17% discount). Set at this level, not US legal-tech levels ($100–500+/seat/month), because it has to work for the actual target customer — a solo Ghanaian practitioner — as one single price, with no separate regional/diaspora rate.
 - 500 AI actions/month soft cap — rate-limited/throttled near the edge rather than hard-blocked mid-task, to protect margin without a jarring paywall experience — plus **pay-as-you-go top-up packs** (e.g. +100 actions for a small add-on fee) for the rare power-user overage, instead of forcing an immediate tier jump
 - Unlimited cases/matters, 5GB document storage
 - Full Drafting Studio including export, full Document Review, Authority Tagging/playbook grounding, Case Citator, Case Briefs
@@ -53,5 +52,5 @@ Case/matter management, document storage/browsing, and Legal Library browsing ar
 ## Open questions to validate before implementation
 
 - Actual DeepSeek/HuggingFace/Tavily per-action cost at current usage volume, to sanity-check the 20/500 credit caps against real margin
-- Willingness-to-pay validation with a handful of target users before locking the $25–49 range
-- Whether GHS or USD should be the primary displayed currency at launch
+- Willingness-to-pay validation with a handful of target users before locking in $29/month
+- Whether GHS or USD should be the displayed currency at launch

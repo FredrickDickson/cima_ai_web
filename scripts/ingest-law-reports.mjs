@@ -426,7 +426,7 @@ function buildStoragePath(candidate, finalExt) {
 // retry based on the returned error field (falling back to try/catch for any
 // call that does throw), with backoff before giving up on a given file.
 
-async function withRetry(fn, { attempts = 8, delayMs = 2000 } = {}) {
+async function withRetry(fn, { attempts = 4, delayMs = 1200 } = {}) {
   let lastResult;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -518,7 +518,7 @@ async function processCandidate(candidate) {
         // on the HNSW index) — fall back to one-row-at-a-time, which is much
         // less likely to time out, before giving up on the whole document.
         for (const row of rows) {
-          const { error: rowErr } = await withRetry(() => supabase.from('legal_library').insert([row]), { attempts: 8, delayMs: 2000 });
+          const { error: rowErr } = await withRetry(() => supabase.from('legal_library').insert([row]), { attempts: 5, delayMs: 1500 });
           if (rowErr) throw new Error(`Chunk insert failed: ${rowErr.message}`);
           inserted++;
         }
