@@ -20,6 +20,12 @@
  *                           use the same lowercase country-name vocabulary as
  *                           supabase/functions/_shared/laws-africa.ts's COUNTRY_MAP
  *                           (e.g. 'kenya', 'nigeria') or 'international'
+ *   --root=<path>           Archive root to walk, relative to this script's directory
+ *                           (default '../assests/Law Reports'). Use this to point at a
+ *                           differently-shaped archive, e.g. --root="../assests/International"
+ *                           for a flat folder of instruments with no court/legislation
+ *                           subfolder structure — see the `segments.length === 1` branch
+ *                           in buildCandidate().
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -51,12 +57,13 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-const ROOT_DIR = path.resolve(__dirname, '../assests/Law Reports');
 const BUCKET = 'legal-documents';
 
 // ─── CLI ARGS ──────────────────────────────────────────────────────────────
 
 const argv = process.argv.slice(2);
+const ROOT_ARG = argv.find(a => a.startsWith('--root='))?.split('=')[1] ?? '../assests/Law Reports';
+const ROOT_DIR = path.resolve(__dirname, ROOT_ARG);
 const DRY_RUN = argv.includes('--dry-run');
 const FORCE = argv.includes('--force');
 const LIMIT = Number(argv.find(a => a.startsWith('--limit='))?.split('=')[1] ?? 0) || Infinity;
@@ -254,6 +261,22 @@ function buildCandidate(absPath) {
     title = parsed.title;
     parties = parsed.parties;
     dedupKey = `case|${court}|${year ?? 'unknown'}|${normalizeKey(filenameNoExt)}`;
+  } else if (segments.length === 1) {
+    // A file sitting directly at ROOT_DIR with no category subfolder — used for
+    // flat archives like assests/International (institutional rules/conventions,
+    // no court/legislation folder structure to key off of).
+    sourceType = 'statute';
+    court = '';
+    year = parseYearFromText(filenameNoExt);
+    sourceCollection = slugify(filenameNoExt, 60);
+    title = filenameNoExt.replace(/\s+/g, ' ').trim();
+    parties = [];
+    citation = '';
+    legislationNumber = '';
+    // Deliberately NOT normalizeKey() here — it strips parenthetical content, which
+    // would silently collapse e.g. "... Rules 2025" and "... Rules 2025 (Draft - November)"
+    // into the same dedup group and drop one without telling anyone. Exact filename instead.
+    dedupKey = `flat|${filenameNoExt}`;
   } else {
     return null; // unexpected top-level folder
   }

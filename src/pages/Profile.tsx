@@ -295,6 +295,42 @@ export default function Profile() {
             </div>
           </div>
 
+          {/* Billing */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-navy-950">Billing</h3>
+              <span className={`text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${
+                profile?.plan === "max" ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : profile?.plan === "pro" ? "bg-gold-500/10 text-gold-700 border border-gold-500/20"
+                  : "bg-slate-100 text-slate-600 border border-slate-200"
+              }`}>
+                {profile?.plan === "max" ? "Max" : profile?.plan === "pro" ? "Pro" : "Free"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-slate-600">
+                  {(profile?.monthly_ai_actions_used ?? 0).toLocaleString()} AI actions used this cycle
+                  {(profile?.extra_ai_actions ?? 0) > 0 && ` + ${profile!.extra_ai_actions} top-up credits`}
+                </p>
+                {profile?.subscription_renews_at && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Renews {new Date(profile.subscription_renews_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
+                {profile?.plan_status === "past_due" && (
+                  <p className="text-xs text-red-500 mt-0.5">Your last payment failed — please update your billing to avoid losing access.</p>
+                )}
+              </div>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+              >
+                {profile?.plan === "free" ? "Upgrade" : "Change plan"}
+              </button>
+            </div>
+          </div>
+
           {/* Profile Form */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-navy-950 mb-4">Personal Information</h3>

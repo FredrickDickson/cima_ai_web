@@ -14,8 +14,11 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173/reset-password"]
+site_url = "https://cimaai.vercel.app"
+additional_redirect_urls = [
+  "https://cimaai.vercel.app/reset-password",
+  "http://localhost:5173/reset-password",
+]
 
 [auth.email]
 # Pinned explicitly so future `config push` runs don't silently depend on
@@ -24,3 +27,11 @@ double_confirm_changes = true
 
 [storage]
 enabled = true
+
+# Paystack calls this directly over the public internet — it can't carry a
+# Supabase user JWT, so it's the one function in this repo that opts out of
+# the platform's default JWT verification. Every event is instead verified
+# via the x-paystack-signature HMAC inside the function itself (see
+# supabase/functions/paystack-webhook/index.ts).
+[functions.paystack-webhook]
+verify_jwt = false

@@ -5,6 +5,7 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
+import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +31,9 @@ Deno.serve(async (req: Request) => {
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
 
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    const billingUserId = await getAuthedUserId(req);
+    await deductAiAction(supabase, billingUserId);
 
     // Strict grounding: when the user has @-tagged specific cases/legislation/
     // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
@@ -286,6 +290,8 @@ No external sources were retrieved for this query. Provide a comprehensive legal
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

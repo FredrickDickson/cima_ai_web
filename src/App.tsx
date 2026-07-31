@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import ClassicLoader from "./components/ui/loader";
+import MorphLoading from "./components/ui/morph-loading";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TourProvider } from "./contexts/TourContext";
@@ -22,6 +22,8 @@ const DraftingStudio = lazy(() => import("./pages/DraftingStudio"));
 const ContractReview = lazy(() => import("./pages/ContractReview"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const BillingCallback = lazy(() => import("./pages/BillingCallback"));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -56,7 +58,7 @@ function LoadingScreen() {
         </svg>
       </div>
       {/* Spinner */}
-      <ClassicLoader size={36} />
+      <MorphLoading variant="morph" size="sm" />
       {/* Label */}
       <p className="text-slate-400 text-sm tracking-wide">Loading CIMA AI...</p>
     </div>
@@ -109,6 +111,14 @@ export default function App() {
             <Route
               path="/privacy"
               element={<PrivacyPolicy />}
+            />
+            <Route
+              path="/pricing"
+              element={<Pricing />}
+            />
+            <Route
+              path="/billing/callback"
+              element={<RequireAuth><BillingCallback /></RequireAuth>}
             />
             <Route
               path="/"

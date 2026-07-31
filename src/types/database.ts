@@ -150,6 +150,15 @@ export interface Profile {
   avatar_url: string | null;
   title: string | null;
   onboarding_completed_at: string | null;
+  plan: "free" | "pro" | "max";
+  plan_status: "active" | "past_due" | "cancelled";
+  monthly_ai_actions_used: number;
+  monthly_ai_actions_reset_at: string;
+  extra_ai_actions: number;
+  paystack_customer_code: string | null;
+  paystack_authorization_code: string | null;
+  subscription_code: string | null;
+  subscription_renews_at: string | null;
   created_at: string;
   updated_at: string;
 }

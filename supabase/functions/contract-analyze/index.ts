@@ -5,6 +5,7 @@ import { fetchLawsAfricaSources, COUNTRY_MAP } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildPlaybookGroundingBlock } from "../_shared/strict-grounding.ts";
+import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,6 +87,9 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    const billingUserId = await getAuthedUserId(req);
+    await deductAiAction(supabase, billingUserId, 3); // full multi-step document review, the heaviest metered action
 
     const excerpt = text.slice(0, 100000);
     const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
@@ -301,6 +305,8 @@ ${excerpt}`,
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

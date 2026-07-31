@@ -1,6 +1,7 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getAuthedUserId, requirePaidPlan, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +34,9 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    const userId = await getAuthedUserId(req);
+    await requirePaidPlan(supabase, userId);
+
     if (!force_regenerate) {
       const { data: existing } = await supabase
         .from("case_briefs")
@@ -63,6 +67,8 @@ Deno.serve(async (req: Request) => {
       fullText = fullText.slice(0, MAX_CHARS) + "\n\n[... document truncated for length ...]";
     }
 
+    await deductAiAction(supabase, userId);
+
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
 
     const res = await fetch("https://api.deepseek.com/chat/completions", {
@@ -87,7 +93,7 @@ ${fullText}
 
 Produce a JSON object with exactly this shape:
 {
-  "area_of_law": "concise classification of the area(s) of law this case concerns, deduced from the judgment text (e.g. 'Contract Law', 'Arbitration & ADR', 'Tort Law — Negligence', 'Constitutional Law', 'Employment Law', 'Land Law'). Give the most specific applicable label. Only join multiple labels with ' / ' if the case genuinely spans distinct areas — do not pad this with extra categories.",
+  "area_of_law": "the precise legal topic or sub-doctrine this case concerns, deduced from the judgment text — NOT a broad subject heading. Say 'offer and acceptance' or 'privity of contract', not 'Contract Law'; say 'occupiers' liability' or 'duty of care in negligence', not 'Tort Law'. This is the narrow doctrine a law student would use to title an IRAC answer on these facts, so name it as specifically as the judgment supports. Only join multiple labels with ' / ' if the case genuinely turns on distinct doctrines — do not pad this with extra categories.",
   "facts": "2-4 paragraph summary of the material facts as found by the court",
   "issues": ["issue 1 framed as a question", "issue 2"],
   "holding": "1-2 paragraph statement of what the court actually decided and the order made",
@@ -157,6 +163,8 @@ If there are no concurring or dissenting opinions in the text, return an empty a
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },

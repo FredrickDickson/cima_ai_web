@@ -12,6 +12,7 @@ import {
   FileText,
   GitBranch,
   Loader2,
+  Lock,
   RefreshCw,
   Search,
   Send,
@@ -33,6 +34,8 @@ import type {
   LegalLibraryDocumentWithChunks,
 } from "../types/database";
 import { jurisdictionLabel } from "../lib/jurisdictions";
+import { documentTypeLabel, partyLabel } from "../lib/legalLibrary";
+import { useAuth } from "../contexts/AuthContext";
 
 interface LawsAfricaMatch {
   id: string;
@@ -426,6 +429,11 @@ function CaseBriefPanel({ docId }: { docId: string }) {
         force_regenerate: forceRegenerate,
       });
       setBrief(data.brief);
+      if (!forceRegenerate && !data.brief.area_of_law && data.brief.parse_status !== "failed") {
+        setLoading(false);
+        await load(true);
+        return;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate a case brief.");
     } finally {
@@ -747,6 +755,8 @@ function CurrencyCheckPanel({ docId }: { docId: string }) {
 export default function LibraryDocument() {
   const { docId } = useParams<{ docId: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isFreePlan = profile?.plan === "free";
   const [doc, setDoc] = useState<LegalLibraryDocumentWithChunks | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -778,8 +788,7 @@ export default function LibraryDocument() {
     })();
   }, [docId]);
 
-  const title =
-    doc?.parties?.length === 2 ? `${doc.parties[0].name} v. ${doc.parties[1].name}` : doc?.title ?? "";
+  const title = doc ? partyLabel(doc) : "";
 
   return (
     <AppLayout>
@@ -793,44 +802,49 @@ export default function LibraryDocument() {
             <ArrowLeft size={15} /> Back to Library
           </button>
           <div className="flex items-center gap-2">
-            {/* {fileUrl && (
+            {fileUrl && (
               <a
                 href={fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                download
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
-                <Download size={13} /> Original
+                <Download size={13} /> View Original
               </a>
-            )} */}
+            )}
             {doc?.source_type === "case" && (
               <button
-                onClick={() => setActivePanel((p) => (p === "brief" ? null : "brief"))}
+                onClick={() => isFreePlan ? navigate("/pricing") : setActivePanel((p) => (p === "brief" ? null : "brief"))}
+                title={isFreePlan ? "Case Brief requires a Pro or Max plan" : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                   activePanel === "brief"
                     ? "bg-navy-950 text-white"
-                    : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
+                    : isFreePlan
+                      ? "text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
                 }`}
               >
-                {activePanel === "brief" ? <X size={13} /> : <FileText size={13} />}
+                {activePanel === "brief" ? <X size={13} /> : isFreePlan ? <Lock size={13} /> : <FileText size={13} />}
                 {activePanel === "brief" ? "Close" : "Case Brief"}
               </button>
             )}
             {doc?.source_type === "case" && (
               <button
-                onClick={() => setActivePanel((p) => (p === "citator" ? null : "citator"))}
+                onClick={() => isFreePlan ? navigate("/pricing") : setActivePanel((p) => (p === "citator" ? null : "citator"))}
+                title={isFreePlan ? "Smart Citator requires a Pro or Max plan" : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                   activePanel === "citator"
                     ? "bg-navy-950 text-white"
-                    : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
+                    : isFreePlan
+                      ? "text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
                 }`}
               >
-                {activePanel === "citator" ? <X size={13} /> : <GitBranch size={13} />}
+                {activePanel === "citator" ? <X size={13} /> : isFreePlan ? <Lock size={13} /> : <GitBranch size={13} />}
                 {activePanel === "citator" ? "Close" : "Citator"}
               </button>
             )}
-            {doc?.source_type === "statute" && (
+            {doc?.source_type === "statute" && doc.jurisdiction !== "international" && (
               <button
                 onClick={() => setActivePanel((p) => (p === "currency" ? null : "currency"))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
@@ -869,7 +883,7 @@ export default function LibraryDocument() {
                   <p className="text-xs text-slate-500 mb-1">
                     {jurisdictionLabel(doc.jurisdiction)}
                     {" · "}
-                    {doc.source_type === "case" ? doc.court : "Legislation"}
+                    {documentTypeLabel(doc)}
                     {doc.decided_year ? ` · ${doc.decided_year}` : ""}
                     {doc.citation ? ` · ${doc.citation}` : ""}
                     {doc.legislation_number ? ` · ${doc.legislation_number}` : ""}

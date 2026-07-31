@@ -1,6 +1,7 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getAuthedUserId, requirePaidPlan, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,6 +141,9 @@ Deno.serve(async (req: Request) => {
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    const userId = await getAuthedUserId(req);
+    await requirePaidPlan(supabase, userId);
+
     const { data: cited, error: citedError } = await supabase
       .from("legal_library_documents")
       .select("id, title, citation, parties, decided_year, source_type")
@@ -239,6 +243,8 @@ Deno.serve(async (req: Request) => {
     candidateDocs.sort((a, b) => b.score - a.score);
     candidateDocs = candidateDocs.slice(0, MAX_CANDIDATES);
 
+    await deductAiAction(supabase, userId);
+
     // Classify candidates in small parallel batches to bound wall-clock time.
     const classified: { candidate: Candidate; verdict: NonNullable<Awaited<ReturnType<typeof classifyCandidate>>> }[] = [];
     const BATCH_SIZE = 5;
@@ -300,6 +306,8 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },

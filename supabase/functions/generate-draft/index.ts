@@ -4,6 +4,7 @@ import { fetchLawsAfricaSources, COUNTRY_MAP, type LawsAfricaSource } from "../_
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
+import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -137,6 +138,9 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    const billingUserId = await getAuthedUserId(req);
+    await deductAiAction(supabase, billingUserId, 2); // drafting generates a full document, weighted higher than a single query/message
 
     // ---- Fetch matter context if a case is linked ----
     const matterContext = case_id ? await fetchMatterContext(supabase, case_id) : "";
@@ -359,6 +363,8 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

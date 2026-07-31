@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bot, Send, Plus, Search, Scale, FileText, Gavel, Loader2,
   ChevronRight, MessageSquare, Sparkles, User, Clock, Trash2,
-  Paperclip, X, Briefcase, ShieldAlert,
+  Paperclip, X, Briefcase, ShieldAlert, Lock,
   PenTool, HandshakeIcon, Award, Target, Menu, Upload, Copy, Check,
 } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
@@ -133,7 +134,8 @@ function formatDate(d: string) {
 }
 
 export default function AIAssistant() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConv, setActiveConv] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -387,6 +389,30 @@ export default function AIAssistant() {
 
   const contextInfo = CONTEXTS.find(c => c.value === context);
   const starters = STARTER_PROMPTS[context] ?? STARTER_PROMPTS.general;
+
+  if (profile?.plan === "free") {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center h-full bg-navy-950 px-6">
+          <div className="max-w-sm w-full text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gold-500/10 border border-gold-500/20 flex items-center justify-center mx-auto mb-5">
+              <Lock size={24} className="text-gold-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-2">Ask CIMA AI is a Pro feature</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Upgrade to Pro to chat with CIMA AI across every legal mode — research, drafting, case strategy, and more.
+            </p>
+            <button
+              onClick={() => navigate("/pricing")}
+              className="px-5 py-2.5 bg-gold-500 hover:bg-gold-400 text-navy-950 text-sm font-semibold rounded-lg transition-colors"
+            >
+              View plans
+            </button>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

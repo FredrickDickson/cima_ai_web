@@ -11,6 +11,7 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { searchLegalLibrary, searchTavily, type RetrievedLibrarySource, type TavilyResult } from "../_shared/legal-retrieval.ts";
+import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
 
 interface CitedSource {
   marker: string;
@@ -97,6 +98,13 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Metered for every caller (Free included) — ai-chat is a shared utility
+    // behind Research/Drafting/Review/Documents/LibraryDocument as well as the
+    // standalone "Ask CIMA AI" assistant, so it isn't feature-gated to a paid
+    // plan here; the dedicated AI Assistant page enforces that at the frontend.
+    const billingUserId = await getAuthedUserId(req);
+    await deductAiAction(supabase, billingUserId);
 
     const {
       messages, context = "general", stream = false,
@@ -240,6 +248,8 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    const billingResp = billingErrorResponse(err, corsHeaders);
+    if (billingResp) return billingResp;
     return new Response(
       JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

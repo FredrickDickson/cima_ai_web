@@ -18,6 +18,7 @@ import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import type { LegalLibraryDocument } from "../types/database";
 import { jurisdictionLabel } from "../lib/jurisdictions";
+import { documentTypeLabel, partyLabel } from "../lib/legalLibrary";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -34,13 +35,6 @@ function courtIcon(court: string) {
   if (court === "Court of Appeal") return <Gavel size={14} className="text-gold-500" />;
   if (court === "High Court") return <Scale size={14} className="text-gold-500" />;
   return <BookOpen size={14} className="text-gold-500" />;
-}
-
-function partyLabel(doc: LegalLibraryDocument): string {
-  if (doc.parties?.length >= 2) {
-    return `${doc.parties[0].name} v. ${doc.parties[1].name}`;
-  }
-  return doc.title;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────
@@ -539,7 +533,7 @@ export default function Library() {
                     >
                       <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
                         {doc.source_type === "case" ? courtIcon(doc.court) : <BookOpen size={14} className="text-gold-500" />}
-                        <span>{doc.source_type === "case" ? doc.court || "Case" : "Legislation"}</span>
+                        <span>{documentTypeLabel(doc)}</span>
                         {doc.decided_year && <span>· {doc.decided_year}</span>}
                       </div>
                       <h3 className="text-sm font-semibold text-navy-950 line-clamp-2 mb-1.5">
