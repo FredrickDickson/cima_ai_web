@@ -52,6 +52,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import { getRelevantRulesContext } from "../lib/documentSearch";
+import { logCaseEvent } from "../lib/caseEvents";
 import type { Template, Case, Draft } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import LegalEditor from "../components/drafting/LegalEditor";
@@ -476,6 +477,9 @@ export default function DraftingStudio() {
       setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
+      if (data.draft_id && nlLinkedCaseId) {
+        logCaseEvent(nlLinkedCaseId, user.id, "draft_created", `Draft generated: "${nlPrompt.slice(0, 80)}"`);
+      }
       loadDrafts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft generation failed");
@@ -522,6 +526,9 @@ export default function DraftingStudio() {
       setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
+      if (data.draft_id && linkedCaseId) {
+        logCaseEvent(linkedCaseId, user.id, "draft_created", `Draft generated: "${selectedTemplate.title}"`);
+      }
       loadDrafts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft generation failed");

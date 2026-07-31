@@ -117,6 +117,16 @@ export interface Database {
         Insert: Omit<Evidence, "id" | "created_at">;
         Update: Partial<Omit<Evidence, "id" | "created_at">>;
       };
+      evidence_issues: {
+        Row: EvidenceIssueLink;
+        Insert: Omit<EvidenceIssueLink, "id" | "created_at">;
+        Update: never;
+      };
+      case_events: {
+        Row: CaseEvent;
+        Insert: Omit<CaseEvent, "id" | "created_at">;
+        Update: never;
+      };
       procedural_orders: {
         Row: ProceduralOrder;
         Insert: Omit<ProceduralOrder, "id">;
@@ -391,6 +401,8 @@ export interface ContractAnalysis {
   detected_document_type?: string;
   governing_law_found: boolean;
   governing_law: string;
+  cited_sources?: any;
+  tagged_authorities?: any;
   created_at: string;
   updated_at: string;
 }
@@ -425,6 +437,23 @@ export interface Evidence {
   title: string;
   type: string;
   summary: string;
+  created_at: string;
+}
+
+export interface EvidenceIssueLink {
+  id: string;
+  evidence_id: string;
+  issue_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface CaseEvent {
+  id: string;
+  case_id: string;
+  user_id: string;
+  event_type: string;
+  description: string;
   created_at: string;
 }
 

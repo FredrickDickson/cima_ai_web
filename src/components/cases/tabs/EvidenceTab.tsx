@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, Loader2, Sparkles, ChevronDown, ChevronUp, Layers } from "lucide-react";
+import { Plus, Loader2, Sparkles, ChevronDown, ChevronUp, Layers, X } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
+import { logCaseEvent } from "../../../lib/caseEvents";
 
 type Evidence = {
   id: string;
@@ -12,7 +13,8 @@ type Evidence = {
   created_at: string;
 };
 
-type Issue = { description: string };
+type Issue = { id: string; issue_number: number; description: string };
+type EvidenceLink = { id: string; issue_id: string };
 
 const TYPE_COLORS: Record<string, string> = {
   documentary: "bg-blue-500/10 text-blue-400",
@@ -33,11 +35,12 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
   const [aiResult, setAiResult] = useState("");
   const [aiAction, setAiAction] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [links, setLinks] = useState<Record<string, EvidenceLink[]>>({});
 
   useEffect(() => {
     Promise.all([
       supabase.from("evidence").select("*").eq("case_id", caseId).order("created_at", { ascending: false }),
-      supabase.from("issues").select("description").eq("case_id", caseId).order("issue_number"),
+      supabase.from("issues").select("id, issue_number, description").eq("case_id", caseId).order("issue_number"),
     ]).then(([evRes, issRes]) => {
       setItems(evRes.data ?? []);
       setIssues(issRes.data ?? []);
@@ -45,11 +48,38 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
     });
   }, [caseId]);
 
+  useEffect(() => {
+    if (items.length === 0) { setLinks({}); return; }
+    supabase.from("evidence_issues").select("id, evidence_id, issue_id").in("evidence_id", items.map(i => i.id))
+      .then(({ data }) => {
+        const grouped: Record<string, EvidenceLink[]> = {};
+        for (const row of (data ?? []) as { id: string; evidence_id: string; issue_id: string }[]) {
+          (grouped[row.evidence_id] ??= []).push({ id: row.id, issue_id: row.issue_id });
+        }
+        setLinks(grouped);
+      });
+  }, [items]);
+
+  async function linkIssue(evidenceId: string, issueId: string) {
+    const { data } = await supabase.from("evidence_issues")
+      .insert({ evidence_id: evidenceId, issue_id: issueId, user_id: user!.id })
+      .select().maybeSingle();
+    if (data) setLinks(p => ({ ...p, [evidenceId]: [...(p[evidenceId] ?? []), { id: data.id, issue_id: data.issue_id }] }));
+  }
+
+  async function unlinkIssue(evidenceId: string, linkId: string) {
+    await supabase.from("evidence_issues").delete().eq("id", linkId);
+    setLinks(p => ({ ...p, [evidenceId]: (p[evidenceId] ?? []).filter(l => l.id !== linkId) }));
+  }
+
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const { data } = await supabase.from("evidence").insert({ ...form, case_id: caseId, user_id: user!.id }).select().maybeSingle();
-    if (data) setItems(p => [data, ...p]);
+    if (data) {
+      setItems(p => [data, ...p]);
+      logCaseEvent(caseId, user!.id, "evidence_added", `Evidence added: "${data.title}"`);
+    }
     setForm({ title: "", type: "documentary", summary: "" });
     setShowForm(false);
     setSaving(false);
@@ -153,6 +183,31 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
               </div>
               {item.summary && <p className="text-xs text-slate-400 line-clamp-3">{item.summary}</p>}
               <p className="text-xs text-slate-600 mt-2">{new Date(item.created_at).toLocaleDateString()}</p>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-navy-800">
+                {(links[item.id] ?? []).map(link => {
+                  const iss = issues.find(i => i.id === link.issue_id);
+                  return (
+                    <span key={link.id} className="flex items-center gap-1 text-xs px-1.5 py-0.5 bg-navy-800 border border-navy-700 rounded text-slate-400">
+                      Issue #{iss?.issue_number ?? "?"}
+                      <button onClick={() => unlinkIssue(item.id, link.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <X size={9} />
+                      </button>
+                    </span>
+                  );
+                })}
+                {issues.filter(i => !(links[item.id] ?? []).some(l => l.issue_id === i.id)).length > 0 && (
+                  <select
+                    value=""
+                    onChange={e => { if (e.target.value) linkIssue(item.id, e.target.value); }}
+                    className="text-xs bg-navy-900 border border-navy-700 rounded px-1.5 py-0.5 text-slate-500 focus:outline-none focus:border-gold-500/50"
+                  >
+                    <option value="">+ Supports issue...</option>
+                    {issues.filter(i => !(links[item.id] ?? []).some(l => l.issue_id === i.id)).map(i => (
+                      <option key={i.id} value={i.id}>#{i.issue_number} {i.description.slice(0, 30)}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           ))}
         </div>

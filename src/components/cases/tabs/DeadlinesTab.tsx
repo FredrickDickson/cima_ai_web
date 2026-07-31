@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Plus, Calendar, Sparkles, Loader2, Check, X, AlertCircle, ClipboardList } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
-import { callCaseAI, type CaseContext } from "../caseAI";
+import { callCaseAI, buildProceduralCalendarPrompt, parseProceduralCalendarLines, type CaseContext, type SuggestedDeadline } from "../caseAI";
+import { logCaseEvent } from "../../../lib/caseEvents";
 
 type Deadline = {
   id: string;
@@ -11,14 +12,6 @@ type Deadline = {
   type?: string;
   status?: string;
   notes?: string;
-};
-
-type SuggestedDeadline = {
-  title: string;
-  due_date: string;
-  type: string;
-  notes: string;
-  selected: boolean;
 };
 
 export default function DeadlinesTab({ caseId, caseData }: { caseId: string; caseData?: CaseContext }) {
@@ -52,7 +45,10 @@ export default function DeadlinesTab({ caseId, caseData }: { caseId: string; cas
     const { data } = await supabase.from("deadlines")
       .insert({ ...form, case_id: caseId, user_id: user!.id, status: "pending" })
       .select().maybeSingle();
-    if (data) setDeadlines(p => [...p, data].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()));
+    if (data) {
+      setDeadlines(p => [...p, data].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()));
+      logCaseEvent(caseId, user!.id, "deadline_added", `Deadline added: "${data.title}" due ${data.due_date}`);
+    }
     setForm({ title: "", due_date: "", type: "filing", notes: "" });
     setShowForm(false);
     setSaving(false);
@@ -65,33 +61,11 @@ export default function DeadlinesTab({ caseId, caseData }: { caseId: string; cas
     setSuggested([]);
     setShowCalendar(true);
 
-    const today = new Date().toISOString().split("T")[0];
-    const prompt = `Generate a complete procedural calendar for this ${caseData.type} case governed by ${caseData.framework ?? "the Ghana ADR Act 2010 (Act 798)"}.
-
-Today's date is ${today}. The case status is: ${(caseData as { status?: string }).status ?? "active"}.
-
-Existing deadlines already recorded: ${deadlines.length > 0 ? deadlines.map(d => `${d.due_date}: ${d.title}`).join("; ") : "None"}.
-
-Generate ONLY the missing procedural steps required under the applicable rules. For each step output EXACTLY this format (one per line, no extra text):
-DEADLINE|<title>|<YYYY-MM-DD>|<type: filing/hearing/response/submission/other>|<brief notes>
-
-Include all standard procedural steps such as: Statement of Claim/Defence deadlines, document disclosure, witness statement exchange, expert report exchange, pre-hearing conference, main hearing, post-hearing submissions, award deadline. Calculate realistic dates from today spaced appropriately under the rules.
-
-Output ONLY the DEADLINE lines — no explanation, no headers, no other text.`;
+    const prompt = buildProceduralCalendarPrompt(caseData as CaseContext & { status?: string }, deadlines);
 
     try {
       const raw = await callCaseAI(caseData, prompt);
-      const lines = raw.split("\n").filter(l => l.startsWith("DEADLINE|"));
-      const parsed: SuggestedDeadline[] = lines.map(line => {
-        const parts = line.split("|");
-        return {
-          title: parts[1]?.trim() ?? "Procedural Step",
-          due_date: parts[2]?.trim() ?? today,
-          type: parts[3]?.trim() ?? "filing",
-          notes: parts[4]?.trim() ?? "",
-          selected: true,
-        };
-      }).filter(d => d.title && d.due_date);
+      const parsed = parseProceduralCalendarLines(raw);
       if (parsed.length === 0) {
         setCalendarError("Could not parse procedural steps. Try again or add deadlines manually.");
       }
@@ -327,6 +301,7 @@ Output ONLY the ITEM lines — no explanation, no headers, no other text.`;
                 const next = d.status === "completed" ? "pending" : "completed";
                 await supabase.from("deadlines").update({ status: next }).eq("id", d.id);
                 setDeadlines(p => p.map(x => x.id === d.id ? { ...x, status: next } : x));
+                if (next === "completed") logCaseEvent(caseId, user!.id, "deadline_completed", `Deadline completed: "${d.title}"`);
               }} className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${d.status === "completed" ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-navy-600 text-slate-400 hover:border-emerald-500/40 hover:text-emerald-400"}`}>
                 {d.status === "completed" ? "Done" : "Mark Done"}
               </button>

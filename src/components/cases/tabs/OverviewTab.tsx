@@ -2,12 +2,24 @@ import { useEffect, useState } from "react";
 import {
   Users, BookOpen, Calendar, FileText, ShieldAlert,
   AlertTriangle, Loader2, Sparkles, PenTool, Search, Scale,
-  Clock, Download, Handshake,
+  Clock, Download, Handshake, Activity,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { callCaseAI, type CaseContext } from "../caseAI";
 import ReactMarkdown from "react-markdown";
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
 
 type Case = CaseContext & {
   status: string;
@@ -26,8 +38,10 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
   const parties: { name: string; role: string }[] = Array.isArray(caseData.parties) ? caseData.parties : [];
 
   const [deadlines, setDeadlines] = useState<{ id: string; title: string; due_date: string; status?: string }[]>([]);
+  const [upcomingHearings, setUpcomingHearings] = useState<{ id: string; title: string; scheduled_at: string }[]>([]);
   const [docs, setDocs] = useState<{ id: string; name: string; created_at: string }[]>([]);
   const [issueCount, setIssueCount] = useState(0);
+  const [activity, setActivity] = useState<{ id: string; event_type: string; description: string; created_at: string }[]>([]);
   const [aiSummary, setAiSummary] = useState("");
   const [aiRisks, setAiRisks] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -47,6 +61,17 @@ export default function OverviewTab({ caseData, onTabChange }: OverviewTabProps)
 
     supabase.from("issues").select("id", { count: "exact" }).eq("case_id", caseData.id).eq("status", "open")
       .then(({ count }) => setIssueCount(count ?? 0));
+
+    // Live-computed next hearing — cases.next_hearing is a manually-set
+    // column that drifts stale, so we derive it from the hearings table.
+    supabase.from("hearings").select("id, title, scheduled_at").eq("case_id", caseData.id)
+      .eq("status", "scheduled").gte("scheduled_at", new Date().toISOString())
+      .order("scheduled_at", { ascending: true }).limit(5)
+      .then(({ data }) => setUpcomingHearings(data ?? []));
+
+    supabase.from("case_events").select("id, event_type, description, created_at").eq("case_id", caseData.id)
+      .order("created_at", { ascending: false }).limit(12)
+      .then(({ data }) => setActivity(data ?? []));
   }, [caseData.id]);
 
   async function generateSummary() {
@@ -207,7 +232,7 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
             {[
               ["Matter No.", caseData.matter_number],
               ["Opened", new Date(caseData.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })],
-              ["Next Hearing", caseData.next_hearing ? new Date(caseData.next_hearing).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null],
+              ["Next Hearing", upcomingHearings[0] ? new Date(upcomingHearings[0].scheduled_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null],
               ["Open Issues", issueCount > 0 ? `${issueCount} open` : null],
             ].map(([k, v]) => v && (
               <div key={String(k)} className="flex justify-between">
@@ -243,6 +268,31 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
           <button onClick={() => onTabChange("timeline")} className="text-xs text-gold-400 hover:text-gold-300 mt-3 block transition-colors">View all →</button>
         </div>
 
+        {/* Upcoming Hearings */}
+        <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <Scale size={13} className="text-gold-400" />Upcoming Hearings
+          </h3>
+          {upcomingHearings.length === 0 ? (
+            <p className="text-xs text-slate-500">No scheduled hearings.</p>
+          ) : (
+            <div className="space-y-2">
+              {upcomingHearings.map(h => {
+                const days = Math.ceil((new Date(h.scheduled_at).getTime() - today.getTime()) / 86400000);
+                const soon = days <= 3;
+                return (
+                  <div key={h.id} className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${soon ? "bg-red-400" : "bg-gold-400"}`} />
+                    <p className="text-xs text-slate-300 flex-1 truncate">{h.title}</p>
+                    <span className={`text-xs font-medium shrink-0 ${soon ? "text-red-400" : "text-slate-500"}`}>{new Date(h.scheduled_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={() => onTabChange("hearings")} className="text-xs text-gold-400 hover:text-gold-300 mt-3 block transition-colors">View all →</button>
+        </div>
+
         {/* Recent Documents */}
         <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -270,6 +320,24 @@ Case details: Type: ${caseData.type}, Framework: ${caseData.framework ?? "N/A"},
         <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Description</h3>
           <p className="text-sm text-slate-400 leading-relaxed">{caseData.description}</p>
+        </div>
+      )}
+
+      {/* Activity */}
+      {activity.length > 0 && (
+        <div className="bg-navy-800/30 border border-navy-700 rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <Activity size={13} className="text-gold-400" />Activity
+          </h3>
+          <div className="space-y-2.5">
+            {activity.map(a => (
+              <div key={a.id} className="flex items-start gap-2.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-navy-600 shrink-0 mt-1.5" />
+                <p className="text-xs text-slate-400 flex-1">{a.description}</p>
+                <span className="text-xs text-slate-600 shrink-0">{relativeTime(a.created_at)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

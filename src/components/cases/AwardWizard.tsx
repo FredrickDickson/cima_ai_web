@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import type { CaseContext } from "./caseAI";
+import { logCaseEvent } from "../../lib/caseEvents";
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -51,6 +52,10 @@ export default function AwardWizard({ caseData, onClose }: { caseData: CaseConte
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [closeMatterOnGenerate, setCloseMatterOnGenerate] = useState(true);
+
+  const concludesMatter = awardType === "Final Award" || awardType === "Consent Award";
+  const matterStatusOnClose = awardType === "Consent Award" ? "settled" : "closed";
 
   // Fetch procedural history from hearings + orders
   useEffect(() => {
@@ -175,6 +180,10 @@ DRAFTING INSTRUCTIONS:
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      if (concludesMatter && closeMatterOnGenerate) {
+        await supabase.from("cases").update({ status: matterStatusOnClose }).eq("id", caseData.id);
+        logCaseEvent(caseData.id, user!.id, "status_changed", `Matter marked ${matterStatusOnClose} after ${awardType} generation`);
+      }
       onClose();
       navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
     } catch (e) {
@@ -391,6 +400,20 @@ DRAFTING INSTRUCTIONS:
                   className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-gold-500/50"
                 />
               </div>
+
+              {concludesMatter && (
+                <label className="flex items-start gap-2.5 p-3 bg-navy-800/50 border border-navy-700 rounded-xl cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={closeMatterOnGenerate}
+                    onChange={e => setCloseMatterOnGenerate(e.target.checked)}
+                    className="mt-0.5 accent-gold-500"
+                  />
+                  <span className="text-xs text-slate-300">
+                    Mark this matter as <span className="font-semibold text-white capitalize">{matterStatusOnClose}</span> once the award is generated.
+                  </span>
+                </label>
+              )}
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">

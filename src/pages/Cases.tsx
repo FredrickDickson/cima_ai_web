@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Briefcase, Plus, Scale, Calendar, Users,
-  ChevronRight, Gavel, Search, Menu,
+  ChevronRight, Gavel, Search, Menu, AlertCircle,
 } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import { supabase } from "../lib/supabase";
@@ -32,6 +32,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUSES = ["active", "pending", "closed", "settled"];
 
+type SortBy = "recent" | "deadline" | "title" | "matter_number";
+type Urgency = { nextDate?: string; overdueCount: number };
+
 // Inner component — rendered inside AppLayout's SidebarProvider so useSidebar() works
 function CasesContent({
   cases,
@@ -41,6 +44,9 @@ function CasesContent({
   setSearch,
   filterStatus,
   setFilterStatus,
+  sortBy,
+  setSortBy,
+  urgency,
   selectedCase,
   setSelectedCase,
   showNewCase,
@@ -54,6 +60,9 @@ function CasesContent({
   setSearch: (v: string) => void;
   filterStatus: string;
   setFilterStatus: (v: string) => void;
+  sortBy: SortBy;
+  setSortBy: (v: SortBy) => void;
+  urgency: Record<string, Urgency>;
   selectedCase: Case | null;
   setSelectedCase: (c: Case | null) => void;
   showNewCase: boolean;
@@ -123,6 +132,16 @@ function CasesContent({
             </button>
           ))}
         </div>
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value as SortBy)}
+          className="sm:ml-auto px-2.5 py-1.5 bg-navy-800 border border-navy-700 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-gold-500/50 shrink-0"
+        >
+          <option value="recent">Sort: Recent</option>
+          <option value="deadline">Sort: Next Deadline</option>
+          <option value="title">Sort: Title</option>
+          <option value="matter_number">Sort: Matter No.</option>
+        </select>
       </div>
 
       {/* Case list */}
@@ -189,12 +208,28 @@ function CasesContent({
                       {c.framework && (
                         <span className="text-xs text-slate-500 hidden sm:inline">{c.framework}</span>
                       )}
-                      {c.next_hearing && (
-                        <span className="text-xs text-amber-400 flex items-center gap-1 shrink-0">
-                          <Calendar size={10} />
-                          {new Date(c.next_hearing).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                        </span>
-                      )}
+                      {(() => {
+                        const u = urgency[c.id];
+                        if (!u) return null;
+                        if (u.overdueCount > 0) {
+                          return (
+                            <span className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                              <AlertCircle size={10} />{u.overdueCount} overdue
+                            </span>
+                          );
+                        }
+                        if (u.nextDate) {
+                          const days = Math.ceil((new Date(u.nextDate).getTime() - Date.now()) / 86400000);
+                          const soon = days <= 7;
+                          return (
+                            <span className={`text-xs flex items-center gap-1 shrink-0 ${soon ? "text-amber-400" : "text-slate-500"}`}>
+                              <Calendar size={10} />
+                              {days <= 0 ? "Due today" : `Due in ${days}d`}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
 
@@ -210,6 +245,7 @@ function CasesContent({
         <NewCaseModal
           onClose={() => setShowNewCase(false)}
           onCreated={c => { setCases(p => [c, ...p]); setShowNewCase(false); setSelectedCase(c); }}
+          existingCases={cases}
         />
       )}
     </div>
@@ -222,6 +258,8 @@ export default function Cases() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [urgency, setUrgency] = useState<Record<string, Urgency>>({});
   const [showNewCase, setShowNewCase] = useState(false);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
 
@@ -235,12 +273,58 @@ export default function Cases() {
       .then(({ data }) => { setCases(data ?? []); setLoading(false); });
   }, [user]);
 
+  // Cross-matter urgency: batched hearings/deadlines queries across all of
+  // the user's matters, grouped by case_id. Re-fetched whenever the list
+  // becomes visible again (selectedCase -> null) so it stays fresh after
+  // deadlines/hearings are edited inside a matter.
+  useEffect(() => {
+    if (!user || cases.length === 0 || selectedCase) return;
+    const caseIds = cases.map(c => c.id);
+    const nowIso = new Date().toISOString();
+    Promise.all([
+      supabase.from("hearings").select("case_id, scheduled_at")
+        .eq("user_id", user.id).eq("status", "scheduled").gte("scheduled_at", nowIso).in("case_id", caseIds),
+      supabase.from("deadlines").select("case_id, due_date")
+        .eq("user_id", user.id).neq("status", "completed").in("case_id", caseIds),
+    ]).then(([hearingsRes, deadlinesRes]) => {
+      const map: Record<string, Urgency> = {};
+      const now = new Date();
+      for (const h of (hearingsRes.data ?? []) as { case_id: string; scheduled_at: string }[]) {
+        const e = (map[h.case_id] ??= { overdueCount: 0 });
+        if (!e.nextDate || h.scheduled_at < e.nextDate) e.nextDate = h.scheduled_at;
+      }
+      for (const d of (deadlinesRes.data ?? []) as { case_id: string; due_date: string }[]) {
+        const e = (map[d.case_id] ??= { overdueCount: 0 });
+        if (new Date(d.due_date) < now) e.overdueCount++;
+        else if (!e.nextDate || d.due_date < e.nextDate) e.nextDate = d.due_date;
+      }
+      setUrgency(map);
+    });
+  }, [user, cases, selectedCase]);
+
   const filtered = cases.filter(c => {
+    const q = search.toLowerCase();
+    const parties: { name: string; role: string }[] = Array.isArray(c.parties) ? c.parties : [];
     const matchSearch = !search ||
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      (c.matter_number ?? "").toLowerCase().includes(search.toLowerCase());
+      c.title.toLowerCase().includes(q) ||
+      (c.matter_number ?? "").toLowerCase().includes(q) ||
+      parties.some(p => p.name.toLowerCase().includes(q));
     const matchStatus = filterStatus === "all" || c.status === filterStatus;
     return matchSearch && matchStatus;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "title") return a.title.localeCompare(b.title);
+    if (sortBy === "matter_number") return (a.matter_number ?? "").localeCompare(b.matter_number ?? "");
+    if (sortBy === "deadline") {
+      const da = urgency[a.id]?.nextDate;
+      const db = urgency[b.id]?.nextDate;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da < db ? -1 : 1;
+    }
+    return 0; // "recent" — already created_at desc from the fetch
   });
 
   return (
@@ -248,11 +332,14 @@ export default function Cases() {
       <CasesContent
         cases={cases}
         loading={loading}
-        filtered={filtered}
+        filtered={sorted}
         search={search}
         setSearch={setSearch}
         filterStatus={filterStatus}
         setFilterStatus={setFilterStatus}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        urgency={urgency}
         selectedCase={selectedCase}
         setSelectedCase={setSelectedCase}
         showNewCase={showNewCase}

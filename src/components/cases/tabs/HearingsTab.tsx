@@ -3,6 +3,7 @@ import { Plus, MapPin, Calendar, Loader2, ChevronDown, Sparkles } from "lucide-r
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
+import { logCaseEvent } from "../../../lib/caseEvents";
 
 type Hearing = {
   id: string;
@@ -54,7 +55,10 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
       user_id: user!.id,
       status: "scheduled",
     }).select().maybeSingle();
-    if (data) setHearings(p => [...p, data].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()));
+    if (data) {
+      setHearings(p => [...p, data].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()));
+      logCaseEvent(caseId, user!.id, "hearing_scheduled", `Hearing scheduled: "${data.title}" on ${new Date(data.scheduled_at).toLocaleDateString("en-GB")}`);
+    }
     setForm({ title: "", scheduled_at: "", location: "", type: "preliminary", notes: "" });
     setShowForm(false);
     setSaving(false);
@@ -73,7 +77,9 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
 
   async function updateStatus(id: string, status: string) {
     await supabase.from("hearings").update({ status }).eq("id", id);
+    const hearing = hearings.find(h => h.id === id);
     setHearings(p => p.map(h => h.id === id ? { ...h, status } : h));
+    if (hearing) logCaseEvent(caseId, user!.id, "hearing_updated", `Hearing "${hearing.title}" marked ${status}`);
   }
 
   if (loading) return <div className="text-slate-500 text-sm py-4">Loading hearings...</div>;
@@ -130,17 +136,21 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
               {group.items.map(h => {
                 const date = new Date(h.scheduled_at);
                 const isExpanded = expanded === h.id;
+                const daysAway = h.status === "scheduled" ? Math.ceil((date.getTime() - Date.now()) / 86400000) : null;
+                const urgent = daysAway !== null && daysAway <= 3;
+                const urgencyLabel = daysAway === null ? null : daysAway < 0 ? "Overdue" : daysAway === 0 ? "Today" : daysAway === 1 ? "Tomorrow" : `In ${daysAway}d`;
                 return (
-                  <div key={h.id} className="border border-navy-700 rounded-xl overflow-hidden">
+                  <div key={h.id} className={`border rounded-xl overflow-hidden ${urgent ? "border-red-500/30 bg-red-500/5" : "border-navy-700"}`}>
                     <button onClick={() => setExpanded(p => p === h.id ? null : h.id)} className="w-full flex items-start gap-4 p-4 hover:bg-navy-800/30 transition-colors text-left">
-                      <div className="w-12 h-12 rounded-xl bg-navy-700 flex flex-col items-center justify-center shrink-0">
-                        <span className="text-xs font-bold text-gold-400">{date.toLocaleDateString("en", { month: "short" }).toUpperCase()}</span>
-                        <span className="text-lg font-bold text-white leading-none">{date.getDate()}</span>
+                      <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${urgent ? "bg-red-500/15" : "bg-navy-700"}`}>
+                        <span className={`text-xs font-bold ${urgent ? "text-red-400" : "text-gold-400"}`}>{date.toLocaleDateString("en", { month: "short" }).toUpperCase()}</span>
+                        <span className={`text-lg font-bold leading-none ${urgent ? "text-red-400" : "text-white"}`}>{date.getDate()}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold text-white">{h.title}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_COLORS[h.status] ?? STATUS_COLORS.scheduled}`}>{h.status}</span>
+                          {urgencyLabel && <span className={`text-xs font-medium ${urgent ? "text-red-400" : "text-slate-500"}`}>{urgencyLabel}</span>}
                           {h.type && <span className="text-xs text-slate-500 capitalize">{h.type}</span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1">

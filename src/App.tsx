@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ClassicLoader from "./components/ui/loader";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -7,17 +7,18 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Dashboard from "./pages/Dashboard";
-import Research from "./pages/Research";
-import Cases from "./pages/Cases";
-import Documents from "./pages/Documents";
-import Library from "./pages/Library";
-import LibraryDocument from "./pages/LibraryDocument";
-import AIAssistant from "./pages/AIAssistant";
-import DraftingStudio from "./pages/DraftingStudio";
-import ContractReview from "./pages/ContractReview";
-import Profile from "./pages/Profile";
-import Admin from "./pages/Admin";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Research = lazy(() => import("./pages/Research"));
+const Cases = lazy(() => import("./pages/Cases"));
+const Documents = lazy(() => import("./pages/Documents"));
+const Library = lazy(() => import("./pages/Library"));
+const LibraryDocument = lazy(() => import("./pages/LibraryDocument"));
+const AIAssistant = lazy(() => import("./pages/AIAssistant"));
+const DraftingStudio = lazy(() => import("./pages/DraftingStudio"));
+const ContractReview = lazy(() => import("./pages/ContractReview"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -79,6 +80,7 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
+          <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route
               path="/login"
@@ -142,6 +144,7 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

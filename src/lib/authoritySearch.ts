@@ -23,22 +23,14 @@ export async function searchAuthorities(
   const q = query.trim();
   if (!q) return [];
 
-  const [libRes, docRes] = await Promise.all([
-    supabase
-      .from("legal_library_documents" as any)
-      .select("id, title, source_type, citation")
-      .eq("ingestion_status", "completed")
-      .in("source_type", ["case", "statute"])
-      .or(`title.ilike.%${q}%,citation.ilike.%${q}%`)
-      .limit(limit),
+  const [libRes, docIdsRes] = await Promise.all([
+    supabase.rpc("search_legal_library_documents" as any, {
+      search_query: q,
+      match_count: limit,
+    }),
     userId
-      ? supabase
-          .from("documents" as any)
-          .select("id, name")
-          .eq("user_id", userId)
-          .ilike("name", `%${q}%`)
-          .limit(limit)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      ? supabase.rpc("search_documents" as any, { search_query: q, match_count: limit })
+      : Promise.resolve({ data: [] as { id: string }[] }),
   ]);
 
   const libResults: AuthoritySearchResult[] = ((libRes.data ?? []) as {
@@ -53,11 +45,18 @@ export async function searchAuthorities(
     citation: d.citation || undefined,
   }));
 
-  const docResults: AuthoritySearchResult[] = ((docRes.data ?? []) as { id: string; name: string }[]).map((d) => ({
-    id: d.id,
-    type: "document" as AuthorityType,
-    label: d.name,
-  }));
+  const docIds = ((docIdsRes.data ?? []) as { id: string }[]).map((d) => d.id);
+  let docResults: AuthoritySearchResult[] = [];
+  if (docIds.length > 0) {
+    const { data: docRows } = await supabase
+      .from("documents" as any)
+      .select("id, name")
+      .in("id", docIds);
+    const byId = new Map((docRows ?? []).map((d: any) => [d.id, d.name]));
+    docResults = docIds
+      .filter((id) => byId.has(id))
+      .map((id) => ({ id, type: "document" as AuthorityType, label: byId.get(id) as string }));
+  }
 
   return [...libResults, ...docResults];
 }

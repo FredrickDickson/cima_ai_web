@@ -32,6 +32,7 @@ import type {
   LegalLibraryDocumentChunk,
   LegalLibraryDocumentWithChunks,
 } from "../types/database";
+import { jurisdictionLabel } from "../lib/jurisdictions";
 
 interface LawsAfricaMatch {
   id: string;
@@ -787,7 +788,7 @@ export default function LibraryDocument() {
             <ArrowLeft size={15} /> Back to Library
           </button>
           <div className="flex items-center gap-2">
-            {fileUrl && (
+            {/* {fileUrl && (
               <a
                 href={fileUrl}
                 target="_blank"
@@ -797,7 +798,7 @@ export default function LibraryDocument() {
               >
                 <Download size={13} /> Original
               </a>
-            )}
+            )} */}
             {doc?.source_type === "case" && (
               <button
                 onClick={() => setActivePanel((p) => (p === "brief" ? null : "brief"))}
@@ -861,6 +862,8 @@ export default function LibraryDocument() {
               <div className="max-w-3xl mx-auto">
                 <div className="mb-6 pb-4 border-b border-slate-200">
                   <p className="text-xs text-slate-500 mb-1">
+                    {jurisdictionLabel(doc.jurisdiction)}
+                    {" · "}
                     {doc.source_type === "case" ? doc.court : "Legislation"}
                     {doc.decided_year ? ` · ${doc.decided_year}` : ""}
                     {doc.citation ? ` · ${doc.citation}` : ""}

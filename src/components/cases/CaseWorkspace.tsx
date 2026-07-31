@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Briefcase, ChevronRight, BarChart2, ShieldAlert, Calendar,
   Layers, FileText, Gavel, Zap, BookOpen, PenTool, Scale, Handshake, Loader2, AlertCircle,
@@ -57,9 +57,23 @@ export default function CaseWorkspace({ caseData, onBack }: { caseData: Case; on
   const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["overview"]));
   const [showAwardWizard, setShowAwardWizard] = useState(false);
   const [generatingTOR, setGeneratingTOR] = useState(false);
   const [torError, setTorError] = useState("");
+
+  // Reset tab state when switching to a different matter — each matter
+  // starts fresh on Overview rather than inheriting the previous matter's
+  // visited/active tab.
+  useEffect(() => {
+    setActiveTab("overview");
+    setVisitedTabs(new Set(["overview"]));
+  }, [caseData.id]);
+
+  function handleTabChange(id: string) {
+    setActiveTab(id);
+    setVisitedTabs(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }
 
   async function generateTOR() {
     setGeneratingTOR(true);
@@ -148,7 +162,7 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
       {/* Tab bar */}
       <div className="flex items-center gap-0.5 px-2 sm:px-6 py-2 border-b border-navy-800 overflow-x-auto shrink-0">
         {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={() => handleTabChange(tab.id)}
             className={`flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               activeTab === tab.id
                 ? "bg-gold-500/10 text-gold-400 border border-gold-500/20"
@@ -166,19 +180,64 @@ Draft a complete 11-section Terms of Reference document including: parties, trib
         </div>
       )}
 
-      {/* Tab content */}
+      {/* Tab content — each tab stays mounted once visited so AI-generated
+          results and in-progress state survive switching between tabs. */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-6">
-        {activeTab === "overview" && <OverviewTab caseData={caseData} onTabChange={setActiveTab} />}
-        {activeTab === "issues" && <IssuesTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "timeline" && <DeadlinesTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "hearings" && <HearingsTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "evidence" && <EvidenceTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "documents" && <DocumentsTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "orders" && <OrdersTab caseId={caseData.id} />}
-        {activeTab === "research" && <ResearchTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "drafts" && <DraftsTab caseId={caseData.id} />}
-        {activeTab === "settlement" && <SettlementTab caseId={caseData.id} caseData={caseData} />}
-        {activeTab === "ai" && <AIInsightsTab caseData={caseData} />}
+        {visitedTabs.has("overview") && (
+          <div className={activeTab === "overview" ? "" : "hidden"}>
+            <OverviewTab caseData={caseData} onTabChange={handleTabChange} />
+          </div>
+        )}
+        {visitedTabs.has("issues") && (
+          <div className={activeTab === "issues" ? "" : "hidden"}>
+            <IssuesTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("timeline") && (
+          <div className={activeTab === "timeline" ? "" : "hidden"}>
+            <DeadlinesTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("hearings") && (
+          <div className={activeTab === "hearings" ? "" : "hidden"}>
+            <HearingsTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("evidence") && (
+          <div className={activeTab === "evidence" ? "" : "hidden"}>
+            <EvidenceTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("documents") && (
+          <div className={activeTab === "documents" ? "" : "hidden"}>
+            <DocumentsTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("orders") && (
+          <div className={activeTab === "orders" ? "" : "hidden"}>
+            <OrdersTab caseId={caseData.id} />
+          </div>
+        )}
+        {visitedTabs.has("research") && (
+          <div className={activeTab === "research" ? "" : "hidden"}>
+            <ResearchTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("drafts") && (
+          <div className={activeTab === "drafts" ? "" : "hidden"}>
+            <DraftsTab caseId={caseData.id} />
+          </div>
+        )}
+        {visitedTabs.has("settlement") && (
+          <div className={activeTab === "settlement" ? "" : "hidden"}>
+            <SettlementTab caseId={caseData.id} caseData={caseData} />
+          </div>
+        )}
+        {visitedTabs.has("ai") && (
+          <div className={activeTab === "ai" ? "" : "hidden"}>
+            <AIInsightsTab caseData={caseData} />
+          </div>
+        )}
       </div>
 
       {showAwardWizard && (

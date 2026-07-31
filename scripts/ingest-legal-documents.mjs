@@ -15,6 +15,7 @@ import mammoth from 'mammoth';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -241,7 +242,7 @@ async function main() {
 
       // Extract text
       console.log('   Extracting text...');
-      const fullText = await extractText(fileData, mimeType);
+      const fullText = stripWatermarks(await extractText(fileData, mimeType));
       console.log(`   Extracted ${fullText.length.toLocaleString()} characters`);
 
       // Chunk content

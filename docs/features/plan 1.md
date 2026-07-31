@@ -140,3 +140,11 @@ DOCX renders via docx-preview with formatting intact, scrollable.
 Confirm a document uploaded before this change (no storage_path) does not show a broken "View Original" button — the extracted-text pane still works as before.
 Try an unsupported format (e.g. .txt) — confirm the fallback message + download link appears instead of a broken render.
 Sanity-check ContractReview.tsx's own upload-to-documents-bucket call now succeeds (bucket exists) — upload a contract there and confirm no more silent storage failure.
+
+PLAN 16 - Performance improvements
+
+PLAN 17 - We need to figure out how we can make the cases and matters section useful. Does it work end to end do the buttons work.
+
+Let's look the whole process of creating a case and matter, the whole user experience, what needs work , what needs improvement
+
+also the documents from the legal library need to be formatted

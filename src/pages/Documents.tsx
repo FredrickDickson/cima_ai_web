@@ -31,6 +31,7 @@ import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
+import { logCaseEvent } from "../lib/caseEvents";
 import { useAuth } from "../contexts/AuthContext";
 import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
 
@@ -180,6 +181,12 @@ export default function Documents() {
   const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
   const [semanticResults, setSemanticResults] = useState<string[]>([]);
   const [semanticLoading, setSemanticLoading] = useState(false);
+  const [keywordResults, setKeywordResults] = useState<string[]>([]);
+
+  // Google-style suggestions dropdown
+  const [suggestions, setSuggestions] = useState<DocType[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
 
   // ── Multi-select & Compare ────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -220,6 +227,10 @@ export default function Documents() {
   // ── Semantic debounce timer & abort controller ────────────────────────────
   const semanticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const semanticAbort = useRef<AbortController | null>(null);
+  const keywordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keywordRequestId = useRef(0);
+  const suggestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionRequestId = useRef(0);
 
   // ─── AI Helper ─────────────────────────────────────────────────────────────
 
@@ -333,7 +344,17 @@ export default function Documents() {
             (a, b) =>
               semanticResults.indexOf(a.id) - semanticResults.indexOf(b.id)
           );
+      } else if (searchMode === "keyword" && keywordResults.length > 0) {
+        const idSet = new Set(keywordResults);
+        base = base
+          .filter((d) => idSet.has(d.id))
+          .sort(
+            (a, b) =>
+              keywordResults.indexOf(a.id) - keywordResults.indexOf(b.id)
+          );
       } else {
+        // Fallback while the debounced FTS request is still in flight (or failed) —
+        // keeps the list non-empty rather than flashing blank on every keystroke.
         const q = search.toLowerCase();
         base = base.filter(
           (d) =>
@@ -345,7 +366,7 @@ export default function Documents() {
     }
 
     return base;
-  }, [documents, activeSection, filterCaseId, filterFolderId, search, searchMode, semanticResults]);
+  }, [documents, activeSection, filterCaseId, filterFolderId, search, searchMode, semanticResults, keywordResults]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -416,6 +437,10 @@ export default function Documents() {
         .single();
 
       if (insertErr) throw insertErr;
+
+      if (inserted?.case_id) {
+        logCaseEvent(inserted.case_id, user!.id, "document_uploaded", `Document uploaded: "${docName}"`);
+      }
 
       setShowUpload(false);
       setUploadForm({ name: "", type: "document", caseId: "" });
@@ -828,11 +853,71 @@ Provide a structured comparison covering:
     }
   }
 
+  async function runKeywordSearch(query: string) {
+    if (!query.trim()) {
+      setKeywordResults([]);
+      return;
+    }
+    const requestId = ++keywordRequestId.current;
+    const { data } = await supabase.rpc("search_documents" as any, {
+      search_query: query.trim(),
+      match_count: 100,
+    });
+    if (requestId !== keywordRequestId.current) return; // stale, a newer keystroke has since fired
+    setKeywordResults(((data ?? []) as { id: string }[]).map((d) => d.id));
+  }
+
+  function selectSuggestion(doc: DocType) {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setViewerDoc(doc);
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (suggestions[activeSuggestion]) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeSuggestion]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
   function handleSearchChange(value: string) {
     setSearch(value);
+    setShowSuggestions(!!value.trim());
     if (searchMode === "semantic") {
       if (semanticTimer.current) clearTimeout(semanticTimer.current);
       semanticTimer.current = setTimeout(() => handleSemanticSearch(value), 600);
+    } else {
+      if (keywordTimer.current) clearTimeout(keywordTimer.current);
+      keywordTimer.current = setTimeout(() => runKeywordSearch(value), 200);
+    }
+
+    if (suggestionTimer.current) clearTimeout(suggestionTimer.current);
+    if (value.trim()) {
+      const requestId = ++suggestionRequestId.current;
+      suggestionTimer.current = setTimeout(async () => {
+        const { data } = await supabase.rpc("search_documents" as any, {
+          search_query: value.trim(),
+          match_count: 8,
+        });
+        if (requestId !== suggestionRequestId.current) return;
+        const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
+        const byId = new Map(documents.map((d) => [d.id, d]));
+        setSuggestions(ids.map((id) => byId.get(id)).filter((d): d is DocType => !!d));
+        setActiveSuggestion(0);
+      }, 200);
+    } else {
+      setSuggestions([]);
     }
   }
 
@@ -840,8 +925,10 @@ Provide a structured comparison covering:
     setSearchMode(mode);
     if (mode === "keyword") {
       setSemanticResults([]);
-    } else if (search.trim()) {
-      handleSemanticSearch(search);
+      if (search.trim()) runKeywordSearch(search);
+    } else {
+      setKeywordResults([]);
+      if (search.trim()) handleSemanticSearch(search);
     }
   }
 
@@ -1170,6 +1257,9 @@ Provide a structured comparison covering:
               <input
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => setShowSuggestions(!!search.trim() && suggestions.length > 0)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder={
                   searchMode === "semantic"
                     ? "Semantic search..."
@@ -1177,6 +1267,31 @@ Provide a structured comparison covering:
                 }
                 className="w-full pl-7 pr-7 py-1.5 border border-slate-300 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent"
               />
+
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((doc, i) => (
+                    <button
+                      key={doc.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectSuggestion(doc);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 flex items-center gap-2 transition-colors ${
+                        i === activeSuggestion ? "bg-navy-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <FileText size={12} className="text-navy-400 shrink-0" />
+                      <span className="flex-1 min-w-0 truncate text-xs text-navy-950">
+                        {doc.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0 capitalize">
+                        {doc.type}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* KW / AI toggle */}

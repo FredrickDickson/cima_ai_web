@@ -31,6 +31,7 @@ import {
   Wand2,
   ExternalLink,
   Settings,
+  Send,
   X
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -45,7 +46,7 @@ import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
 import { MentionPopup } from "../components/ui/MentionPopup";
 import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
-import { splitTaggedAuthorityIds } from "../lib/mentions";
+import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
 
 interface AnalysisResult {
   id?: string;
@@ -67,6 +68,15 @@ interface AnalysisResult {
   negotiation_points?: string[];
   ai_insights?: string;
   contract_text: string;
+  cited_sources?: CitedSource[];
+}
+
+interface ReviewChatMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
   cited_sources?: CitedSource[];
 }
 
@@ -185,7 +195,7 @@ async function extractTextFromFile(file: File): Promise<string> {
   return file.text();
 }
 
-type AnalysisTab = "overview" | "clauses" | "obligations" | "risks" | "missing" | "redlines" | "arbitration" | "ai_insights";
+type AnalysisTab = "overview" | "clauses" | "obligations" | "risks" | "missing" | "redlines" | "arbitration" | "ai_insights" | "questions";
 
 function RiskGauge({ score }: { score: number }) {
   const color = score >= 70 ? "#ef4444" : score >= 40 ? "#f59e0b" : "#10b981";
@@ -328,6 +338,7 @@ function ClauseCard({
   actionResults,
   onHighlight,
   onSendToDraft,
+  citedSources,
 }: {
   clause: ContractClauseAnalysis;
   onAction: (clause: ContractClauseAnalysis, action: typeof CLAUSE_ACTIONS[number]) => void;
@@ -335,6 +346,7 @@ function ClauseCard({
   actionResults: Record<string, Record<string, string>>;
   onHighlight: (name: string) => void;
   onSendToDraft: (content: string, name: string) => void;
+  citedSources?: CitedSource[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const results = actionResults[clause.clause_name] ?? {};
@@ -371,7 +383,9 @@ function ClauseCard({
         <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1">Analysis</p>
-            <p className="text-xs text-slate-700 leading-relaxed">{clause.analysis}</p>
+            <div className="text-xs text-slate-700 leading-relaxed">
+              <CitedMarkdown text={clause.analysis} sources={citedSources} />
+            </div>
           </div>
 
           {clause.redline_suggestion && (
@@ -460,6 +474,12 @@ export default function ContractReview() {
   const [cases, setCases] = useState<Case[]>([]);
   const [casesLoaded, setCasesLoaded] = useState(false);
   const [linkedCaseId, setLinkedCaseId] = useState("");
+
+  // Playbook / authority tagging (checked against the review in addition to
+  // the document itself)
+  const [tagText, setTagText] = useState("");
+  const tagTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const tagMentions = useAuthorityMentions({ text: tagText, setText: setTagText, textareaRef: tagTextareaRef, userId: user?.id });
   const [analyzing, setAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState("");
@@ -494,6 +514,25 @@ export default function ContractReview() {
   // Export
   const [exportOpen, setExportOpen] = useState(false);
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
+
+  // Ask Questions tab
+  const [questionConversationId, setQuestionConversationId] = useState<string | null>(null);
+  const [questionMessages, setQuestionMessages] = useState<ReviewChatMessage[]>([]);
+  const [questionInput, setQuestionInput] = useState("");
+  const [questionStreaming, setQuestionStreaming] = useState(false);
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
+  const questionTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const questionMentions = useAuthorityMentions({ text: questionInput, setText: setQuestionInput, textareaRef: questionTextareaRef, userId: user?.id });
+  const questionsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab === "questions") loadQuestionThread();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, uploadedDocId]);
+
+  useEffect(() => {
+    questionsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [questionMessages, questionStreaming]);
 
   // Ref to track step interval for cleanup
   const stepIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -570,6 +609,7 @@ export default function ContractReview() {
       industry_type?: string;
       revised_contract_text?: string;
       applied_redlines?: string[];
+      cited_sources?: CitedSource[];
     };
     if (a.industry_type) setDocumentType(a.industry_type);
     
@@ -624,7 +664,13 @@ export default function ContractReview() {
       negotiation_points: a.negotiation_points,
       ai_insights: a.ai_insights,
       contract_text: a.contract_text ?? "",
+      cited_sources: a.cited_sources,
     });
+    setUploadedDocId(a.document_id ?? null);
+    tagMentions.hydrateTags((a as unknown as { tagged_authorities?: TaggedAuthority[] }).tagged_authorities ?? []);
+    setQuestionConversationId(null);
+    setQuestionMessages([]);
+    setQuestionsLoaded(false);
     setMode("analysis");
     setActiveTab("overview");
     setHighlightedClause(null);
@@ -643,6 +689,101 @@ export default function ContractReview() {
     }
     
     localStorage.setItem("cima_last_review_id", id);
+  }
+
+  async function loadQuestionThread() {
+    if (!user || !uploadedDocId || questionsLoaded) return;
+    setQuestionsLoaded(true);
+    const { data: existing } = await supabase
+      .from("ai_conversations")
+      .select("*")
+      .eq("document_id", uploadedDocId)
+      .eq("context", "review")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let convId = (existing as { id: string } | null)?.id ?? null;
+    setQuestionConversationId(convId);
+    if (convId) {
+      const { data: msgs } = await supabase.from("ai_messages").select("*").eq("conversation_id", convId).order("created_at");
+      setQuestionMessages(
+        (msgs ?? []).map((m) => ({
+          ...(m as ReviewChatMessage),
+          cited_sources: (m as unknown as { metadata?: { cited_sources?: CitedSource[] } }).metadata?.cited_sources,
+        })),
+      );
+    }
+  }
+
+  async function sendQuestion() {
+    const text = questionInput.trim();
+    if (!text || questionStreaming || !user || !uploadedDocId) return;
+    setQuestionInput("");
+    setQuestionStreaming(true);
+
+    const userMsg: ReviewChatMessage = {
+      id: crypto.randomUUID(),
+      conversation_id: questionConversationId ?? "",
+      role: "user",
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    const history = questionMessages.map((m) => ({ role: m.role, content: m.content }));
+    setQuestionMessages((prev) => [...prev, userMsg]);
+
+    try {
+      let convId = questionConversationId;
+      if (!convId) {
+        const { data: created } = await supabase
+          .from("ai_conversations")
+          .insert({ user_id: user.id, document_id: uploadedDocId, context: "review", title: fileName || "Document Review Q&A" } as any)
+          .select()
+          .single();
+        convId = (created as { id: string } | null)?.id ?? null;
+        setQuestionConversationId(convId);
+      }
+      if (convId) {
+        await supabase.from("ai_messages").insert({ conversation_id: convId, role: "user", content: text } as any);
+      }
+
+      const token = await getToken();
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(questionMentions.activeTaggedAuthorities);
+      const res = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          messages: [...history, { role: "user", content: text }],
+          context: "review",
+          document_ids: [uploadedDocId, ...documentIds],
+          ...(libraryDocIds.length > 0 ? { library_doc_ids: libraryDocIds } : {}),
+        }),
+      });
+      const data = await res.json();
+      const content: string = data.content ?? "I encountered an issue answering that question.";
+      const citedSources: CitedSource[] | undefined = data.cited_sources;
+
+      setQuestionMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), conversation_id: convId ?? "", role: "assistant", content, created_at: new Date().toISOString(), cited_sources: citedSources },
+      ]);
+      if (convId) {
+        await supabase.from("ai_messages").insert({
+          conversation_id: convId,
+          role: "assistant",
+          content,
+          ...(citedSources && citedSources.length > 0 ? { metadata: { cited_sources: citedSources } } : {}),
+        } as any);
+      }
+    } catch {
+      setQuestionMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), conversation_id: questionConversationId ?? "", role: "assistant", content: "Sorry, something went wrong answering that question.", created_at: new Date().toISOString() },
+      ]);
+    } finally {
+      setQuestionStreaming(false);
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -701,6 +842,9 @@ export default function ContractReview() {
     setError("");
     setAnalyzing(true);
     setCurrentStep(0);
+    setQuestionConversationId(null);
+    setQuestionMessages([]);
+    setQuestionsLoaded(false);
 
     stepIntervalRef.current = setInterval(() => {
       setCurrentStep((s) => (s < STEPS.length - 1 ? s + 1 : s));
@@ -709,16 +853,41 @@ export default function ContractReview() {
     try {
       const token = await getToken();
       const plainText = htmlToPlainText(contractText);
+
+      // Ask Questions needs a `documents` row to ground against — file
+      // uploads already create one (handleFileUpload); pasted text doesn't,
+      // so create one here if missing.
+      let docId = uploadedDocId;
+      if (!docId) {
+        const { data: docData } = await supabase.from("documents").insert({
+          user_id: user.id,
+          case_id: linkedCaseId || null,
+          name: fileName || "Pasted Document",
+          type: "contract",
+          extracted_text: plainText.slice(0, 50000),
+          ai_summary: "",
+          risk_score: 0,
+          status: "ready",
+          metadata: {},
+        } as any).select("id").single();
+        docId = (docData as { id: string } | null)?.id ?? null;
+        if (docId) setUploadedDocId(docId);
+      }
+
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(tagMentions.activeTaggedAuthorities);
       const res = await fetch(`${supabaseUrl}/functions/v1/contract-analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           text: plainText,
-          document_id: uploadedDocId || undefined,
+          document_id: docId || undefined,
           case_id: linkedCaseId || undefined,
           user_id: user.id,
           document_type: documentType,
           jurisdiction,
+          ...(libraryDocIds.length > 0 ? { library_doc_ids: libraryDocIds } : {}),
+          ...(documentIds.length > 0 ? { document_ids: documentIds } : {}),
+          ...(tagMentions.activeTaggedAuthorities.length > 0 ? { tagged_authorities: tagMentions.activeTaggedAuthorities } : {}),
         }),
       });
 
@@ -910,6 +1079,11 @@ export default function ContractReview() {
     setGeneratedClauses({});
     setRedlineText("");
     setRedlineResult(null);
+    setUploadedDocId(null);
+    setTagText("");
+    setQuestionConversationId(null);
+    setQuestionMessages([]);
+    setQuestionsLoaded(false);
   }
 
   async function handleExport(fmt: "pdf" | "word") {
@@ -996,6 +1170,7 @@ export default function ContractReview() {
       { id: "redlines" as AnalysisTab, label: "Redlines" },
       { id: "arbitration" as AnalysisTab, label: "Arbitration" },
       { id: "ai_insights" as AnalysisTab, label: "AI Insights" },
+      { id: "questions" as AnalysisTab, label: "Ask Questions" },
     ];
   }, [analysis, riskClauses.length]);
 
@@ -1040,6 +1215,37 @@ export default function ContractReview() {
             <option key={c.id} value={c.id}>{c.title}{c.matter_number ? ` (${c.matter_number})` : ""}</option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Playbook &amp; Authorities (optional)</p>
+        {tagMentions.activeTaggedAuthorities.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            {tagMentions.activeTaggedAuthorities.map((tag) => (
+              <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => tagMentions.removeTag(tag.id)} />
+            ))}
+          </div>
+        )}
+        <div className="relative">
+          <textarea
+            ref={tagTextareaRef}
+            value={tagText}
+            onChange={tagMentions.handleTextareaChange}
+            onKeyDown={(e) => { tagMentions.handleTextareaKeyDown(e); }}
+            rows={2}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 resize-none"
+            placeholder="Type @ to tag your firm's playbook, or specific case law/legislation to check this document against"
+          />
+          {tagMentions.popupOpen && (
+            <MentionPopup
+              results={tagMentions.popupResults}
+              loading={tagMentions.popupLoading}
+              activeIndex={tagMentions.activeIndex}
+              onHover={tagMentions.setActiveIndex}
+              onSelect={tagMentions.selectSuggestion}
+            />
+          )}
+        </div>
       </div>
 
       {/* Past reviews */}
@@ -1416,7 +1622,9 @@ export default function ContractReview() {
                       <Sparkles size={13} className="text-navy-600" />
                       <p className="text-xs font-bold text-navy-950">AI Summary</p>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">{analysis.ai_summary}</p>
+                    <div className="text-xs text-slate-600 leading-relaxed">
+                      <CitedMarkdown text={analysis.ai_summary} sources={analysis.cited_sources} />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1454,6 +1662,7 @@ export default function ContractReview() {
                       actionResults={clauseResults}
                       onHighlight={setHighlightedClause}
                       onSendToDraft={(content, name) => navigate("/drafting", { state: { fromDocument: { name, type: "brief", content, summary: "" } } })}
+                      citedSources={analysis.cited_sources}
                     />
                   ))}
                 </div>
@@ -1513,7 +1722,9 @@ export default function ContractReview() {
                                   {clause.risk_level}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-700 leading-relaxed">{clause.analysis}</p>
+                              <div className="text-xs text-slate-700 leading-relaxed">
+                                <CitedMarkdown text={clause.analysis} sources={analysis.cited_sources} />
+                              </div>
                               {clause.redline_suggestion && (
                                 <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
                                   <p className="text-xs font-semibold text-orange-700 mb-1">Suggested Change</p>
@@ -1812,7 +2023,7 @@ export default function ContractReview() {
                         <p className="text-xs font-bold text-navy-950">Senior Associate Review</p>
                       </div>
                       <div className="text-xs text-slate-700 leading-relaxed prose prose-xs max-w-none">
-                        <ReactMarkdown>{analysis.ai_insights}</ReactMarkdown>
+                        <CitedMarkdown text={analysis.ai_insights} sources={analysis.cited_sources} />
                       </div>
                     </div>
                   ) : null}
@@ -1846,7 +2057,9 @@ export default function ContractReview() {
                         {analysis.recommendations.map((rec, i) => (
                           <li key={i} className="flex items-start gap-2">
                             <Shield size={11} className="text-navy-400 mt-0.5 shrink-0" />
-                            <p className="text-xs text-slate-700 leading-relaxed">{rec}</p>
+                            <div className="text-xs text-slate-700 leading-relaxed">
+                              <CitedMarkdown text={rec} sources={analysis.cited_sources} />
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -1859,6 +2072,86 @@ export default function ContractReview() {
                       <p className="text-sm font-semibold text-slate-500">No insights available</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── ASK QUESTIONS ── */}
+              {activeTab === "questions" && (
+                <div className="bg-white rounded-xl border border-slate-200 flex flex-col" style={{ height: "70vh" }}>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {questionMessages.length === 0 && !questionStreaming ? (
+                      <p className="text-xs text-slate-400 text-center py-8">
+                        Ask a question about this document — e.g. "What are the termination rights?" or "Does this
+                        comply with the tagged playbook?". Answers are grounded in this document, plus anything you
+                        @-tag below.
+                      </p>
+                    ) : (
+                      questionMessages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`text-xs rounded-lg px-3 py-2 max-w-[85%] ${
+                            m.role === "user" ? "bg-navy-950 text-white ml-auto" : "bg-slate-100 text-navy-950 mr-auto"
+                          }`}
+                        >
+                          {m.role === "assistant" ? (
+                            <div className="leading-relaxed">
+                              <CitedMarkdown text={m.content} sources={m.cited_sources} />
+                            </div>
+                          ) : (
+                            <p className="leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    {questionStreaming && (
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Loader2 size={12} className="animate-spin" /> Thinking...
+                      </div>
+                    )}
+                    <div ref={questionsEndRef} />
+                  </div>
+                  <div className="p-3 border-t border-slate-200 space-y-2">
+                    {questionMentions.activeTaggedAuthorities.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {questionMentions.activeTaggedAuthorities.map((tag) => (
+                          <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => questionMentions.removeTag(tag.id)} />
+                        ))}
+                      </div>
+                    )}
+                    <div className="relative flex gap-2">
+                      <textarea
+                        ref={questionTextareaRef}
+                        value={questionInput}
+                        onChange={questionMentions.handleTextareaChange}
+                        onKeyDown={(e) => {
+                          const handled = questionMentions.handleTextareaKeyDown(e);
+                          if (!handled && e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            sendQuestion();
+                          }
+                        }}
+                        rows={1}
+                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                        placeholder="Ask a question... Type @ to tag a case, legislation, or document"
+                      />
+                      <button
+                        onClick={sendQuestion}
+                        disabled={questionStreaming || !questionInput.trim()}
+                        className="p-2 rounded-lg bg-navy-950 text-white disabled:opacity-40"
+                      >
+                        <Send size={14} />
+                      </button>
+                      {questionMentions.popupOpen && (
+                        <MentionPopup
+                          results={questionMentions.popupResults}
+                          loading={questionMentions.popupLoading}
+                          activeIndex={questionMentions.activeIndex}
+                          onHover={questionMentions.setActiveIndex}
+                          onSelect={questionMentions.selectSuggestion}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1920,7 +2213,9 @@ export default function ContractReview() {
                       {clause.analysis && (
                         <div>
                           <p className="text-xs font-semibold text-slate-500 mb-2">Analysis</p>
-                          <p className="text-xs text-slate-700 leading-relaxed">{clause.analysis}</p>
+                          <div className="text-xs text-slate-700 leading-relaxed">
+                            <CitedMarkdown text={clause.analysis} sources={analysis.cited_sources} />
+                          </div>
                         </div>
                       )}
                     </div>

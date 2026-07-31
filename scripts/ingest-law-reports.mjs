@@ -16,6 +16,10 @@
  *   --batch-size=N          Embedding batch size (default 16)
  *   --batch-delay-ms=N      Delay between embedding batches (default 0 — local model, no rate limit)
  *   --force                 Reprocess files even if already marked completed
+ *   --jurisdiction=<value>  Jurisdiction to tag all ingested rows with (default 'ghana') —
+ *                           use the same lowercase country-name vocabulary as
+ *                           supabase/functions/_shared/laws-africa.ts's COUNTRY_MAP
+ *                           (e.g. 'kenya', 'nigeria') or 'international'
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -27,6 +31,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -56,8 +61,10 @@ const DRY_RUN = argv.includes('--dry-run');
 const FORCE = argv.includes('--force');
 const LIMIT = Number(argv.find(a => a.startsWith('--limit='))?.split('=')[1] ?? 0) || Infinity;
 const ONLY = argv.find(a => a.startsWith('--only='))?.split('=')[1] ?? null;
-const BATCH_SIZE = Number(argv.find(a => a.startsWith('--batch-size='))?.split('=')[1] ?? 16);
+const BATCH_SIZE = Number(argv.find(a => a.startsWith('--batch-size='))?.split('=')[1] ?? 8);
 const BATCH_DELAY_MS = Number(argv.find(a => a.startsWith('--batch-delay-ms='))?.split('=')[1] ?? 0);
+const DOC_DELAY_MS = Number(argv.find(a => a.startsWith('--doc-delay-ms='))?.split('=')[1] ?? 400);
+const JURISDICTION = argv.find(a => a.startsWith('--jurisdiction='))?.split('=')[1] ?? 'ghana';
 
 // ─── LOGGING ───────────────────────────────────────────────────────────────
 
@@ -419,7 +426,7 @@ function buildStoragePath(candidate, finalExt) {
 // retry based on the returned error field (falling back to try/catch for any
 // call that does throw), with backoff before giving up on a given file.
 
-async function withRetry(fn, { attempts = 3, delayMs = 1000 } = {}) {
+async function withRetry(fn, { attempts = 8, delayMs = 2000 } = {}) {
   let lastResult;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -441,7 +448,8 @@ async function processCandidate(candidate) {
   const storagePath = buildStoragePath(candidate, finalExt);
 
   try {
-    const text = await extractText(candidate.absPath, candidate.format);
+    const rawText = await extractText(candidate.absPath, candidate.format);
+    const text = stripWatermarks(rawText);
     if (!text || text.trim().length < 50) {
       throw new Error('Extracted text too short (<50 chars) — likely empty or image-only');
     }
@@ -467,7 +475,7 @@ async function processCandidate(candidate) {
       .upsert({
         title: candidate.title,
         source_type: candidate.sourceType,
-        jurisdiction: 'ghana',
+        jurisdiction: JURISDICTION,
         citation: candidate.citation,
         court: candidate.court,
         decided_year: candidate.year,
@@ -499,14 +507,24 @@ async function processCandidate(candidate) {
         content: chunk.content,
         embedding: embeddings[j] ?? null,
         source_type: candidate.sourceType,
-        jurisdiction: 'ghana',
+        jurisdiction: JURISDICTION,
         citation: chunk.citation,
         doc_id: docId,
         chunk_index: i + j,
       }));
       const { error: insErr } = await withRetry(() => supabase.from('legal_library').insert(rows));
-      if (insErr) throw new Error(`Chunk insert failed: ${insErr.message}`);
-      inserted += rows.length;
+      if (insErr) {
+        // Batch insert kept failing (e.g. statement timeout under write load
+        // on the HNSW index) — fall back to one-row-at-a-time, which is much
+        // less likely to time out, before giving up on the whole document.
+        for (const row of rows) {
+          const { error: rowErr } = await withRetry(() => supabase.from('legal_library').insert([row]), { attempts: 8, delayMs: 2000 });
+          if (rowErr) throw new Error(`Chunk insert failed: ${rowErr.message}`);
+          inserted++;
+        }
+      } else {
+        inserted += rows.length;
+      }
       if (BATCH_DELAY_MS > 0 && i + BATCH_SIZE < chunks.length) {
         await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
       }
@@ -528,7 +546,7 @@ async function processCandidate(candidate) {
         storage_path: storagePath,
         title: candidate.title,
         source_type: candidate.sourceType,
-        jurisdiction: 'ghana',
+        jurisdiction: JURISDICTION,
         court: candidate.court,
         decided_year: candidate.year,
         ingestion_status: 'failed',
@@ -597,11 +615,17 @@ async function main() {
     const completedPaths = new Set();
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
-      const { data } = await withRetry(() => supabase
+      const { data, error } = await withRetry(() => supabase
         .from('legal_library_documents')
         .select('storage_path')
         .eq('ingestion_status', 'completed')
-        .range(offset, offset + pageSize - 1));
+        .range(offset, offset + pageSize - 1), { attempts: 12, delayMs: 2000 });
+      if (error) {
+        console.error(`\n❌  Could not fetch already-completed documents (page offset=${offset}): ${error.message}`);
+        console.error('    Refusing to proceed — this would cause every document to be reprocessed from scratch.');
+        console.error('    Re-run the script once the database is responsive again.');
+        process.exit(1);
+      }
       if (!data || data.length === 0) break;
       for (const row of data) completedPaths.add(row.storage_path);
       if (data.length < pageSize) break;
@@ -620,6 +644,10 @@ async function main() {
     process.stdout.write(`[${i}/${toProcess.length}] ${candidate.relPath.slice(0, 80)}... `);
     const status = await processCandidate(candidate);
     stats[status]++;
+    // Small pacing delay between documents — under sustained write load the
+    // Supabase project can return transient "schema cache" / timeout errors;
+    // giving it breathing room between documents reduces how often that happens.
+    if (DOC_DELAY_MS > 0) await new Promise(r => setTimeout(r, DOC_DELAY_MS));
     console.log(status);
   }
 

@@ -293,6 +293,7 @@ ${excerpt}`,
       governing_law_found: Boolean(analysis.governing_law_found),
       governing_law: String(analysis.governing_law ?? ""),
       cited_sources: citedSources,
+      tagged_authorities: tagged_authorities ?? [],
     }).select().maybeSingle();
 
     return new Response(
