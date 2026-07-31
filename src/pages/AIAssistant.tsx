@@ -694,7 +694,7 @@ export default function AIAssistant() {
               <div className="relative flex-1">
                 <textarea ref={textareaRef} value={input} onChange={mentions.handleTextareaChange} onKeyDown={handleKeyDown}
                   rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}... (type @ to tag a source)`}
-                  className="w-full text-sm text-slate-200 placeholder-slate-600 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
+                  className="w-full text-sm text-slate-200 placeholder-white/70 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
                   style={{ minHeight: "24px" }} />
                 {mentions.popupOpen && (
                   <MentionPopup
