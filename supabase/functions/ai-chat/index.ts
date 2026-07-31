@@ -10,6 +10,7 @@ import {
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
+import { searchLegalLibrary, searchTavily, type RetrievedLibrarySource, type TavilyResult } from "../_shared/legal-retrieval.ts";
 
 interface CitedSource {
   marker: string;
@@ -91,6 +92,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const LAWS_AFRICA_API_KEY = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
+    const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
+    const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
@@ -120,11 +123,17 @@ Deno.serve(async (req: Request) => {
       : null;
 
     const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];
-    const [lawsSources, accraRows]: [LawsAfricaSource[], AccraRuleRow[]] = taggedContext
-      ? [[], []]
+    // Research mode also searches the full legal-library corpus (case law +
+    // statutes) and the web, matching what the standalone Research page
+    // already does — previously this mode only got Laws.Africa legislation.
+    const isResearchMode = context === "research" && !!userQuery;
+    const [lawsSources, accraRows, librarySources, webResults]: [LawsAfricaSource[], AccraRuleRow[], RetrievedLibrarySource[], TavilyResult[]] = taggedContext
+      ? [[], [], [], []]
       : await Promise.all([
           userQuery ? fetchLawsAfricaSources(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve([]),
           (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesRows(userQuery) : Promise.resolve([]),
+          isResearchMode ? searchLegalLibrary(userQuery, supabase, { hfKey: HUGGINGFACE_API_KEY, jurisdiction: jurisdictionCode, matchCount: 6 }) : Promise.resolve([]),
+          isResearchMode ? searchTavily(userQuery, jurisdictionLabel, TAVILY_API_KEY) : Promise.resolve([]),
         ]);
 
     const lawsContext = lawsSources.length > 0
@@ -133,6 +142,18 @@ Deno.serve(async (req: Request) => {
           .join("\n\n")}`
       : "";
     const accraContext = formatAccraRulesContext(accraRows);
+
+    const libraryContext = librarySources.length > 0
+      ? `\n\nRelevant Case Law & Legal Library Sources:\n${librarySources
+          .map((s, i) => `[C${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}\n${s.content.slice(0, 800)}`)
+          .join("\n\n")}`
+      : "";
+
+    const webContext = webResults.length > 0
+      ? `\n\nRelevant Web Sources:\n${webResults
+          .map((r, i) => `[W${i + 1}] ${r.title}\nSource: ${r.url}\n${r.content.slice(0, 600)}`)
+          .join("\n\n")}`
+      : "";
 
     const citedSources: CitedSource[] = [
       ...lawsSources.map((s, i) => ({
@@ -151,6 +172,21 @@ Deno.serve(async (req: Request) => {
         content: r.content,
         doc_id: r.doc_id,
       })),
+      ...librarySources.map((s, i) => ({
+        marker: `C${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        doc_id: s.doc_id,
+      })),
+      ...webResults.map((r, i) => ({
+        marker: `W${i + 1}`,
+        source_name: r.title,
+        content: r.content,
+        url: r.url,
+      })),
       ...(taggedContext?.citedSources ?? []),
     ];
 
@@ -158,7 +194,7 @@ Deno.serve(async (req: Request) => {
       ? buildStrictGroundingBlock(taggedContext.titles, taggedContext.context)
       : "";
 
-    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel, accraContext) + strictGroundingBlock;
+    const systemPrompt = buildSystemPrompt(context, lawsContext, jurisdictionLabel, accraContext, libraryContext, webContext) + strictGroundingBlock;
 
     const allMessages: Message[] = [
       { role: "system", content: systemPrompt },
@@ -211,7 +247,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = "Ghana", accraContext = ""): string {
+function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = "Ghana", accraContext = "", libraryContext = "", webContext = ""): string {
   const base = CIMA_SYSTEM_PROMPT + `\n\nDETECTED JURISDICTION: ${jurisdiction}\n\nAdditional citation principles:\n1. Always cite legal authority (statutes, case law, arbitration rules) when making legal claims — specific to ${jurisdiction} where applicable\n2. Distinguish clearly between legal analysis and your own opinion\n3. When Laws.Africa sources are provided below, treat them as primary authority and cite them where relevant\n4. Only cite sources that are directly relevant to the jurisdiction and question — if a source is from a different jurisdiction and not applicable as comparative law, do not cite it\n5. If you cannot find a relevant source, provide analysis based on your training knowledge and clearly state you are drawing on general legal knowledge\n6. Never fabricate citations — if uncertain about a case name or statute, say so explicitly\n7. When drafting, produce professional-grade legal language\n8. Structure responses clearly with headers when providing detailed analysis`;
 
   const contextMap: Record<string, string> = {
@@ -227,10 +263,10 @@ function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = 
     general: `\n\nProvide comprehensive, professional legal assistance under ${jurisdiction} law across all areas of legal practice.`,
   };
 
-  const citationFormatNote = (lawsContext || accraContext)
-    ? `\n\nWhen citing the sources listed below, use the exact bracket marker shown before each source (e.g. "[1]", "[R1]") inline in your answer — these markers are matched back to the real source and rendered as verifiable links, so do not invent marker numbers beyond what is listed.`
+  const citationFormatNote = (lawsContext || accraContext || libraryContext || webContext)
+    ? `\n\nWhen citing the sources listed below, use the exact bracket marker shown before each source (e.g. "[1]", "[R1]", "[C1]", "[W1]") inline in your answer — these markers are matched back to the real source and rendered as verifiable links, so do not invent marker numbers beyond what is listed.`
     : "";
 
-  return base + (contextMap[context] ?? contextMap.general) + citationFormatNote + lawsContext + accraContext;
+  return base + (contextMap[context] ?? contextMap.general) + citationFormatNote + lawsContext + accraContext + libraryContext + webContext;
 }
 

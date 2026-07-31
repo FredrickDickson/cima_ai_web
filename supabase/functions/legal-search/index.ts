@@ -4,30 +4,13 @@ import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/l
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
+import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
-
-async function getEmbedding(text: string, hfKey: string): Promise<number[] | null> {
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
-      {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: text, options: { wait_for_model: true } }),
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data[0]) ? data[0] : data;
-  } catch {
-    return null;
-  }
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -137,58 +120,27 @@ Answer the query using only the tagged authority text provided below. Cite each 
 
     const queryEmbedding = hfKey ? await getEmbedding(query, hfKey) : null;
 
-    if (queryEmbedding) {
-      const { data: libResults } = await supabase.rpc("match_legal_library", {
+    const librarySources = await searchLegalLibrary(query, supabase, {
+      embedding: queryEmbedding,
+      jurisdiction: jurisdiction || undefined,
+      sourceType: source_types?.[0] || undefined,
+      matchCount: 6,
+    });
+    sources.push(...librarySources);
+
+    if (queryEmbedding && user_id) {
+      const { data: docChunks } = await supabase.rpc("match_document_chunks", {
         query_embedding: queryEmbedding,
-        match_count: 6,
-        filter_jurisdiction: jurisdiction || null,
-        filter_source_type: source_types?.[0] || null,
+        match_count: 3,
+        filter_user_id: user_id,
       });
-      for (const r of (libResults ?? [])) {
+      for (const r of (docChunks ?? [])) {
         sources.push({
           id: r.id,
-          source_name: r.title,
-          citation: r.citation,
-          source_type: r.source_type,
-          jurisdiction: r.jurisdiction,
+          source_name: `Document: ${r.document_name ?? "Uploaded Document"}`,
+          source_type: "document",
           content: r.content,
           similarity: r.similarity,
-          doc_id: r.doc_id ?? undefined,
-        });
-      }
-
-      if (user_id) {
-        const { data: docChunks } = await supabase.rpc("match_document_chunks", {
-          query_embedding: queryEmbedding,
-          match_count: 3,
-          filter_user_id: user_id,
-        });
-        for (const r of (docChunks ?? [])) {
-          sources.push({
-            id: r.id,
-            source_name: `Document: ${r.document_name ?? "Uploaded Document"}`,
-            source_type: "document",
-            content: r.content,
-            similarity: r.similarity,
-          });
-        }
-      }
-    }
-
-    if (sources.length === 0) {
-      const { data: ftsResults } = await supabase.rpc("search_legal_library_fts", {
-        search_query: query,
-        match_count: 5,
-      });
-      for (const r of (ftsResults ?? [])) {
-        sources.push({
-          id: r.id,
-          source_name: r.title,
-          citation: r.citation,
-          source_type: r.source_type,
-          jurisdiction: r.jurisdiction,
-          content: r.content,
-          doc_id: r.doc_id ?? undefined,
         });
       }
     }
@@ -223,36 +175,7 @@ Answer the query using only the tagged authority text provided below. Cite each 
       } catch { /* non-fatal */ }
     }
 
-    let tavilyResults: { title: string; url: string; content: string; score: number }[] = [];
-    if (tavilyKey) {
-      try {
-        const tvRes = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: tavilyKey,
-            query: `legal: ${query}${jurisdiction ? ` ${jurisdiction}` : ""}`,
-            search_depth: "advanced",
-            max_results: 5,
-            include_domains: [
-              "lawsghana.com", "ghanaweb.com", "ghanalegal.com",
-              "uncitral.un.org", "iccwbo.org", "lcia.org",
-              "lawfareblog.com", "kluwerlawonline.com", "italaw.com",
-              "globalarbitrationreview.com",
-            ],
-          }),
-        });
-        if (tvRes.ok) {
-          const tvData = await tvRes.json();
-          tavilyResults = (tvData.results ?? []).map((r: { title: string; url: string; content: string; score: number }) => ({
-            title: r.title,
-            url: r.url,
-            content: r.content,
-            score: r.score ?? 0,
-          }));
-        }
-      } catch { /* non-fatal */ }
-    }
+    const tavilyResults = await searchTavily(query, jurisdiction, tavilyKey);
 
     // Laws.Africa legislation always appears first; fill remaining slots with other sources
     const allSources = [...lawsSources, ...sources];
