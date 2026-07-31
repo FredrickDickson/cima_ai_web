@@ -123,17 +123,17 @@ Deno.serve(async (req: Request) => {
       : null;
 
     const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];
-    // Research mode also searches the full legal-library corpus (case law +
-    // statutes) and the web, matching what the standalone Research page
-    // already does — previously this mode only got Laws.Africa legislation.
-    const isResearchMode = context === "research" && !!userQuery;
+    // Every mode searches the full legal-library corpus (case law + statutes)
+    // and the web, matching what the standalone Research page already does —
+    // previously only Laws.Africa legislation was fetched, and only for
+    // "research" mode.
     const [lawsSources, accraRows, librarySources, webResults]: [LawsAfricaSource[], AccraRuleRow[], RetrievedLibrarySource[], TavilyResult[]] = taggedContext
       ? [[], [], [], []]
       : await Promise.all([
           userQuery ? fetchLawsAfricaSources(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve([]),
           (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesRows(userQuery) : Promise.resolve([]),
-          isResearchMode ? searchLegalLibrary(userQuery, supabase, { hfKey: HUGGINGFACE_API_KEY, jurisdiction: jurisdictionCode, matchCount: 6 }) : Promise.resolve([]),
-          isResearchMode ? searchTavily(userQuery, jurisdictionLabel, TAVILY_API_KEY) : Promise.resolve([]),
+          userQuery ? searchLegalLibrary(userQuery, supabase, { hfKey: HUGGINGFACE_API_KEY, jurisdiction: jurisdictionCode, matchCount: 6 }) : Promise.resolve([]),
+          userQuery ? searchTavily(userQuery, jurisdictionLabel, TAVILY_API_KEY) : Promise.resolve([]),
         ]);
 
     const lawsContext = lawsSources.length > 0

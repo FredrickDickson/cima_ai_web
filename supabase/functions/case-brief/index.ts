@@ -11,6 +11,7 @@ const corsHeaders = {
 const MAX_CHARS = 45000;
 
 const EMPTY_BRIEF = {
+  area_of_law: "",
   facts: "",
   issues: [],
   holding: "",
@@ -86,6 +87,7 @@ ${fullText}
 
 Produce a JSON object with exactly this shape:
 {
+  "area_of_law": "concise classification of the area(s) of law this case concerns, deduced from the judgment text (e.g. 'Contract Law', 'Arbitration & ADR', 'Tort Law — Negligence', 'Constitutional Law', 'Employment Law', 'Land Law'). Give the most specific applicable label. Only join multiple labels with ' / ' if the case genuinely spans distinct areas — do not pad this with extra categories.",
   "facts": "2-4 paragraph summary of the material facts as found by the court",
   "issues": ["issue 1 framed as a question", "issue 2"],
   "holding": "1-2 paragraph statement of what the court actually decided and the order made",
@@ -128,6 +130,7 @@ If there are no concurring or dissenting opinions in the text, return an empty a
 
     const brief = {
       doc_id,
+      area_of_law: String(parsed.area_of_law ?? EMPTY_BRIEF.area_of_law),
       facts: String(parsed.facts ?? EMPTY_BRIEF.facts),
       issues: Array.isArray(parsed.issues) ? parsed.issues : EMPTY_BRIEF.issues,
       holding: String(parsed.holding ?? EMPTY_BRIEF.holding),

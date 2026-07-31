@@ -461,6 +461,11 @@ function CaseBriefPanel({ docId }: { docId: string }) {
             {brief.parse_status === "partial" && (
               <p className="text-xs text-amber-600">Some sections may be incomplete.</p>
             )}
+            {brief.area_of_law && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gold-50 text-gold-700 border border-gold-200">
+                {brief.area_of_law}
+              </span>
+            )}
             <BriefSection label="Facts" body={brief.facts} />
             <BriefListSection label="Issues" items={brief.issues} />
             <BriefSection label="Holding" body={brief.holding} />

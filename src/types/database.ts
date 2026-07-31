@@ -364,6 +364,7 @@ export interface CaseBriefConcurrenceDissent {
 
 export interface CaseBrief {
   doc_id: string;
+  area_of_law: string;
   facts: string;
   issues: string[];
   holding: string;
