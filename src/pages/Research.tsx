@@ -26,6 +26,7 @@ import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { VoiceInputButton } from "../components/ui/VoiceInputButton";
+import { SharpenButton } from "../components/ui/SharpenButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
@@ -419,13 +420,20 @@ Format as a numbered list matching the order above. If you cannot verify the sta
                     onChange={mentions.handleTextareaChange}
                     onKeyDown={(e) => { mentions.handleTextareaKeyDown(e); }}
                     rows={3}
-                    className="w-full px-4 py-3 pr-11 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all resize-none"
+                    className="w-full px-4 py-3 pr-16 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all resize-none"
                     placeholder="e.g. What are the grounds for challenging an arbitral award under the New York Convention? Type @ to tag specific cases, legislation, or documents."
                   />
                   <VoiceInputButton
                     onTranscript={(text) => setQuery((prev) => (prev ? `${prev} ${text}` : text))}
                     className="absolute top-2 right-2"
                     title="Dictate your research query"
+                  />
+                  <SharpenButton
+                    text={query}
+                    onSharpened={setQuery}
+                    kind="research query"
+                    className="absolute top-2 right-9"
+                    title="Sharpen your query"
                   />
                   {mentions.popupOpen && (
                     <MentionPopup

@@ -19,7 +19,7 @@ type Case = {
 
 const CASE_TYPES = ["arbitration", "litigation", "mediation", "advisory", "transactional"];
 const FRAMEWORKS = [
-  "", "Ghana ADR Act 2010", "ICC Rules", "UNCITRAL Rules",
+  "Ghana ADR Act 2010", "ICC Rules", "UNCITRAL Rules",
   "LCIA Rules", "New York Convention", "AFSA Rules", "Ad Hoc",
 ];
 
@@ -256,13 +256,17 @@ export default function NewCaseModal({
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1">Framework / Rules</label>
-            <select
+            <input
               value={form.framework}
               onChange={e => setForm(p => ({ ...p, framework: e.target.value }))}
-              className="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500/50"
-            >
-              {FRAMEWORKS.map(f => <option key={f} value={f}>{f || "— Select framework —"}</option>)}
-            </select>
+              list="framework-options"
+              placeholder="e.g. Ghana ADR Act 2010, ICC Rules, or type your own..."
+              className="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-gold-500/50"
+            />
+            <datalist id="framework-options">
+              {FRAMEWORKS.map(f => <option key={f} value={f} />)}
+            </datalist>
+            <p className="mt-1 text-[11px] text-slate-500">Pick a common one or type your own procedural framework/rules.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

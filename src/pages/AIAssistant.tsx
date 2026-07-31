@@ -8,6 +8,7 @@ import {
 import AppLayout from "../components/layout/AppLayout";
 import { FileAttachment } from "../components/ui/FileAttachment";
 import { VoiceInputButton } from "../components/ui/VoiceInputButton";
+import { SharpenButton } from "../components/ui/SharpenButton";
 import { extractTextFromFile } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
@@ -690,6 +691,13 @@ export default function AIAssistant() {
                 onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
                 className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
                 title="Dictate your message"
+              />
+              <SharpenButton
+                text={input}
+                onSharpened={setInput}
+                kind="chat message"
+                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                title="Sharpen your message"
               />
               <div className="relative flex-1">
                 <textarea ref={textareaRef} value={input} onChange={mentions.handleTextareaChange} onKeyDown={handleKeyDown}

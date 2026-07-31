@@ -48,6 +48,7 @@ import { useSearchParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { VoiceInputButton } from "../components/ui/VoiceInputButton";
+import { SharpenButton } from "../components/ui/SharpenButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
@@ -1152,11 +1153,18 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                       <textarea ref={nlInputRef} value={nlPrompt} onChange={mentions.handleTextareaChange}
                         onKeyDown={(e) => { if (mentions.handleTextareaKeyDown(e)) return; if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleNlGenerate(); }}
                         rows={4} placeholder="e.g., Draft a Notice of Arbitration for a construction dispute... Type @ to tag specific cases, legislation, or documents."
-                        className="w-full px-5 py-4 pr-11 text-sm text-navy-950 placeholder-slate-400 focus:outline-none resize-none border-0" />
+                        className="w-full px-5 py-4 pr-16 text-sm text-navy-950 placeholder-slate-400 focus:outline-none resize-none border-0" />
                       <VoiceInputButton
                         onTranscript={(text) => setNlPrompt((prev) => (prev ? `${prev} ${text}` : text))}
                         className="absolute top-3 right-3"
                         title="Dictate your instructions"
+                      />
+                      <SharpenButton
+                        text={nlPrompt}
+                        onSharpened={setNlPrompt}
+                        kind="drafting instruction"
+                        className="absolute top-3 right-10"
+                        title="Sharpen your instructions"
                       />
                       {mentions.popupOpen && (
                         <MentionPopup
@@ -1601,6 +1609,12 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                             <VoiceInputButton
                               onTranscript={(text) => setResearchQuery((prev) => (prev ? `${prev} ${text}` : text))}
                               title="Dictate your search"
+                            />
+                            <SharpenButton
+                              text={researchQuery}
+                              onSharpened={setResearchQuery}
+                              kind="research query"
+                              title="Sharpen your search"
                             />
                             <button type="submit" disabled={researchLoading || !researchQuery.trim()}
                               className="px-3 py-2 bg-navy-950 hover:bg-navy-800 text-white rounded-lg transition-colors disabled:opacity-50">
