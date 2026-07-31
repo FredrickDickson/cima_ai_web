@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
       ? await fetchTaggedAuthorityContext(supabase, user_id, mergedLibraryDocIds, document_ids)
       : null;
 
-    const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review"];
+    const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];
     const [lawsSources, accraRows]: [LawsAfricaSource[], AccraRuleRow[]] = taggedContext
       ? [[], []]
       : await Promise.all([
@@ -221,6 +221,9 @@ function buildSystemPrompt(context: string, lawsContext: string, jurisdiction = 
     review: `\n\nCurrent mode: CONTRACT REVIEW. Focus on clause-by-clause analysis, risk scoring, unusual language detection, liability analysis, and practical recommendations under ${jurisdiction} law.`,
     arbitration: `\n\nCurrent mode: ARBITRATION MANAGEMENT. Focus on procedural requirements, applicable rules, timeline management, jurisdictional issues, and award enforcement considerations under ${jurisdiction} law.`,
     case_strategy: `\n\nCurrent mode: CASE STRATEGY. Focus on analyzing the specific case details provided, identifying legal strategies, procedural next steps, strengths, weaknesses, and relevant precedents under ${jurisdiction} law.`,
+    settlement: `\n\nCurrent mode: SETTLEMENT & NEGOTIATION. Focus on settlement strategy, BATNA/WATNA analysis, negotiation frameworks, term sheet structuring, and mediation preparation under ${jurisdiction} law. Weigh commercial risk against the cost and likely outcome of continued litigation or arbitration.`,
+    evidence: `\n\nCurrent mode: EVIDENCE ANALYSIS. Focus on evidentiary standards and burden of proof, admissibility, evidence bundle structuring, witness statement strategy, identifying evidentiary gaps, and disclosure/discovery obligations under ${jurisdiction} law.`,
+    award: `\n\nCurrent mode: AWARD & ORDER DRAFTING. Focus on drafting arbitral awards, procedural orders, and tribunal directions — structuring findings of fact, legal reasoning, and dispositive relief in a form that is clear and enforceable under ${jurisdiction} law and the New York Convention where applicable.`,
     general: `\n\nProvide comprehensive, professional legal assistance under ${jurisdiction} law across all areas of legal practice.`,
   };
 

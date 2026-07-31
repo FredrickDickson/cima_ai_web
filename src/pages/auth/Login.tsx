@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Scale, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Scale, Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const resetSuccess = Boolean((location.state as { resetSuccess?: boolean } | null)?.resetSuccess);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -81,6 +83,13 @@ export default function Login() {
           <h2 className="text-2xl font-bold text-navy-950 mb-1">Welcome back</h2>
           <p className="text-slate-500 mb-8">Sign in to your legal workspace</p>
 
+          {resetSuccess && (
+            <div className="flex items-center gap-2.5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg mb-6 text-sm text-emerald-700">
+              <CheckCircle2 size={16} className="shrink-0" />
+              Password updated — sign in with your new password.
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2.5 p-3.5 bg-red-50 border border-red-200 rounded-lg mb-6 text-sm text-red-700">
               <AlertCircle size={16} className="shrink-0" />
@@ -104,9 +113,17 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-navy-900 mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-navy-900">
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-navy-700 hover:text-gold-600 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}

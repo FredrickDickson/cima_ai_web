@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Briefcase,
   FileText,
@@ -18,6 +18,7 @@ import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useTour } from "../contexts/TourContext";
 import type { Case, DbDocument as Document, Hearing } from "../types/database";
 
 interface Stats {
@@ -29,10 +30,19 @@ interface Stats {
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const { start: startTour } = useTour();
   const [stats, setStats] = useState<Stats>({ activeCases: 0, totalDocuments: 0, researchSessions: 0, upcomingHearings: 0 });
   const [recentCases, setRecentCases] = useState<Case[]>([]);
   const [recentDocs, setRecentDocs] = useState<Document[]>([]);
   const [upcomingHearings, setUpcomingHearings] = useState<Hearing[]>([]);
+
+  const autoStartedTourRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedTourRef.current) return;
+    if (!profile || profile.onboarding_completed_at) return;
+    autoStartedTourRef.current = true;
+    startTour();
+  }, [profile, startTour]);
 
   useEffect(() => {
     if (!user) return;

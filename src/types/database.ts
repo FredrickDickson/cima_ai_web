@@ -149,6 +149,7 @@ export interface Profile {
   jurisdiction: string | null;
   avatar_url: string | null;
   title: string | null;
+  onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

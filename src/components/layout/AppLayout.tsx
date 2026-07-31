@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import { SidebarProvider, useSidebar } from "../../contexts/SidebarContext";
+import TourOverlay from "../onboarding/TourOverlay";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -25,6 +26,8 @@ function AppLayoutInner({ children }: AppLayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
         {children}
       </main>
+
+      <TourOverlay />
     </div>
   );
 }

@@ -3,8 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ClassicLoader from "./components/ui/loader";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { TourProvider } from "./contexts/TourContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
@@ -80,6 +83,7 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
+          <TourProvider>
           <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route
@@ -89,6 +93,14 @@ export default function App() {
             <Route
               path="/register"
               element={<RedirectIfAuth><Register /></RedirectIfAuth>}
+            />
+            <Route
+              path="/forgot-password"
+              element={<RedirectIfAuth><ForgotPassword /></RedirectIfAuth>}
+            />
+            <Route
+              path="/reset-password"
+              element={<ResetPassword />}
             />
             <Route
               path="/terms"
@@ -145,6 +157,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
+          </TourProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
