@@ -22,10 +22,15 @@ export async function getAuthedUserId(req: Request): Promise<string> {
   return data.user.id;
 }
 
+/** True if the user has no active paid plan — a non-throwing sibling to requirePaidPlan(), for callers that should degrade gracefully rather than block the whole request. */
+export async function isFreePlan(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from("profiles").select("plan").eq("id", userId).maybeSingle();
+  return !profile || profile.plan === "free";
+}
+
 /** Throws PLAN_RESTRICTED if the user isn't on a paid (pro/max) plan. */
 export async function requirePaidPlan(supabase: SupabaseClient, userId: string): Promise<void> {
-  const { data: profile } = await supabase.from("profiles").select("plan").eq("id", userId).maybeSingle();
-  if (!profile || profile.plan === "free") {
+  if (await isFreePlan(supabase, userId)) {
     throw new Error("PLAN_RESTRICTED");
   }
 }
@@ -56,6 +61,9 @@ export function billingErrorResponse(err: unknown, corsHeaders: Record<string, s
   }
   if (message === "INSUFFICIENT_CREDITS") {
     return json({ error: "You've used all your AI actions for this billing cycle.", code: "INSUFFICIENT_CREDITS" }, 402);
+  }
+  if (message === "RATE_LIMITED") {
+    return json({ error: "Too many requests — please slow down and try again shortly.", code: "RATE_LIMITED" }, 429);
   }
   return null;
 }

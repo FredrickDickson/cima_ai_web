@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getAuthedUserId, requirePaidPlan, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -142,6 +143,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const userId = await getAuthedUserId(req);
+    await rateLimit(supabase, `case-citator:${userId}`, { limit: 10, windowSeconds: 60 });
     await requirePaidPlan(supabase, userId);
 
     const { data: cited, error: citedError } = await supabase

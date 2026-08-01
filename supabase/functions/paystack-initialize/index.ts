@@ -7,7 +7,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getAuthedUserId, billingErrorResponse } from "../_shared/billing.ts";
-import { planAmountPesewa, paystackFetch } from "../_shared/paystack.ts";
+import { planAmountPesewa, planCode, paystackFetch } from "../_shared/paystack.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +34,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+    await rateLimit(supabase, `paystack-initialize:${userId}`, { limit: 20, windowSeconds: 60 });
 
     const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(userId);
     if (userErr || !userRes.user?.email) throw new Error("Could not resolve account email");
@@ -44,6 +46,7 @@ Deno.serve(async (req: Request) => {
     let amount: number;
     let metadata: Record<string, unknown>;
     let txType: "subscription" | "topup";
+    let planCodeValue: string | undefined;
 
     if (topup_credits) {
       const credits = Number(topup_credits);
@@ -54,6 +57,13 @@ Deno.serve(async (req: Request) => {
     } else {
       if (!plan || !interval) throw new Error("plan and interval are required");
       amount = planAmountPesewa(plan, interval);
+      // Passing `plan` (a Paystack Plan code) subscribes the customer on
+      // successful payment — Paystack then owns recurring billing from here
+      // (see docs/Paystack docs/Subscriptions.md "Adding plan code to a
+      // transaction"). `amount` is still sent per Paystack's own example
+      // even though the plan's amount takes precedence, and it keeps our
+      // own billing_transactions bookkeeping below accurate regardless.
+      planCodeValue = planCode(plan, interval);
       metadata = { user_id: userId, plan, interval };
       txType = "subscription";
     }
@@ -69,6 +79,7 @@ Deno.serve(async (req: Request) => {
         reference,
         callback_url: `${appUrl}/billing/callback`,
         metadata,
+        ...(planCodeValue ? { plan: planCodeValue } : {}),
       }),
     });
 

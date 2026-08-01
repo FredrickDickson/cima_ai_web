@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { Scale } from "lucide-react";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 export default function PrivacyPolicy() {
+  useDocumentTitle("Privacy Policy — CIMA AI");
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-navy-950 text-white py-4 px-6">

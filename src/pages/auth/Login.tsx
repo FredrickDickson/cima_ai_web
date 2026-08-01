@@ -2,8 +2,10 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Scale, Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useDocumentTitle } from "../../lib/useDocumentTitle";
 
 export default function Login() {
+  useDocumentTitle("Sign In — CIMA AI");
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

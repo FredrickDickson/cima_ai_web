@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Scale, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useDocumentTitle } from "../../lib/useDocumentTitle";
 
 const ROLES = [
   { value: "lawyer", label: "Lawyer / Advocate" },
@@ -13,6 +14,7 @@ const ROLES = [
 ];
 
 export default function Register() {
+  useDocumentTitle("Create Account — CIMA AI");
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ fullName: "", email: "", password: "", role: "lawyer" });

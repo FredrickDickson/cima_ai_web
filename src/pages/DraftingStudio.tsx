@@ -1843,14 +1843,14 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                       </div>
                       <h3 className="text-base font-semibold text-navy-950 mb-2">CIMA AI is drafting your document...</h3>
                       <p className="text-sm text-slate-500 max-w-sm">This may take a moment. Your document is being grounded in real legal authorities.</p>
-                      <div className="flex justify-center gap-6 mt-6">
+                      {/* <div className="flex justify-center gap-6 mt-6">
                         {["CIMA AI", "Laws.Africa", "Legal Library"].map((s) => (
                           <div key={s} className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-navy-300 animate-pulse" />
                             <span className="text-xs text-slate-400">{s}</span>
                           </div>
                         ))}
-                      </div>
+                      </div> */}
                     </>
                   ) : (
                     <>

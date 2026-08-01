@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getAuthedUserId, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,10 +42,12 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  let ownershipVerified = false;
+
   try {
-    const { document_id, text_content, user_id } = await req.json();
-    if (!document_id || !text_content || !user_id) {
-      throw new Error("document_id, text_content, and user_id are required");
+    const { document_id, text_content } = await req.json();
+    if (!document_id || !text_content) {
+      throw new Error("document_id and text_content are required");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -51,6 +55,21 @@ Deno.serve(async (req: Request) => {
     const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Runs on the service-role client, which bypasses RLS — without an
+    // explicit auth check + ownership verification here, anyone holding the
+    // public anon key (shipped to every browser) could overwrite any user's
+    // document chunks/summary/status just by naming a document_id.
+    const user_id = await getAuthedUserId(req);
+    await rateLimit(supabase, `embed-document:${user_id}`, { limit: 20, windowSeconds: 60 });
+    const { data: owned } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("id", document_id)
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (!owned) throw new Error("Document not found");
+    ownershipVerified = true;
 
     await supabase.from("documents").update({ status: "processing" }).eq("id", document_id);
 
@@ -146,13 +165,18 @@ ${excerpt}`,
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    try {
-      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const body = await (req.clone()).json().catch(() => ({}));
-      if (body.document_id) {
-        await supabase.from("documents").update({ status: "error" }).eq("id", body.document_id);
-      }
-    } catch { /* ignore */ }
+    const billingResp = billingErrorResponse(error, corsHeaders);
+    if (billingResp) return billingResp;
+
+    if (ownershipVerified) {
+      try {
+        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const body = await (req.clone()).json().catch(() => ({}));
+        if (body.document_id) {
+          await supabase.from("documents").update({ status: "error" }).eq("id", body.document_id);
+        }
+      } catch { /* ignore */ }
+    }
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

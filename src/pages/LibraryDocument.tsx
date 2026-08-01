@@ -802,7 +802,7 @@ export default function LibraryDocument() {
             <ArrowLeft size={15} /> Back to Library
           </button>
           <div className="flex items-center gap-2">
-            {fileUrl && (
+            {/* {fileUrl && (
               <a
                 href={fileUrl}
                 target="_blank"
@@ -811,7 +811,7 @@ export default function LibraryDocument() {
               >
                 <Download size={13} /> View Original
               </a>
-            )}
+            )} */}
             {doc?.source_type === "case" && (
               <button
                 onClick={() => isFreePlan ? navigate("/pricing") : setActivePanel((p) => (p === "brief" ? null : "brief"))}
@@ -858,12 +858,17 @@ export default function LibraryDocument() {
               </button>
             )}
             <button
-              onClick={() => setActivePanel((p) => (p === "chat" ? null : "chat"))}
+              onClick={() => isFreePlan ? navigate("/pricing") : setActivePanel((p) => (p === "chat" ? null : "chat"))}
+              title={isFreePlan ? "Ask CIMA AI requires a Pro or Max plan" : undefined}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                activePanel === "chat" ? "bg-navy-950 text-white" : "text-gold-700 border border-gold-300 bg-gold-50 hover:bg-gold-100"
+                activePanel === "chat"
+                  ? "bg-navy-950 text-white"
+                  : isFreePlan
+                    ? "text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                    : "text-gold-700 border border-gold-300 bg-gold-50 hover:bg-gold-100"
               }`}
             >
-              {activePanel === "chat" ? <X size={13} /> : <Bot size={13} />}
+              {activePanel === "chat" ? <X size={13} /> : isFreePlan ? <Lock size={13} /> : <Bot size={13} />}
               {activePanel === "chat" ? "Close chat" : "Ask CIMA AI"}
             </button>
           </div>

@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /pricing
+Allow: /login
+Allow: /register
+Allow: /terms
+Allow: /privacy
+Disallow: /
+Disallow: /research
+Disallow: /cases
+Disallow: /documents
+Disallow: /library
+Disallow: /assistant
+Disallow: /drafting
+Disallow: /review
+Disallow: /profile
+Disallow: /admin
+Disallow: /billing
+Disallow: /forgot-password
+Disallow: /reset-password
+
+Sitemap: https://cimaai.vercel.app/sitemap.xml

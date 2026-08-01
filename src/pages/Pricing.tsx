@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, Loader2, Scale } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 type PlanId = "free" | "pro" | "max";
 type Interval = "monthly" | "annually";
@@ -27,6 +28,7 @@ const PLANS: Plan[] = [
     annualPrice: 0,
     features: [
       "Unlimited Legal Library browsing",
+      "Authority tagging (@ mentions)",
       "20 AI actions / month",
       "1 active case, 250MB storage",
       "Research, Drafting Studio, Document Review",
@@ -44,7 +46,7 @@ const PLANS: Plan[] = [
       "Case Brief, Smart Citator, Ask CIMA AI",
       "500 AI actions / month + pay-as-you-go top-ups",
       "Unlimited cases, 5GB storage",
-      "Authority tagging & document export",
+      "Document export",
       "Priority support",
     ],
   },
@@ -63,6 +65,10 @@ const PLANS: Plan[] = [
     ],
   },
 ];
+
+// Mirrors topupAmountPesewa() in supabase/functions/paystack-initialize/index.ts
+const CREDIT_PACKS = [50, 150, 500] as const;
+const CREDIT_PRICE_GHS = 1.5;
 
 const revealVariants = {
   visible: (i: number) => ({
@@ -100,11 +106,36 @@ function PricingSwitch({ interval, onChange }: { interval: Interval; onChange: (
 }
 
 export default function Pricing() {
+  useDocumentTitle("Pricing — CIMA AI");
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [interval, setInterval] = useState<Interval>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+  const [loadingTopup, setLoadingTopup] = useState<number | null>(null);
   const [error, setError] = useState("");
+
+  async function handleTopup(credits: number) {
+    if (!user) {
+      navigate("/register");
+      return;
+    }
+    setError("");
+    setLoadingTopup(credits);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-initialize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ topup_credits: credits }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not start checkout");
+      window.location.href = data.authorization_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start checkout");
+      setLoadingTopup(null);
+    }
+  }
 
   async function handleSelect(plan: Plan) {
     if (plan.id === "free") return;
@@ -245,8 +276,34 @@ export default function Pricing() {
         })}
       </div>
 
+      <article className="relative z-10 text-center max-w-2xl mx-auto px-6 pb-4 space-y-2">
+        <h3 className="text-2xl font-semibold text-white">Need more AI actions?</h3>
+        <p className="text-neutral-400 text-sm">
+          Buy a one-off credit pack anytime, on any plan — credits never expire and stack on top of your monthly allowance.
+        </p>
+      </article>
+      <div className="relative z-10 grid sm:grid-cols-3 max-w-3xl gap-4 mx-auto px-6 pb-10">
+        {CREDIT_PACKS.map((credits, i) => (
+          <motion.div key={credits} custom={PLANS.length + i} initial="hidden" animate="visible" variants={revealVariants}>
+            <div className="text-white border border-neutral-800 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 p-6 text-center">
+              <p className="text-3xl font-semibold">{credits}</p>
+              <p className="text-neutral-400 text-sm mb-4">AI action credits</p>
+              <p className="text-lg font-medium mb-4">GHS {(credits * CREDIT_PRICE_GHS).toFixed(0)}</p>
+              <button
+                onClick={() => handleTopup(credits)}
+                disabled={loadingTopup === credits}
+                className="w-full py-3 text-sm font-semibold rounded-xl bg-gradient-to-t from-blue-500 to-blue-600 shadow-lg shadow-blue-800/50 border border-blue-500 text-white hover:brightness-110 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loadingTopup === credits && <Loader2 size={14} className="animate-spin" />}
+                Buy credits
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
       <p className="relative z-10 text-center text-xs text-neutral-500 pb-16 px-6">
-        Prices shown in USD; charged in Ghanaian Cedis (GHS) at checkout via Paystack.
+        Prices shown in USD; charged in Ghanaian Cedis (GHS) at checkout via Paystack. Credit top-ups are billed directly in GHS.
       </p>
     </div>
   );

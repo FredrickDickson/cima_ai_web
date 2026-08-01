@@ -6,6 +6,7 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildPlaybookGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,10 +76,10 @@ Deno.serve(async (req: Request) => {
   try {
     // Accept both document_type (new) and industry_type (legacy) params
     const {
-      text, document_id, case_id, user_id, document_type, industry_type, jurisdiction,
+      text, document_id, case_id, document_type, industry_type, jurisdiction,
       library_doc_ids, document_ids, tagged_authorities,
     } = await req.json();
-    if (!text || !user_id) throw new Error("text and user_id are required");
+    if (!text) throw new Error("text is required");
 
     const effectiveDocType = document_type ?? industry_type ?? "commercial";
 
@@ -89,6 +90,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const billingUserId = await getAuthedUserId(req);
+    await rateLimit(supabase, `contract-analyze:${billingUserId}`, { limit: 10, windowSeconds: 60 });
     await deductAiAction(supabase, billingUserId, 3); // full multi-step document review, the heaviest metered action
 
     const excerpt = text.slice(0, 100000);
@@ -115,8 +117,19 @@ Deno.serve(async (req: Request) => {
     // Playbook/authority tagging: augments the review (doesn't replace it —
     // the document itself remains the primary subject of analysis).
     const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, billingUserId, library_doc_ids, document_ids)
       : null;
+
+    // Verify the caller actually owns case_id/document_id before attaching
+    // them to the saved analysis — otherwise an attacker could plant a
+    // fabricated analysis under another user's case/document by just naming
+    // its id in the request body.
+    const [ownedCaseRes, ownedDocRes] = await Promise.all([
+      case_id ? supabase.from("cases").select("id").eq("id", case_id).eq("user_id", billingUserId).maybeSingle() : Promise.resolve({ data: null }),
+      document_id ? supabase.from("documents").select("id").eq("id", document_id).eq("user_id", billingUserId).maybeSingle() : Promise.resolve({ data: null }),
+    ]);
+    const ownedCaseId = ownedCaseRes.data ? case_id : null;
+    const ownedDocumentId = ownedDocRes.data ? document_id : null;
     const playbookBlock = taggedContext ? buildPlaybookGroundingBlock(taggedContext.titles, taggedContext.context) : "";
 
     const citedSources: CitedSource[] = [
@@ -273,9 +286,9 @@ ${excerpt}`,
     }
 
     const { data: savedAnalysis } = await supabase.from("contract_analyses").insert({
-      document_id: document_id || null,
-      user_id,
-      case_id: case_id || null,
+      document_id: ownedDocumentId,
+      user_id: billingUserId,
+      case_id: ownedCaseId,
       overall_risk_score: Number(analysis.overall_risk_score) || 0,
       risk_items: analysis.clauses ?? [],
       clauses_data: analysis.clauses ?? [],

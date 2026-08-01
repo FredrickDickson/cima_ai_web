@@ -1,9 +1,7 @@
-// Thin wrapper around Paystack's Verify Transaction endpoint, called from
-// the /billing/callback page for immediate UI feedback right after a
-// customer returns from checkout. The webhook (paystack-webhook) remains
-// the source of truth for actually applying the plan/credits — this is
-// just so the callback page can show "success"/"failed" without waiting on
-// webhook delivery timing.
+// Thin wrapper around Paystack's hosted subscription-management page
+// (GET /subscription/:code/manage/link) — lets a Pro/Max user update their
+// card or cancel directly on Paystack's own page, per
+// docs/Paystack docs/Subscriptions.md "Updating the card on a subscription".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getAuthedUserId, billingErrorResponse } from "../_shared/billing.ts";
@@ -27,32 +25,24 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
-    await rateLimit(supabase, `paystack-verify:${userId}`, { limit: 20, windowSeconds: 60 });
+    await rateLimit(supabase, `paystack-manage-link:${userId}`, { limit: 20, windowSeconds: 60 });
 
-    const { reference } = await req.json();
-    if (!reference) throw new Error("reference is required");
-
-    // Confirm the caller owns this reference before proxying to Paystack —
-    // otherwise any signed-in user who knows/guesses another user's
-    // reference could read that transaction's status/amount.
-    const { data: owned } = await supabase
-      .from("billing_transactions")
-      .select("id")
-      .eq("reference", reference)
-      .eq("user_id", userId)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("subscription_code")
+      .eq("id", userId)
       .maybeSingle();
-    if (!owned) throw new Error("Transaction not found");
 
-    const verifyData = await paystackFetch(`/transaction/verify/${encodeURIComponent(reference)}`, {
+    if (!profile?.subscription_code) {
+      throw new Error("No active subscription to manage");
+    }
+
+    const linkData = await paystackFetch(`/subscription/${encodeURIComponent(profile.subscription_code)}/manage/link`, {
       method: "GET",
     });
 
     return new Response(
-      JSON.stringify({
-        status: verifyData.data.status,
-        amount: verifyData.data.amount,
-        currency: verifyData.data.currency,
-      }),
+      JSON.stringify({ link: linkData.data.link }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

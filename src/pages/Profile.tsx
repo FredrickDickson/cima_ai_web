@@ -46,6 +46,8 @@ export default function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [stats, setStats] = useState({ cases: 0, documents: 0, reviews: 0 });
+  const [aiActionCap, setAiActionCap] = useState<number | null>(null);
+  const [manageLoading, setManageLoading] = useState(false);
 
   const [form, setForm] = useState({
     full_name: "",
@@ -64,6 +66,7 @@ export default function Profile() {
       });
       setAvatarPreview(profile.avatar_url || null);
       loadStats();
+      loadAiActionCap();
     }
   }, [profile]);
 
@@ -82,6 +85,29 @@ export default function Profile() {
       });
     } catch (err) {
       console.error("Failed to load stats:", err);
+    }
+  }
+
+  async function loadAiActionCap() {
+    if (!profile) return;
+    const { data } = await supabase.rpc("plan_ai_action_cap" as any, { p_plan: profile.plan });
+    if (typeof data === "number") setAiActionCap(data);
+  }
+
+  async function handleManageSubscription() {
+    setManageLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-manage-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not open subscription management");
+      window.location.href = data.link;
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Could not open subscription management" });
+      setManageLoading(false);
     }
   }
 
@@ -308,11 +334,24 @@ export default function Profile() {
               </span>
             </div>
             <div className="flex items-center justify-between mb-4">
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-slate-600">
-                  {(profile?.monthly_ai_actions_used ?? 0).toLocaleString()} AI actions used this cycle
+                  {(profile?.monthly_ai_actions_used ?? 0).toLocaleString()}
+                  {aiActionCap !== null && ` / ${aiActionCap.toLocaleString()}`} AI actions used this cycle
                   {(profile?.extra_ai_actions ?? 0) > 0 && ` + ${profile!.extra_ai_actions} top-up credits`}
                 </p>
+                {aiActionCap !== null && aiActionCap > 0 && (
+                  <div className="w-full max-w-xs h-2 bg-slate-100 rounded-full overflow-hidden mt-1.5">
+                    <div
+                      className={`h-full rounded-full ${
+                        (profile?.monthly_ai_actions_used ?? 0) >= aiActionCap ? "bg-red-500" : "bg-navy-950"
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.round(((profile?.monthly_ai_actions_used ?? 0) / aiActionCap) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                )}
                 {profile?.subscription_renews_at && (
                   <p className="text-xs text-slate-400 mt-0.5">
                     Renews {new Date(profile.subscription_renews_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
@@ -322,12 +361,30 @@ export default function Profile() {
                   <p className="text-xs text-red-500 mt-0.5">Your last payment failed — please update your billing to avoid losing access.</p>
                 )}
               </div>
-              <button
-                onClick={() => navigate("/pricing")}
-                className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
-              >
-                {profile?.plan === "free" ? "Upgrade" : "Change plan"}
-              </button>
+              {profile?.plan !== "free" && profile?.subscription_code ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => navigate("/pricing")}
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-navy-950 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Change plan
+                  </button>
+                  <button
+                    onClick={handleManageSubscription}
+                    disabled={manageLoading}
+                    className="px-4 py-2 bg-navy-950 hover:bg-navy-800 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    {manageLoading ? "Opening..." : "Manage subscription"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => navigate("/pricing")}
+                  className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+                >
+                  {profile?.plan === "free" ? "Upgrade" : "Change plan"}
+                </button>
+              )}
             </div>
           </div>
 

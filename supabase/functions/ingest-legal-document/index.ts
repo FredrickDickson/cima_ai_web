@@ -170,6 +170,21 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  // This function is meant to be invoked only by the storage-upload DB
+  // trigger (handle_legal_doc_upload in
+  // 20260615000001_auto_ingest_trigger.sql), which authenticates by sending
+  // the service-role key itself as the bearer token. Without this check,
+  // anyone holding the public anon key could call this directly to
+  // mass-delete legal_library rows by title prefix and inject arbitrary
+  // content into the corpus every user's research draws from.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (authHeader !== `Bearer ${serviceKey}`) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden" }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const body = await req.json();
     const {

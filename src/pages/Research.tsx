@@ -497,14 +497,14 @@ Format as a numbered list matching the order above. If you cannot verify the sta
               </div>
               <p className="text-sm font-medium text-navy-900">Searching legal authorities...</p>
               <p className="text-xs text-slate-400 mt-1">Retrieving from legal library, case databases, and live sources</p>
-              <div className="flex justify-center gap-6 mt-5">
+              {/* <div className="flex justify-center gap-6 mt-5">
                 {["Legal Library", "Laws.Africa", "CourtListener", "Tavily"].map((s) => (
                   <div key={s} className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-navy-300 animate-pulse" />
                     <span className="text-xs text-slate-400">{s}</span>
                   </div>
                 ))}
-              </div>
+              </div> */}
             </div>
           )}
 
@@ -679,7 +679,7 @@ Format as a numbered list matching the order above. If you cannot verify the sta
               </div>
             ))}
           </div>
-          <div className="p-4 border-t border-slate-100">
+          {/* <div className="p-4 border-t border-slate-100">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Source Layers</p>
             <div className="space-y-1.5">
               {[{ label: "Legal Library", color: "bg-navy-400" }, { label: "Laws.Africa", color: "bg-teal-400" }, { label: "CourtListener", color: "bg-blue-400" }, { label: "Live Web", color: "bg-amber-400" }].map((s) => (
@@ -689,7 +689,7 @@ Format as a numbered list matching the order above. If you cannot verify the sta
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </AppLayout>

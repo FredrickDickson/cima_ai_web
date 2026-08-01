@@ -5,6 +5,7 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,10 +70,14 @@ interface MatterParty {
 async function fetchMatterContext(
   supabase: ReturnType<typeof createClient>,
   caseId: string,
+  ownerUserId: string,
 ): Promise<string> {
   try {
+    // Scoped to the authenticated caller — without this, any signed-in user
+    // who knows/guesses a case_id could pull another firm's matter details
+    // (parties, issues, evidence summaries) into their own draft.
     const [caseRes, issuesRes, evidenceRes] = await Promise.all([
-      supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
+      supabase.from("cases").select("*").eq("id", caseId).eq("user_id", ownerUserId).maybeSingle(),
       supabase.from("issues").select("*").eq("case_id", caseId).order("issue_number"),
       supabase.from("evidence").select("title, type, summary").eq("case_id", caseId).limit(10),
     ]);
@@ -128,10 +133,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const {
-      prompt, template_type, jurisdiction, variables, custom_instructions, case_id, user_id, template_id,
+      prompt, template_type, jurisdiction, variables, custom_instructions, case_id, template_id,
       library_doc_ids, document_ids, tagged_authorities,
     } = await req.json();
-    if (!user_id) throw new Error("user_id is required");
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
@@ -140,10 +144,16 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const billingUserId = await getAuthedUserId(req);
+    await rateLimit(supabase, `generate-draft:${billingUserId}`, { limit: 10, windowSeconds: 60 });
     await deductAiAction(supabase, billingUserId, 2); // drafting generates a full document, weighted higher than a single query/message
 
     // ---- Fetch matter context if a case is linked ----
-    const matterContext = case_id ? await fetchMatterContext(supabase, case_id) : "";
+    const matterContext = case_id ? await fetchMatterContext(supabase, case_id, billingUserId) : "";
+    // fetchMatterContext returns "" both on error and when the case isn't
+    // found/owned — a non-empty result is a reliable "verified owned" signal,
+    // reused below so the draft can't be attached to a case the caller
+    // doesn't own without a second query.
+    const ownedCaseId = case_id && matterContext ? case_id : null;
 
     let templateContent = "";
     let templateTitle = template_type ?? "Legal Document";
@@ -169,7 +179,7 @@ Deno.serve(async (req: Request) => {
     // documents, skip the Laws.Africa/Accra Rules lookup entirely and draft
     // only from the tagged sources.
     const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, billingUserId, library_doc_ids, document_ids)
       : null;
 
     // Fetch relevant legislation from Laws.Africa + Accra Arbitration Rules
@@ -337,8 +347,8 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
     const wordCount = mainContent.split(/\s+/).filter(Boolean).length;
 
     const { data: draft } = await supabase.from("drafts").insert({
-      user_id,
-      case_id: case_id || null,
+      user_id: billingUserId,
+      case_id: ownedCaseId,
       title: templateTitle,
       template_type: prompt ? "natural_language" : (template_type ?? "custom"),
       content: mainContent,

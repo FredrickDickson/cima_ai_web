@@ -11,7 +11,8 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { searchLegalLibrary, searchTavily, type RetrievedLibrarySource, type TavilyResult } from "../_shared/legal-retrieval.ts";
-import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
+import { getAuthedUserId, deductAiAction, requirePaidPlan, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 interface CitedSource {
   marker: string;
@@ -75,7 +76,6 @@ interface ChatRequest {
   library_doc_id?: string;
   library_doc_ids?: string[];
   document_ids?: string[];
-  user_id?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -104,12 +104,21 @@ Deno.serve(async (req: Request) => {
     // standalone "Ask CIMA AI" assistant, so it isn't feature-gated to a paid
     // plan here; the dedicated AI Assistant page enforces that at the frontend.
     const billingUserId = await getAuthedUserId(req);
+    await rateLimit(supabase, `ai-chat:${billingUserId}`, { limit: 10, windowSeconds: 60 });
     await deductAiAction(supabase, billingUserId);
 
     const {
       messages, context = "general", stream = false,
-      library_doc_id, library_doc_ids, document_ids, user_id,
+      library_doc_id, library_doc_ids, document_ids,
     }: ChatRequest = await req.json();
+
+    // library_doc_id (singular) is only ever sent by the Library Document
+    // page's "Ask CIMA AI" panel — every other caller (Research/Drafting/
+    // Review/Documents) omits it, so this gate is scoped to that one
+    // Pro/Max-only feature without affecting free-tier callers.
+    if (library_doc_id) {
+      await requirePaidPlan(supabase, billingUserId);
+    }
 
     const userQuery = extractLegalQuery(messages);
     const jurisdictionCode = detectJurisdiction(
@@ -127,7 +136,7 @@ Deno.serve(async (req: Request) => {
       ...(library_doc_ids ?? []),
     ];
     const taggedContext = (mergedLibraryDocIds.length > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, mergedLibraryDocIds, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, billingUserId, mergedLibraryDocIds, document_ids)
       : null;
 
     const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];

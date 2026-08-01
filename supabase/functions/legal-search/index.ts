@@ -6,6 +6,7 @@ import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
 import { getAuthedUserId, deductAiAction, billingErrorResponse } from "../_shared/billing.ts";
+import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +20,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { query, jurisdiction, source_types, user_id, library_doc_ids, document_ids } = await req.json();
+    const { query, jurisdiction, source_types, library_doc_ids, document_ids } = await req.json();
     if (!query) throw new Error("query is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -33,13 +34,14 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const billingUserId = await getAuthedUserId(req);
+    await rateLimit(supabase, `legal-search:${billingUserId}`, { limit: 10, windowSeconds: 60 });
     await deductAiAction(supabase, billingUserId);
 
     // Strict grounding: when the user has @-tagged specific cases/legislation/
     // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
     // and answer only from the tagged sources.
     if ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0) {
-      const tagged = await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids);
+      const tagged = await fetchTaggedAuthorityContext(supabase, billingUserId, library_doc_ids, document_ids);
       if (tagged) {
         const groundedSources = tagged.citedSources.map((s) => ({
           id: s.doc_id ?? s.marker,
@@ -132,11 +134,11 @@ Answer the query using only the tagged authority text provided below. Cite each 
     });
     sources.push(...librarySources);
 
-    if (queryEmbedding && user_id) {
+    if (queryEmbedding) {
       const { data: docChunks } = await supabase.rpc("match_document_chunks", {
         query_embedding: queryEmbedding,
         match_count: 3,
-        filter_user_id: user_id,
+        filter_user_id: billingUserId,
       });
       for (const r of (docChunks ?? [])) {
         sources.push({
