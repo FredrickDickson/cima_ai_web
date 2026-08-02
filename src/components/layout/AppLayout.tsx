@@ -11,7 +11,7 @@ function AppLayoutInner({ children }: AppLayoutProps) {
   const { isOpen, close } = useSidebar();
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex h-full overflow-hidden bg-slate-50">
       {/* Mobile overlay backdrop */}
       {isOpen && (
         <div
