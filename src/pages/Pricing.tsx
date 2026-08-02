@@ -198,7 +198,7 @@ export default function Pricing() {
       <article className="text-center mb-10 pt-10 pb-4 max-w-2xl mx-auto space-y-3 relative z-10 px-6">
         <h2 className="text-4xl font-semibold text-white">Plans built for legal practice</h2>
         <p className="text-neutral-400">
-          Legal research, drafting, and document review — priced for solo practitioners and  firms.
+          Legal research, drafting, and document review — priced for solo practitioners and law firms.
         </p>
         <div className="pt-2">
           <PricingSwitch interval={interval} onChange={setInterval} />

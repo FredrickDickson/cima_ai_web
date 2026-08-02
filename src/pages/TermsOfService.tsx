@@ -103,7 +103,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-xl font-semibold text-navy-950 mb-3">10. Contact Information</h2>
             <p className="text-slate-600 leading-relaxed">
-              For questions about these Terms of Service, please contact us at legal@cimaafrica.com
+              For questions about these Terms of Service, please contact us at info@thecima.org
             </p>
           </section>
         </div>

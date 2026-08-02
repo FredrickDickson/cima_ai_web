@@ -156,7 +156,7 @@ export default function PrivacyPolicy() {
               For questions about this Privacy Policy or to exercise your data rights, please contact us at:
             </p>
             <p className="text-slate-600 mt-2">
-              Email: privacy@cimaafrica.com<br />
+              Email: info@thecima.org<br />
               Address: Accra, Ghana
             </p>
           </section>
