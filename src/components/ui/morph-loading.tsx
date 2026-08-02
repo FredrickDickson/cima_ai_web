@@ -29,7 +29,7 @@ export default function MorphLoading({
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="absolute w-4 h-4 bg-gold-400"
+              className="absolute w-5 h-5 bg-gold-400"
               style={{
                 animation: `morph-${i} 2s infinite ease-in-out`,
                 animationDelay: `${i * 0.2}s`,
