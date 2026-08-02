@@ -9,7 +9,7 @@
  * from the real rate.
  */
 
-export const USD_TO_GHS_RATE = 15;
+export const USD_TO_GHS_RATE = 11.7;
 
 export const PLAN_PRICES_USD: Record<string, Record<string, number>> = {
   pro: { monthly: 29, annually: 290 },

@@ -58,7 +58,7 @@ function LoadingScreen() {
         </svg>
       </div>
       {/* Spinner */}
-      <MorphLoading variant="morph" size="sm" />
+      <MorphLoading variant="morph" size="md" />
       {/* Label */}
       <p className="text-slate-400 text-sm tracking-wide">Loading CIMA AI...</p>
     </div>

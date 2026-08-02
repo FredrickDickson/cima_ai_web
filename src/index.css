@@ -45,28 +45,28 @@
    between square and circle. Each keyframe starts from a different corner
    so the squares appear to follow one another. */
 @keyframes morph-0 {
-  0%, 100% { transform: translate(-16px, -16px); border-radius: 0%; }
-  25% { transform: translate(16px, -16px); border-radius: 50%; }
-  50% { transform: translate(16px, 16px); border-radius: 0%; }
-  75% { transform: translate(-16px, 16px); border-radius: 50%; }
+  0%, 100% { transform: translate(-28px, -28px); border-radius: 0%; }
+  25% { transform: translate(28px, -28px); border-radius: 50%; }
+  50% { transform: translate(28px, 28px); border-radius: 0%; }
+  75% { transform: translate(-28px, 28px); border-radius: 50%; }
 }
 @keyframes morph-1 {
-  0%, 100% { transform: translate(16px, -16px); border-radius: 0%; }
-  25% { transform: translate(16px, 16px); border-radius: 50%; }
-  50% { transform: translate(-16px, 16px); border-radius: 0%; }
-  75% { transform: translate(-16px, -16px); border-radius: 50%; }
+  0%, 100% { transform: translate(28px, -28px); border-radius: 0%; }
+  25% { transform: translate(28px, 28px); border-radius: 50%; }
+  50% { transform: translate(-28px, 28px); border-radius: 0%; }
+  75% { transform: translate(-28px, -28px); border-radius: 50%; }
 }
 @keyframes morph-2 {
-  0%, 100% { transform: translate(16px, 16px); border-radius: 0%; }
-  25% { transform: translate(-16px, 16px); border-radius: 50%; }
-  50% { transform: translate(-16px, -16px); border-radius: 0%; }
-  75% { transform: translate(16px, -16px); border-radius: 50%; }
+  0%, 100% { transform: translate(28px, 28px); border-radius: 0%; }
+  25% { transform: translate(-28px, 28px); border-radius: 50%; }
+  50% { transform: translate(-28px, -28px); border-radius: 0%; }
+  75% { transform: translate(28px, -28px); border-radius: 50%; }
 }
 @keyframes morph-3 {
-  0%, 100% { transform: translate(-16px, 16px); border-radius: 0%; }
-  25% { transform: translate(-16px, -16px); border-radius: 50%; }
-  50% { transform: translate(16px, -16px); border-radius: 0%; }
-  75% { transform: translate(16px, 16px); border-radius: 50%; }
+  0%, 100% { transform: translate(-28px, 28px); border-radius: 0%; }
+  25% { transform: translate(-28px, -28px); border-radius: 50%; }
+  50% { transform: translate(28px, -28px); border-radius: 0%; }
+  75% { transform: translate(28px, 28px); border-radius: 50%; }
 }
 
 /* AI assistant markdown responses */
