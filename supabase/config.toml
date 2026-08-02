@@ -14,9 +14,9 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "https://cimaai.vercel.app"
+site_url = "https://cimaai.thecima.org"
 additional_redirect_urls = [
-  "https://cimaai.vercel.app/reset-password",
+  "https://cimaai.thecima.org/reset-password",
   "http://localhost:5173/reset-password",
 ]
 

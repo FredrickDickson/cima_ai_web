@@ -54,12 +54,24 @@ export default function Header({ title, subtitle }: HeaderProps) {
         <button className="p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors">
           <Bell size={18} />
         </button>
-        <button 
+        <button
           onClick={() => setShowThemeSwitcher(true)}
           className="hidden sm:flex p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
           aria-label="Theme settings"
         >
           <Settings size={18} />
+        </button>
+        <button
+          onClick={() => navigate("/pricing")}
+          className={`text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-full transition-colors ${
+            profile?.plan === "max"
+              ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+              : profile?.plan === "pro"
+                ? "bg-gold-500/10 text-gold-700 border border-gold-500/20 hover:bg-gold-500/20"
+                : "bg-navy-950 text-white hover:bg-navy-800"
+          }`}
+        >
+          {profile?.plan === "max" ? "Max" : profile?.plan === "pro" ? "Pro" : "Upgrade"}
         </button>
         <button
           onClick={() => navigate("/profile")}

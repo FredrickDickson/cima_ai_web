@@ -4,23 +4,15 @@
 // verified via the x-paystack-signature HMAC before anything is trusted —
 // see docs/Paystack docs/webhooks.md's "Verify event origin" section.
 //
-// We use Paystack's native Subscription/Plan objects (see paystack-initialize
-// and docs/Paystack docs/Subscriptions.md) — Paystack owns the recurring
-// billing cycle from here, and tells us what happened via these events:
-//   charge.success       — a transaction WE initiated succeeded (first
-//                           subscription payment, or a topup). Carries our
-//                           own `metadata` since we set it at initialize time.
-//   subscription.create  — fired once, right after the first payment
-//                           subscribes the customer. No metadata — only
-//                           email — so we resolve user_id via
-//                           find_user_id_by_email().
-//   invoice.update       — fired after every recurring (2nd+ cycle) charge
-//                           attempt, success or not, with the final outcome.
-//                           This is the actual renewal signal.
-//   invoice.payment_failed — a recurring charge attempt failed.
-//   subscription.disable — the subscription ended (cancelled or completed).
-// subscription.not_renew / invoice.create / subscription.expiring_cards are
-// acknowledged but not acted on (out of scope for this pass).
+// Deliberately NOT using Paystack's native Subscription/Plan objects (see
+// paystack-initialize) — recurring billing needs a reusable authorization,
+// which only cards (and Nigeria direct debit) support, and most users here
+// pay via Mobile Money. Every plan purchase is a plain one-off charge, so
+// the only event that ever matters is charge.success — it self-tracks
+// subscription_renews_at by adding one billing period, with no auto-renewal
+// for any payment method. downgrade_expired_subscriptions() (run daily via
+// cron, see the accompanying migration) reverts to Free once that date
+// passes without a repeat charge.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { rateLimit, clientIp } from "../_shared/rate-limit.ts";
@@ -129,66 +121,6 @@ Deno.serve(async (req: Request) => {
             })
             .eq("id", userId);
         }
-      }
-    } else if (event.event === "subscription.create") {
-      const data = event.data;
-      const email = data.customer?.email;
-      if (email) {
-        const { data: userId } = await supabase.rpc("find_user_id_by_email", { p_email: email });
-        if (userId) {
-          await supabase
-            .from("profiles")
-            .update({
-              subscription_code: data.subscription_code,
-              paystack_customer_code: data.customer?.customer_code ?? null,
-              subscription_renews_at: data.next_payment_date ?? null,
-            })
-            .eq("id", userId);
-        } else {
-          console.error("subscription.create: no profile found for email", email);
-        }
-      }
-    } else if (event.event === "invoice.update") {
-      const data = event.data;
-      const subscriptionCode = data.subscription?.subscription_code;
-      if (subscriptionCode && data.paid) {
-        const authorizationCode = data.authorization?.authorization_code ?? null;
-        const { data: rows } = await supabase
-          .from("profiles")
-          .update({
-            plan_status: "active",
-            monthly_ai_actions_used: 0,
-            subscription_renews_at: data.subscription?.next_payment_date ?? null,
-            ...(authorizationCode ? { paystack_authorization_code: authorizationCode } : {}),
-          })
-          .eq("subscription_code", subscriptionCode)
-          .select("id, plan");
-
-        const row = rows?.[0];
-        if (row && data.transaction?.reference) {
-          await supabase.from("billing_transactions").insert({
-            user_id: row.id,
-            reference: data.transaction.reference,
-            type: "subscription",
-            plan: row.plan,
-            amount_kobo: data.amount ?? data.transaction.amount ?? 0,
-            currency: data.transaction.currency ?? "GHS",
-            status: "success",
-          });
-        }
-      }
-    } else if (event.event === "invoice.payment_failed") {
-      const subscriptionCode = event.data?.subscription?.subscription_code;
-      if (subscriptionCode) {
-        await supabase.from("profiles").update({ plan_status: "past_due" }).eq("subscription_code", subscriptionCode);
-      }
-    } else if (event.event === "subscription.disable") {
-      const subscriptionCode = event.data?.subscription_code;
-      if (subscriptionCode) {
-        await supabase
-          .from("profiles")
-          .update({ plan: "free", plan_status: "active", subscription_code: null, subscription_renews_at: null })
-          .eq("subscription_code", subscriptionCode);
       }
     }
   } catch (err) {

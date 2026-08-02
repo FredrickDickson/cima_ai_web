@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Check, Loader2, Scale } from "lucide-react";
@@ -29,8 +29,9 @@ const PLANS: Plan[] = [
     features: [
       "Unlimited Legal Library browsing",
       "Authority tagging (@ mentions)",
+      "Document export",
       "20 AI actions / month",
-      "1 active case, 250MB storage",
+      "1 active case",
       "Research, Drafting Studio, Document Review",
     ],
   },
@@ -45,8 +46,7 @@ const PLANS: Plan[] = [
       "Everything in Free, plus:",
       "Case Brief, Smart Citator, Ask CIMA AI",
       "500 AI actions / month + pay-as-you-go top-ups",
-      "Unlimited cases, 5GB storage",
-      "Document export",
+      "Unlimited cases",
       "Priority support",
     ],
   },
@@ -58,8 +58,7 @@ const PLANS: Plan[] = [
     annualPrice: 790,
     features: [
       "Everything in Pro, plus:",
-      "2,000 AI actions / month",
-      "20GB storage",
+      "2,000 AI actions / month + pay-as-you-go top-ups",
       "Priority processing",
       "First access to new features",
     ],
@@ -113,6 +112,12 @@ export default function Pricing() {
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const [loadingTopup, setLoadingTopup] = useState<number | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.location.hash === "#credits") {
+      document.getElementById("credits")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   async function handleTopup(credits: number) {
     if (!user) {
@@ -276,7 +281,7 @@ export default function Pricing() {
         })}
       </div>
 
-      <article className="relative z-10 text-center max-w-2xl mx-auto px-6 pb-4 space-y-2">
+      <article id="credits" className="relative z-10 text-center max-w-2xl mx-auto px-6 pb-4 space-y-2 scroll-mt-10">
         <h3 className="text-2xl font-semibold text-white">Need more AI actions?</h3>
         <p className="text-neutral-400 text-sm">
           Buy a one-off credit pack anytime, on any plan — credits never expire and stack on top of your monthly allowance.

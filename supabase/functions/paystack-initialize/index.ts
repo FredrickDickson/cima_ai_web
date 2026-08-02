@@ -1,13 +1,26 @@
-// Starts a Paystack checkout for a subscription (plan+interval) or an
-// AI-action top-up credit pack. Called from the frontend, which then
+// Starts a Paystack checkout for a plan purchase (plan+interval) or an
+// AI-action top-up credit pack — always a plain one-off charge, never a
+// Paystack Plan-linked subscription. Called from the frontend, which then
 // redirects the browser to the returned `authorization_url` — this is the
 // "Redirect" integration pattern from Paystack's Accept Payments guide, and
 // needs no payment SDK on the frontend since Paystack's own checkout page
-// handles card entry.
+// handles payment method entry.
+//
+// Deliberately NOT using Paystack's native Subscription/Plan objects:
+// recurring/subscription charges require a reusable payment authorization,
+// which Paystack currently only supports for cards (and direct debit in
+// Nigeria) — Mobile Money can't be tokenized for recurring billing. Most of
+// this app's users pay via MoMo, so attaching a Plan code here would hide
+// MoMo as a checkout option entirely. Instead, every plan purchase is a
+// one-off charge for one billing period; paystack-webhook self-tracks
+// subscription_renews_at from it, and downgrade_expired_subscriptions()
+// (see the accompanying migration) reverts to Free if the period lapses
+// without a repeat charge. No auto-renewal for any payment method — the
+// user returns to /pricing to pay for the next period.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getAuthedUserId, billingErrorResponse } from "../_shared/billing.ts";
-import { planAmountPesewa, planCode, paystackFetch } from "../_shared/paystack.ts";
+import { planAmountPesewa, paystackFetch } from "../_shared/paystack.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
@@ -42,11 +55,10 @@ Deno.serve(async (req: Request) => {
 
     const { plan, interval, topup_credits } = await req.json();
 
-    const appUrl = Deno.env.get("APP_URL") ?? "https://cimaai.vercel.app";
+    const appUrl = Deno.env.get("APP_URL") ?? "https://cimaai.thecima.org";
     let amount: number;
     let metadata: Record<string, unknown>;
     let txType: "subscription" | "topup";
-    let planCodeValue: string | undefined;
 
     if (topup_credits) {
       const credits = Number(topup_credits);
@@ -57,19 +69,15 @@ Deno.serve(async (req: Request) => {
     } else {
       if (!plan || !interval) throw new Error("plan and interval are required");
       amount = planAmountPesewa(plan, interval);
-      // Passing `plan` (a Paystack Plan code) subscribes the customer on
-      // successful payment — Paystack then owns recurring billing from here
-      // (see docs/Paystack docs/Subscriptions.md "Adding plan code to a
-      // transaction"). `amount` is still sent per Paystack's own example
-      // even though the plan's amount takes precedence, and it keeps our
-      // own billing_transactions bookkeeping below accurate regardless.
-      planCodeValue = planCode(plan, interval);
       metadata = { user_id: userId, plan, interval };
       txType = "subscription";
     }
 
     const reference = `${txType === "topup" ? "TOPUP" : "SUB"}_${Date.now()}_${userId.slice(0, 8)}`;
 
+    // No `plan` field here — a plain one-off charge, so Paystack offers
+    // every enabled channel (card, Mobile Money, bank, USSD, ...) instead of
+    // restricting to card-only for a Plan-linked subscription.
     const initData = await paystackFetch("/transaction/initialize", {
       method: "POST",
       body: JSON.stringify({
@@ -79,7 +87,6 @@ Deno.serve(async (req: Request) => {
         reference,
         callback_url: `${appUrl}/billing/callback`,
         metadata,
-        ...(planCodeValue ? { plan: planCodeValue } : {}),
       }),
     });
 

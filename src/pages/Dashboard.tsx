@@ -12,6 +12,7 @@ import {
   Gavel,
   Scale,
   Plus,
+  Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
@@ -19,6 +20,7 @@ import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useTour } from "../contexts/TourContext";
+import { useAiActionUsage } from "../lib/useAiActionUsage";
 import type { Case, DbDocument as Document, Hearing } from "../types/database";
 
 interface Stats {
@@ -31,6 +33,7 @@ interface Stats {
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const { start: startTour } = useTour();
+  const aiActionUsage = useAiActionUsage();
   const [stats, setStats] = useState<Stats>({ activeCases: 0, totalDocuments: 0, researchSessions: 0, upcomingHearings: 0 });
   const [recentCases, setRecentCases] = useState<Case[]>([]);
   const [recentDocs, setRecentDocs] = useState<Document[]>([]);
@@ -204,6 +207,40 @@ export default function Dashboard() {
 
           {/* Sidebar widgets */}
           <div className="space-y-4">
+            {/* AI usage */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap size={15} className="text-navy-600" />
+                  <h3 className="text-sm font-semibold text-navy-950">AI Usage</h3>
+                </div>
+                <Link to="/profile" className="text-xs text-navy-600 hover:text-gold-600 font-medium transition-colors">
+                  Details
+                </Link>
+              </div>
+              <p className="text-xs text-slate-500 mb-1.5">
+                {aiActionUsage.used.toLocaleString()}
+                {aiActionUsage.cap !== null && ` / ${aiActionUsage.cap.toLocaleString()}`} AI actions used this cycle
+                {aiActionUsage.extra > 0 && ` · +${aiActionUsage.extra} top-up credits`}
+              </p>
+              {aiActionUsage.percentUsed !== null && (
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${aiActionUsage.isExhausted ? "bg-red-500" : "bg-navy-950"}`}
+                    style={{ width: `${aiActionUsage.percentUsed}%` }}
+                  />
+                </div>
+              )}
+              {aiActionUsage.isExhausted && (
+                <Link
+                  to="/pricing#credits"
+                  className="inline-flex items-center gap-1 mt-2 text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
+                >
+                  Buy more credits <ChevronRight size={12} />
+                </Link>
+              )}
+            </div>
+
             {/* Upcoming hearings */}
             <div className="bg-white rounded-xl border border-slate-200">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">

@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+
+const PROFILE_POLL_ATTEMPTS = 4;
+const PROFILE_POLL_DELAY_MS = 1500;
 
 export default function BillingCallback() {
   const [searchParams] = useSearchParams();
@@ -11,8 +14,15 @@ export default function BillingCallback() {
   const { refreshProfile } = useAuth();
   const [status, setStatus] = useState<"checking" | "success" | "failed">("checking");
   const [message, setMessage] = useState("Confirming your payment...");
+  // Guards against this effect's async body running more than once for the
+  // same mount — refreshProfile() below triggers a profile update, and
+  // without this guard a re-render could otherwise re-enter the effect.
+  const hasRun = useRef(false);
 
   useEffect(() => {
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     if (!reference) {
       setStatus("failed");
       setMessage("No payment reference found.");
@@ -33,8 +43,12 @@ export default function BillingCallback() {
         if (data.status === "success") {
           setStatus("success");
           setMessage("Payment confirmed — your plan is now active.");
-          // The webhook applies the plan; give it a moment then refresh.
-          setTimeout(() => refreshProfile(), 1500);
+          // The webhook applies the plan/credits asynchronously and may not
+          // have landed yet, so poll a few times instead of a single guess.
+          for (let attempt = 0; attempt < PROFILE_POLL_ATTEMPTS; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, PROFILE_POLL_DELAY_MS));
+            await refreshProfile();
+          }
         } else {
           setStatus("failed");
           setMessage("This payment was not successful. No charge was applied.");

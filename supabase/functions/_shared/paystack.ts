@@ -22,23 +22,6 @@ export function planAmountPesewa(plan: string, interval: string): number {
   return Math.round(usd * USD_TO_GHS_RATE * 100);
 }
 
-// Paystack Plan objects (created once via `POST /plan`, see the `payment`
-// branch plan doc's Part 3 rework) — plan_codes live as Supabase secrets
-// rather than hardcoded here so test/live keys can point at different Plans
-// without a code change.
-const PLAN_CODE_ENV_KEYS: Record<string, Record<string, string>> = {
-  pro: { monthly: "PAYSTACK_PLAN_CODE_PRO_MONTHLY", annually: "PAYSTACK_PLAN_CODE_PRO_ANNUALLY" },
-  max: { monthly: "PAYSTACK_PLAN_CODE_MAX_MONTHLY", annually: "PAYSTACK_PLAN_CODE_MAX_ANNUALLY" },
-};
-
-export function planCode(plan: string, interval: string): string {
-  const envKey = PLAN_CODE_ENV_KEYS[plan]?.[interval];
-  if (!envKey) throw new Error("INVALID_PLAN");
-  const code = Deno.env.get(envKey);
-  if (!code) throw new Error(`Paystack plan code not configured (missing secret ${envKey})`);
-  return code;
-}
-
 export async function paystackFetch(path: string, options: RequestInit = {}): Promise<any> {
   const secretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
   if (!secretKey) throw new Error("Paystack is not configured on this server");

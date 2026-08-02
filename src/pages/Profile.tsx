@@ -15,11 +15,13 @@ import {
   LogOut,
   Key,
   Trash2,
+  X,
 } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { useAiActionUsage } from "../lib/useAiActionUsage";
 
 const ROLES = [
   { value: "lawyer", label: "Lawyer / Advocate" },
@@ -38,7 +40,7 @@ const JURISDICTIONS = [
 ];
 
 export default function Profile() {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, signOut, refreshProfile, updatePassword } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,8 +48,11 @@ export default function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [stats, setStats] = useState({ cases: 0, documents: 0, reviews: 0 });
-  const [aiActionCap, setAiActionCap] = useState<number | null>(null);
-  const [manageLoading, setManageLoading] = useState(false);
+  const aiActionUsage = useAiActionUsage();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ password: "", confirm: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   const [form, setForm] = useState({
     full_name: "",
@@ -66,7 +71,6 @@ export default function Profile() {
       });
       setAvatarPreview(profile.avatar_url || null);
       loadStats();
-      loadAiActionCap();
     }
   }, [profile]);
 
@@ -85,29 +89,6 @@ export default function Profile() {
       });
     } catch (err) {
       console.error("Failed to load stats:", err);
-    }
-  }
-
-  async function loadAiActionCap() {
-    if (!profile) return;
-    const { data } = await supabase.rpc("plan_ai_action_cap" as any, { p_plan: profile.plan });
-    if (typeof data === "number") setAiActionCap(data);
-  }
-
-  async function handleManageSubscription() {
-    setManageLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-manage-link`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not open subscription management");
-      window.location.href = data.link;
-    } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Could not open subscription management" });
-      setManageLoading(false);
     }
   }
 
@@ -227,21 +208,51 @@ export default function Profile() {
     navigate("/login");
   }
 
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+
+    if (passwordForm.password.length < 8) {
+      setPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirm) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    const { error } = await updatePassword(passwordForm.password);
+    setPasswordSaving(false);
+
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+
+    setShowPasswordModal(false);
+    setPasswordForm({ password: "", confirm: "" });
+    setMessage({ type: "success", text: "Password updated successfully" });
+  }
+
   async function handleDeleteAccount() {
-    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+    if (!confirm("Are you sure you want to delete your account? This will permanently delete all your cases, documents, and drafts. This action cannot be undone.")) {
       return;
     }
 
     setLoading(true);
     try {
-      // Delete user's data (cascade should handle most)
-      if (user?.id) {
-        await supabase.from("profiles").delete().eq("id", user.id);
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete account");
       await signOut();
       navigate("/login");
     } catch (err) {
-      setMessage({ type: "error", text: "Failed to delete account. Please contact support." });
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to delete account. Please contact support." });
     } finally {
       setLoading(false);
     }
@@ -321,10 +332,10 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Billing */}
+          {/* Plan & Usage */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-navy-950">Billing</h3>
+              <h3 className="text-lg font-semibold text-navy-950">Plan &amp; Usage</h3>
               <span className={`text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${
                 profile?.plan === "max" ? "bg-blue-50 text-blue-700 border border-blue-200"
                   : profile?.plan === "pro" ? "bg-gold-500/10 text-gold-700 border border-gold-500/20"
@@ -333,22 +344,18 @@ export default function Profile() {
                 {profile?.plan === "max" ? "Max" : profile?.plan === "pro" ? "Pro" : "Free"}
               </span>
             </div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-4">
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-slate-600">
-                  {(profile?.monthly_ai_actions_used ?? 0).toLocaleString()}
-                  {aiActionCap !== null && ` / ${aiActionCap.toLocaleString()}`} AI actions used this cycle
-                  {(profile?.extra_ai_actions ?? 0) > 0 && ` + ${profile!.extra_ai_actions} top-up credits`}
+                  {aiActionUsage.used.toLocaleString()}
+                  {aiActionUsage.cap !== null && ` / ${aiActionUsage.cap.toLocaleString()}`} AI actions used this cycle
+                  {aiActionUsage.extra > 0 && ` + ${aiActionUsage.extra} top-up credits`}
                 </p>
-                {aiActionCap !== null && aiActionCap > 0 && (
+                {aiActionUsage.percentUsed !== null && (
                   <div className="w-full max-w-xs h-2 bg-slate-100 rounded-full overflow-hidden mt-1.5">
                     <div
-                      className={`h-full rounded-full ${
-                        (profile?.monthly_ai_actions_used ?? 0) >= aiActionCap ? "bg-red-500" : "bg-navy-950"
-                      }`}
-                      style={{
-                        width: `${Math.min(100, Math.round(((profile?.monthly_ai_actions_used ?? 0) / aiActionCap) * 100))}%`,
-                      }}
+                      className={`h-full rounded-full ${aiActionUsage.isExhausted ? "bg-red-500" : "bg-navy-950"}`}
+                      style={{ width: `${aiActionUsage.percentUsed}%` }}
                     />
                   </div>
                 )}
@@ -360,31 +367,28 @@ export default function Profile() {
                 {profile?.plan_status === "past_due" && (
                   <p className="text-xs text-red-500 mt-0.5">Your last payment failed — please update your billing to avoid losing access.</p>
                 )}
+                {aiActionUsage.isExhausted && (
+                  <p className="text-xs text-red-500 mt-0.5">
+                    You're out of AI actions this cycle — buy a top-up pack to keep going on any plan.
+                  </p>
+                )}
               </div>
-              {profile?.plan !== "free" && profile?.subscription_code ? (
-                <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col gap-2 shrink-0">
+                {aiActionUsage.isExhausted && (
                   <button
-                    onClick={() => navigate("/pricing")}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-navy-950 text-sm font-semibold rounded-lg transition-colors"
+                    onClick={() => navigate("/pricing#credits")}
+                    className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 text-sm font-semibold rounded-lg transition-colors"
                   >
-                    Change plan
+                    Buy more credits
                   </button>
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={manageLoading}
-                    className="px-4 py-2 bg-navy-950 hover:bg-navy-800 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
-                  >
-                    {manageLoading ? "Opening..." : "Manage subscription"}
-                  </button>
-                </div>
-              ) : (
+                )}
                 <button
                   onClick={() => navigate("/pricing")}
-                  className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+                  className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors"
                 >
-                  {profile?.plan === "free" ? "Upgrade" : "Change plan"}
+                  {profile?.plan === "free" ? "Upgrade" : "Renew / Change plan"}
                 </button>
-              )}
+              </div>
             </div>
           </div>
 
@@ -514,7 +518,7 @@ export default function Profile() {
             <h3 className="text-lg font-semibold text-navy-950 mb-4">Account Actions</h3>
             <div className="space-y-3">
               <button
-                onClick={() => {/* TODO: Implement password change */}}
+                onClick={() => { setPasswordError(""); setPasswordForm({ password: "", confirm: "" }); setShowPasswordModal(true); }}
                 className="w-full flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
               >
                 <Key size={18} className="text-slate-500" />
@@ -550,6 +554,67 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-navy-950">Change Password</h3>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              {passwordError && (
+                <div className="flex items-center gap-2.5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  <AlertCircle size={16} /> {passwordError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-navy-900 mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.password}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-navy-950 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all"
+                  placeholder="At least 8 characters"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-navy-900 mb-1.5">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-navy-950 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all"
+                  placeholder="Re-enter new password"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {passwordSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {passwordSaving ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

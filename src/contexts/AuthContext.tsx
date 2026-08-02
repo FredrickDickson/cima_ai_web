@@ -1,7 +1,9 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -95,19 +97,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
-  }
+  }, []);
 
-  async function signUp(
+  const signUp = useCallback(async (
     email: string,
     password: string,
     fullName: string,
     role: string
-  ) {
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
+  ) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
       password,
       options: {
         data: { full_name: fullName }
@@ -128,43 +130,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     return { error: null };
-  }
+  }, []);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  }
+  }, []);
 
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     if (user) await fetchProfile(user.id);
-  }
+  }, [user]);
 
-  async function sendPasswordReset(email: string) {
+  const sendPasswordReset = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     return { error: error?.message ?? null };
-  }
+  }, []);
 
-  async function updatePassword(newPassword: string) {
+  const updatePassword = useCallback(async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     return { error: error?.message ?? null };
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      profile,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      refreshProfile,
+      sendPasswordReset,
+      updatePassword,
+    }),
+    [user, session, profile, loading, signIn, signUp, signOut, refreshProfile, sendPasswordReset, updatePassword]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        refreshProfile,
-        sendPasswordReset,
-        updatePassword,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
