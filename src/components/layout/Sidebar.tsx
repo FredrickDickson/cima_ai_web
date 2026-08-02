@@ -46,7 +46,7 @@ export default function Sidebar() {
         // Mobile: fixed drawer sliding in from left
         "fixed inset-y-0 left-0 z-50 transition-transform duration-300",
         // Desktop: static in normal flow
-        "md:static md:z-auto md:translate-x-0 md:h-full",
+        "md:static md:z-auto md:translate-x-0 md:min-h-screen",
         isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none md:pointer-events-auto",
       ].join(" ")}
     >

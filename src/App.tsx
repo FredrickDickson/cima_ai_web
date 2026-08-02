@@ -1,7 +1,6 @@
 import { Component, lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ClassicLoader from "./components/ui/loader";
-import BetaBanner from "./components/layout/BetaBanner";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TourProvider } from "./contexts/TourContext";
@@ -47,7 +46,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function LoadingScreen() {
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-6" style={{ backgroundColor: 'var(--navy-950)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ backgroundColor: 'var(--navy-950)' }}>
       {/* Logo mark */}
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--accent-500)' }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -85,9 +84,6 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <TourProvider>
-          <div className="min-h-dvh flex flex-col">
-          <BetaBanner />
-          <div className="flex-1 min-h-0 flex flex-col">
           <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route
@@ -161,8 +157,6 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
-          </div>
-          </div>
           </TourProvider>
         </AuthProvider>
       </ThemeProvider>
