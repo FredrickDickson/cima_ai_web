@@ -137,6 +137,18 @@ export default function Sidebar() {
           </div>
         </button>
         <button
+          onClick={() => navigate("/pricing")}
+          className={`flex items-center justify-center w-full text-xs font-semibold uppercase tracking-wide px-3 py-2 rounded-lg mt-1 transition-colors ${
+            profile?.plan === "max"
+              ? "bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20"
+              : profile?.plan === "pro"
+                ? "bg-gold-500/10 text-gold-400 border border-gold-500/20 hover:bg-gold-500/20"
+                : "bg-gold-500 text-navy-950 hover:bg-gold-400"
+          }`}
+        >
+          {profile?.plan === "max" ? "Max" : profile?.plan === "pro" ? "Pro" : "Upgrade"}
+        </button>
+        <button
           onClick={handleSignOut}
           className="flex items-center gap-2 px-2 py-2 w-full text-slate-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors mt-1"
           title="Sign out"

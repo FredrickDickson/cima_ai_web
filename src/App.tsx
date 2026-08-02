@@ -118,7 +118,7 @@ export default function App() {
             />
             <Route
               path="/billing/callback"
-              element={<RequireAuth><BillingCallback /></RequireAuth>}
+              element={<BillingCallback />}
             />
             <Route
               path="/"

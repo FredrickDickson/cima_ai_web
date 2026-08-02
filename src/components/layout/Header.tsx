@@ -62,18 +62,6 @@ export default function Header({ title, subtitle }: HeaderProps) {
           <Settings size={18} />
         </button>
         <button
-          onClick={() => navigate("/pricing")}
-          className={`text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-full transition-colors ${
-            profile?.plan === "max"
-              ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
-              : profile?.plan === "pro"
-                ? "bg-gold-500/10 text-gold-700 border border-gold-500/20 hover:bg-gold-500/20"
-                : "bg-navy-950 text-white hover:bg-navy-800"
-          }`}
-        >
-          {profile?.plan === "max" ? "Max" : profile?.plan === "pro" ? "Pro" : "Upgrade"}
-        </button>
-        <button
           onClick={() => navigate("/profile")}
           className="flex items-center gap-2 ml-1 md:ml-2 pl-2 md:pl-3 border-l border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
         >
