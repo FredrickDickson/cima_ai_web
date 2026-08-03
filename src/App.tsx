@@ -1,6 +1,12 @@
 import { Component, lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ClassicLoader from "./components/ui/loader";
+import {
+  isChunkLoadError,
+  attemptChunkReload,
+  clearChunkReloadGuard,
+  wasChunkReloadJustAttempted,
+} from "./lib/chunkReload";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TourProvider } from "./contexts/TourContext";
@@ -26,8 +32,26 @@ const Admin = lazy(() => import("./pages/Admin"));
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+
+  componentDidMount() {
+    // A successful mount means the current build loaded fine — clear any
+    // stale guard so the next stale-chunk error gets a fresh retry.
+    clearChunkReloadGuard();
+  }
+
+  componentDidCatch(error: Error) {
+    if (isChunkLoadError(error)) {
+      attemptChunkReload(); // no-op if already attempted this session
+    }
+  }
+
   render() {
     if (this.state.error) {
+      if (isChunkLoadError(this.state.error) && wasChunkReloadJustAttempted()) {
+        // Reload is in flight — avoid flashing the error screen for the
+        // split second before navigation actually happens.
+        return null;
+      }
       return (
         <div style={{ padding: 40, fontFamily: "monospace", background: "#1e1e2e", color: "#f38ba8", minHeight: "100vh" }}>
           <h1 style={{ color: "#cdd6f4", marginBottom: 16 }}>Something went wrong</h1>
@@ -132,6 +156,14 @@ export default function App() {
             />
             <Route
               path="/library/:docId"
+              element={<RequireAuth><LibraryDocument /></RequireAuth>}
+            />
+            {/* Convex-hosted docs carry an explicit source segment (see the
+                Legal Library / Convex migration) — the single-param route
+                above stays for existing links that predate it (citations,
+                DraftingStudio, Research), which only ever point at Supabase. */}
+            <Route
+              path="/library/:source/:docId"
               element={<RequireAuth><LibraryDocument /></RequireAuth>}
             />
             <Route

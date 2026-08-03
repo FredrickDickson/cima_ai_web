@@ -14,6 +14,12 @@ export interface RetrievedLibrarySource {
   content: string;
   similarity?: number;
   doc_id?: string;
+  // Documents ingested after Supabase's free tier filled up live in Convex
+  // instead (see the Legal Library / Convex migration) — tags which backend
+  // a hit came from so the client knows where to route the "view document"
+  // link (defaults to "supabase" for callers that don't set it, e.g. Laws.Africa/
+  // CourtListener/document-chunk sources further down legal-search/index.ts).
+  source?: "supabase" | "convex";
 }
 
 export interface TavilyResult {
@@ -42,12 +48,54 @@ export async function getEmbedding(text: string, hfKey: string): Promise<number[
 }
 
 /**
+ * Vector search over Convex's `libraryChunks` (documents ingested after
+ * Supabase's free tier filled up — see the Legal Library / Convex migration)
+ * via its `/searchLibrary` HTTP action, which internally does the same
+ * vector-then-FTS-fallback as the Supabase RPCs below. Fails soft (returns
+ * `[]`) on any error/timeout/missing config — a Convex outage must never
+ * break Supabase-backed search.
+ */
+async function searchConvexLibrary(
+  query: string,
+  embedding: number[] | null | undefined,
+  opts: { jurisdiction?: string; sourceType?: string; matchCount?: number },
+): Promise<RetrievedLibrarySource[]> {
+  const convexSiteUrl = Deno.env.get("CONVEX_SITE_URL");
+  if (!convexSiteUrl) return [];
+  try {
+    const res = await fetch(`${convexSiteUrl}/searchLibrary`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        embedding: embedding ?? undefined,
+        jurisdiction: opts.jurisdiction,
+        sourceType: opts.sourceType,
+        matchCount: opts.matchCount ?? 6,
+      }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (Array.isArray(data) ? data : []).map((r: RetrievedLibrarySource) => ({
+      ...r,
+      source: "convex" as const,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Vector search over `legal_library` via `match_legal_library`, falling back
  * to `search_legal_library_fts` when no embedding is available/succeeds or
  * the vector search returns nothing. Pass a pre-computed `embedding` when the
  * caller already needs one for another RPC too (e.g. legal-search also
  * reuses it for `match_document_chunks`) — otherwise pass `hfKey` and one
- * will be computed here.
+ * will be computed here. Merges in Convex-hosted results (see
+ * searchConvexLibrary above) so this one function stays the single retrieval
+ * brain for all three consumers (legal-search's AI Search, Research.tsx,
+ * ai-chat's research-mode grounding) regardless of which backend a document
+ * ended up in.
  */
 export async function searchLegalLibrary(
   query: string,
@@ -85,6 +133,7 @@ export async function searchLegalLibrary(
         content: r.content,
         similarity: r.similarity,
         doc_id: r.doc_id ?? undefined,
+        source: "supabase",
       });
     }
   }
@@ -103,11 +152,20 @@ export async function searchLegalLibrary(
         jurisdiction: r.jurisdiction,
         content: r.content,
         doc_id: r.doc_id ?? undefined,
+        source: "supabase",
       });
     }
   }
 
-  return results;
+  const convexResults = await searchConvexLibrary(query, embedding, {
+    jurisdiction: opts.jurisdiction,
+    sourceType: opts.sourceType,
+    matchCount,
+  });
+
+  return [...results, ...convexResults]
+    .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+    .slice(0, matchCount);
 }
 
 const TAVILY_LEGAL_DOMAINS = [

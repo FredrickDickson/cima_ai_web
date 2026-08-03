@@ -327,6 +327,16 @@ export interface LegalLibraryDocumentWithChunks extends LegalLibraryDocument {
   chunks: LegalLibraryDocumentChunk[];
 }
 
+// Documents ingested after Supabase's free tier filled up live in Convex
+// instead (see the Legal Library / Convex migration plan) — `source` tags
+// which backend a given document came from so list/search/viewer code never
+// has to guess by ID shape (Convex IDs vs Postgres UUIDs).
+export interface LibraryDocumentRef {
+  source: "supabase" | "convex";
+}
+
+export type UnifiedLibraryDocument = LegalLibraryDocument & LibraryDocumentRef;
+
 export type CaseTreatment = "followed" | "applied" | "distinguished" | "disapproved" | "overruled" | "mentioned";
 export type CaseCitationConfidence = "low" | "medium" | "high";
 

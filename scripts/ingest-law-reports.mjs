@@ -20,6 +20,10 @@
  *                           use the same lowercase country-name vocabulary as
  *                           supabase/functions/_shared/laws-africa.ts's COUNTRY_MAP
  *                           (e.g. 'kenya', 'nigeria') or 'international'
+ *   --target=<supabase|convex>  Where to write ingested documents (default 'supabase').
+ *                           'convex' requires VITE_CONVEX_URL + INGEST_SECRET in .env
+ *                           (see scripts/lib/convex-ingest-target.mjs) — used for
+ *                           documents not yet in Supabase, once its free tier is full.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -32,9 +36,19 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
+import {
+  createConvexIngestClient,
+  convexListSourceKeys,
+  convexUploadFile,
+  convexUpsertDocument,
+  convexReplaceChunks,
+} from './lib/convex-ingest-target.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Convex CLI writes VITE_CONVEX_URL to .env.local (Vite convention) rather
+// than .env — load it too (without overriding anything .env already set).
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: false });
 
 GlobalWorkerOptions.workerSrc = new URL(
   '../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
@@ -65,6 +79,12 @@ const BATCH_SIZE = Number(argv.find(a => a.startsWith('--batch-size='))?.split('
 const BATCH_DELAY_MS = Number(argv.find(a => a.startsWith('--batch-delay-ms='))?.split('=')[1] ?? 0);
 const DOC_DELAY_MS = Number(argv.find(a => a.startsWith('--doc-delay-ms='))?.split('=')[1] ?? 400);
 const JURISDICTION = argv.find(a => a.startsWith('--jurisdiction='))?.split('=')[1] ?? 'ghana';
+const TARGET = argv.find(a => a.startsWith('--target='))?.split('=')[1] ?? 'supabase';
+if (TARGET !== 'supabase' && TARGET !== 'convex') {
+  console.error(`❌  Invalid --target=${TARGET} (expected 'supabase' or 'convex')`);
+  process.exit(1);
+}
+const convexIngest = TARGET === 'convex' ? createConvexIngestClient() : null;
 
 // ─── LOGGING ───────────────────────────────────────────────────────────────
 
@@ -464,6 +484,10 @@ async function processCandidate(candidate) {
         ? 'application/pdf'
         : 'text/plain';
 
+    if (TARGET === 'convex') {
+      return await writeToConvex(candidate, storagePath, text, contentType, uploadBuffer);
+    }
+
     const { error: uploadError } = await withRetry(() => supabase.storage
       .from(BUCKET)
       .upload(storagePath, uploadBuffer, { upsert: true, contentType }));
@@ -540,6 +564,22 @@ async function processCandidate(candidate) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logLine({ relPath: candidate.relPath, storagePath, status: 'failed', error: message });
+    if (TARGET === 'convex') {
+      await convexUpsertDocument(convexIngest, {
+        title: candidate.title,
+        sourceType: candidate.sourceType,
+        jurisdiction: JURISDICTION,
+        court: candidate.court || undefined,
+        decidedYear: candidate.year ?? undefined,
+        parties: candidate.parties || [],
+        originalFormat: candidate.format === 'htm' ? 'htm-text' : candidate.format,
+        extractedCharCount: 0,
+        ingestionStatus: 'failed',
+        errorMessage: message,
+        sourceKey: storagePath,
+      }).catch(() => {});
+      return 'failed';
+    }
     await withRetry(() => supabase
       .from('legal_library_documents')
       .upsert({
@@ -554,6 +594,60 @@ async function processCandidate(candidate) {
       }, { onConflict: 'storage_path' }));
     return 'failed';
   }
+}
+
+/** Convex write path — mirrors the Supabase branch above (upload → upsert
+ * document → replace chunks), called from within processCandidate's try block
+ * so extraction/chunking stays identical regardless of target. */
+async function writeToConvex(candidate, storagePath, text, contentType, uploadBuffer) {
+  const storageId = await convexUploadFile(convexIngest, uploadBuffer, contentType);
+
+  const docFields = {
+    title: candidate.title,
+    sourceType: candidate.sourceType,
+    jurisdiction: JURISDICTION,
+    citation: candidate.citation || undefined,
+    court: candidate.court || undefined,
+    decidedYear: candidate.year ?? undefined,
+    parties: candidate.parties || [],
+    legislationNumber: candidate.legislationNumber || undefined,
+    storageId,
+    originalFormat: candidate.format === 'htm' ? 'htm-text' : candidate.format,
+    sourceCollection: candidate.sourceCollection || undefined,
+    extractedCharCount: text.length,
+    sourceKey: storagePath,
+  };
+
+  const docId = await convexUpsertDocument(convexIngest, { ...docFields, ingestionStatus: 'processing' });
+
+  const chunks = chunkByArticle(text, candidate.title);
+  const chunkRows = [];
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+    const batch = chunks.slice(i, i + BATCH_SIZE);
+    const embeddings = await embedTexts(batch.map(c => c.content));
+    batch.forEach((chunk, j) => {
+      const embedding = embeddings[j];
+      if (!embedding) throw new Error(`Local embedding failed for chunk ${i + j} — refusing to store a chunk with no vector`);
+      chunkRows.push({
+        chunkIndex: i + j,
+        title: chunk.title,
+        citation: chunk.citation || undefined,
+        content: chunk.content,
+        embedding,
+        sourceType: candidate.sourceType,
+        jurisdiction: JURISDICTION,
+      });
+    });
+    if (BATCH_DELAY_MS > 0 && i + BATCH_SIZE < chunks.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+
+  await convexReplaceChunks(convexIngest, docId, chunkRows);
+  await convexUpsertDocument(convexIngest, { ...docFields, ingestionStatus: 'completed' });
+
+  logLine({ relPath: candidate.relPath, storagePath, docId, chunks: chunkRows.length, status: 'completed', target: 'convex' });
+  return 'completed';
 }
 
 async function main() {
@@ -592,51 +686,69 @@ async function main() {
   }, {});
   console.log(`    By type: ${JSON.stringify(bySourceType)}`);
 
+  // Filter out already-completed candidates BEFORE applying --limit, so a
+  // chunked series of runs (each with --limit) targets outstanding
+  // failed/pending work instead of re-scanning the same already-done prefix.
+  //
+  // For --target=convex this is TWO exclusion passes: (a) anything already
+  // attempted in Supabase (regardless of status — never duplicate work
+  // that already has a Supabase row) and (b) anything already in Convex from
+  // a prior --target=convex run (idempotency).
+  const stats = { completed: 0, failed: 0, skipped: 0 };
+  let pending = winners;
+  if (!FORCE) {
+    console.log('🔎  Checking already-completed documents in Supabase...');
+    const supabasePaths = new Set();
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      // supabase target: only exclude completed docs (original behavior — a
+      // failed/pending row should still be retried). convex target: exclude
+      // ANY existing Supabase row regardless of status, since we never want
+      // to duplicate work Supabase already has a record of.
+      let pageQuery = supabase.from('legal_library_documents').select('storage_path');
+      if (TARGET !== 'convex') pageQuery = pageQuery.eq('ingestion_status', 'completed');
+      const { data, error } = await withRetry(
+        () => pageQuery.range(offset, offset + pageSize - 1),
+        { attempts: 12, delayMs: 2000 },
+      );
+      if (error) {
+        console.error(`\n❌  Could not fetch existing Supabase documents (page offset=${offset}): ${error.message}`);
+        console.error('    Refusing to proceed — this would risk duplicating work already done in Supabase.');
+        console.error('    Re-run the script once the database is responsive again.');
+        process.exit(1);
+      }
+      if (!data || data.length === 0) break;
+      for (const row of data) supabasePaths.add(row.storage_path);
+      if (data.length < pageSize) break;
+    }
+    console.log(`    ${supabasePaths.size} already in Supabase`);
+    pending = winners.filter(c => !supabasePaths.has(buildStoragePath(c, getFinalExt(c))));
+
+    if (TARGET === 'convex') {
+      console.log('🔎  Checking already-ingested documents in Convex...');
+      const convexKeys = await convexListSourceKeys(convexIngest);
+      console.log(`    ${convexKeys.size} already in Convex`);
+      pending = pending.filter(c => !convexKeys.has(buildStoragePath(c, getFinalExt(c))));
+    }
+
+    stats.skipped = winners.length - pending.length;
+  }
+
   if (DRY_RUN) {
     console.log('\n--- Dedup decisions (superseded → kept) sample (first 20) ---');
     for (const s of superseded.slice(0, 20)) {
       console.log(`  SKIP  ${s.relPath}  (superseded by a higher-priority format)`);
     }
-    console.log('\n--- Sample parsed candidates (first 20) ---');
-    for (const c of winners.slice(0, 20)) {
+    console.log(`\n--- Sample outstanding candidates for --target=${TARGET} (first 20 of ${pending.length}) ---`);
+    for (const c of pending.slice(0, 20)) {
       console.log(`  [${c.sourceType}] ${c.court || c.legislationNumber || ''} ${c.year ?? ''} — "${c.title}" (${c.format})`);
     }
-    console.log('\n✅  Dry run complete — no writes performed.');
+    console.log(`\n✅  Dry run complete — ${pending.length} outstanding, ${stats.skipped} excluded (already done). No writes performed.`);
     return;
   }
 
-  // Filter out already-completed candidates BEFORE applying --limit, so a
-  // chunked series of runs (each with --limit) targets outstanding
-  // failed/pending work instead of re-scanning the same already-done prefix.
-  const stats = { completed: 0, failed: 0, skipped: 0 };
-  let pending = winners;
-  if (!FORCE) {
-    console.log('🔎  Checking already-completed documents...');
-    const completedPaths = new Set();
-    const pageSize = 1000;
-    for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await withRetry(() => supabase
-        .from('legal_library_documents')
-        .select('storage_path')
-        .eq('ingestion_status', 'completed')
-        .range(offset, offset + pageSize - 1), { attempts: 12, delayMs: 2000 });
-      if (error) {
-        console.error(`\n❌  Could not fetch already-completed documents (page offset=${offset}): ${error.message}`);
-        console.error('    Refusing to proceed — this would cause every document to be reprocessed from scratch.');
-        console.error('    Re-run the script once the database is responsive again.');
-        process.exit(1);
-      }
-      if (!data || data.length === 0) break;
-      for (const row of data) completedPaths.add(row.storage_path);
-      if (data.length < pageSize) break;
-    }
-    console.log(`    ${completedPaths.size} already completed`);
-    pending = winners.filter(c => !completedPaths.has(buildStoragePath(c, getFinalExt(c))));
-    stats.skipped = winners.length - pending.length;
-  }
-
   const toProcess = pending.slice(0, LIMIT);
-  console.log(`\n🚀  Processing ${toProcess.length} documents (${pending.length} outstanding, ${stats.skipped} already completed)...\n`);
+  console.log(`\n🚀  Processing ${toProcess.length} documents (${pending.length} outstanding, ${stats.skipped} already done)...\n`);
 
   let i = 0;
   for (const candidate of toProcess) {
