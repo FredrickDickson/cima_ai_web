@@ -6,7 +6,6 @@ import {
   type ReactNode,
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
-import * as Sentry from "@sentry/react";
 import { supabase } from "../lib/supabase";
 import type { Profile } from "../types/database";
 
@@ -98,13 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    // Wide event: one log with all the context needed to debug a sign-in issue,
-    // rather than scattering fragments across multiple log calls. No email/PII in attributes.
-    if (error) {
-      Sentry.logger.warn("Sign-in failed", { method: "password", reason: error.message });
-    } else {
-      Sentry.logger.info("Sign-in succeeded", { method: "password" });
-    }
     return { error: error?.message ?? null };
   }
 
@@ -122,7 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     if (error) {
-      Sentry.logger.warn("Sign-up failed", { stage: "auth", reason: error.message });
       return { error: error.message };
     }
     if (data.user) {
@@ -135,13 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar_url: "",
       } as any);
       if (profileErr) {
-        Sentry.logger.warn("Sign-up failed", { stage: "profile", reason: profileErr.message });
         return { error: `Account created but profile setup failed: ${profileErr.message}` };
       }
     }
-    // Parameterized message: `role` becomes a searchable structured attribute
-    // rather than being buried in free text.
-    Sentry.logger.info(Sentry.logger.fmt`New account registered with role ${role}`);
     return { error: null };
   }
 
