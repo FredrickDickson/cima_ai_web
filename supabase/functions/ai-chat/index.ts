@@ -225,7 +225,28 @@ Deno.serve(async (req: Request) => {
     }
 
     if (stream) {
-      return new Response(response.body, {
+      // cited_sources never appears in DeepSeek's own stream (it's our data,
+      // not the model's) — prepend one custom SSE frame carrying it before
+      // piping DeepSeek's chunks through untouched, so the frontend can pull
+      // it out before parsing the rest as normal delta events.
+      const metaFrame = `data: ${JSON.stringify({ __meta: { cited_sources: citedSources } })}\n\n`;
+      const upstream = response.body!;
+      const combined = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(new TextEncoder().encode(metaFrame));
+          const reader = upstream.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(combined, {
         headers: {
           ...corsHeaders,
           "Content-Type": "text/event-stream",

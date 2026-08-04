@@ -308,6 +308,7 @@ export default function AIAssistant() {
         context,
         conversation_id: conv.id,
         user_id: user.id,
+        stream: true,
       };
       if (attachedCase) body.case_id = attachedCase.id;
       if (attachedDoc) body.document_id = attachedDoc.id;
@@ -326,10 +327,53 @@ export default function AIAssistant() {
         throw new Error(`AI service error (${res.status}): ${errBody || res.statusText}`);
       }
 
-      const data = await res.json();
-      const content: string = data.content ?? data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
-      const citedSources: CitedSource[] | undefined = data.cited_sources;
+      // ai-chat streams DeepSeek's raw SSE body, prefixed with one custom
+      // { __meta: { cited_sources } } frame (cited_sources is our data, not
+      // something DeepSeek's own stream ever includes) — see ai-chat/index.ts.
+      let content = "";
+      let citedSources: CitedSource[] | undefined;
 
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Streaming is not supported in this browser.");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sepIndex: number;
+        while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex);
+          buffer = buffer.slice(sepIndex + 2);
+
+          const dataLine = rawEvent.split("\n").find((l) => l.startsWith("data:"));
+          if (!dataLine) continue;
+          const payload = dataLine.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+
+          let parsed: { __meta?: { cited_sources?: CitedSource[] }; choices?: { delta?: { content?: string } }[] };
+          try {
+            parsed = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+
+          if (parsed.__meta) {
+            citedSources = parsed.__meta.cited_sources;
+            continue;
+          }
+
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            content += delta;
+            setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
+          }
+        }
+      }
+
+      if (!content) content = "I encountered an issue processing your request.";
       setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content, cited_sources: citedSources } : m));
       await supabase.from("ai_messages").insert({
         conversation_id: conv.id,
