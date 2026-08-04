@@ -94,7 +94,7 @@ const SMART_COLLECTIONS: { key: Section; label: string }[] = [
 
 function statusIcon(status: string) {
   if (status === "ready") return <CheckCircle size={13} className="text-emerald-500" />;
-  if (status === "processing") return <Loader2 size={13} className="text-amber-500 animate-spin" />;
+  if (status === "processing" || status === "extracting") return <Loader2 size={13} className="text-amber-500 animate-spin" />;
   if (status === "error") return <AlertCircle size={13} className="text-red-500" />;
   return <Clock size={13} className="text-slate-400" />;
 }
@@ -383,24 +383,6 @@ export default function Documents() {
         return;
       }
 
-      let textContent: string;
-      try {
-        const { extractTextFromFile } = await import("../lib/fileUtils");
-        textContent = await extractTextFromFile(file);
-      } catch (extractErr) {
-        setUploadError(
-          extractErr instanceof Error ? extractErr.message : "Failed to read file"
-        );
-        setUploading(false);
-        return;
-      }
-
-      if (!textContent.trim()) {
-        setUploadError("The file appears to be empty or contains no readable text");
-        setUploading(false);
-        return;
-      }
-
       const docName = uploadForm.name.trim() || file.name;
 
       let storagePath: string | null = null;
@@ -415,6 +397,11 @@ export default function Documents() {
         storagePath = candidatePath;
       }
 
+      // Row is created before text is extracted (below) — extraction can
+      // involve slow client-side OCR for scanned PDFs (see fileUtils.ts),
+      // and @mention authority tagging (search_documents) matches on `name`
+      // as well as `extracted_text`, so the document is taggable as soon as
+      // this row exists rather than only after OCR finishes.
       const payload: any = {
         user_id: user!.id,
         case_id: uploadForm.caseId || null,
@@ -424,8 +411,8 @@ export default function Documents() {
         storage_path: storagePath,
         file_size: file.size,
         mime_type: file.type || "text/plain",
-        status: "processing",
-        extracted_text: textContent.slice(0, 100000),
+        status: "extracting",
+        extracted_text: "",
         ai_summary: "",
         risk_score: 0,
       };
@@ -448,54 +435,87 @@ export default function Documents() {
       if (fileRef.current) fileRef.current.value = "";
       setDocuments((prev) => [inserted, ...prev]);
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // Fire-and-forget: extract text (incl. possible OCR), then embed.
+      // Neither step blocks the upload UI or the document's taggability.
+      (async () => {
+        try {
+          const { extractTextFromFile } = await import("../lib/fileUtils");
+          const textContent = await extractTextFromFile(file);
 
-      fetch(`${supabaseUrl}/functions/v1/embed-document`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          document_id: inserted.id,
-          text_content: textContent,
-          user_id: user!.id,
-        }),
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const { data: updated } = await supabase
-              .from("documents")
-              .select("*")
-              .eq("id", inserted.id)
-              .single();
-            if (updated) {
-              setDocuments((prev) =>
-                prev.map((d) => (d.id === inserted.id ? updated : d))
-              );
-            }
-          } else {
+          if (!textContent.trim()) {
+            await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
             setDocuments((prev) =>
-              prev.map((d) =>
-                d.id === inserted.id
-                  ? { ...d, status: "error" as DocType["status"] }
-                  : d
-              )
+              prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
             );
+            return;
           }
-        })
-        .catch(() => {
+
+          const { data: withText } = await supabase
+            .from("documents")
+            .update({ extracted_text: textContent.slice(0, 100000), status: "processing" })
+            .eq("id", inserted.id)
+            .select()
+            .single();
+          if (withText) {
+            setDocuments((prev) => prev.map((d) => (d.id === inserted.id ? withText : d)));
+          }
+
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          fetch(`${supabaseUrl}/functions/v1/embed-document`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({
+              document_id: inserted.id,
+              text_content: textContent,
+              user_id: user!.id,
+            }),
+          })
+            .then(async (res) => {
+              if (res.ok) {
+                const { data: updated } = await supabase
+                  .from("documents")
+                  .select("*")
+                  .eq("id", inserted.id)
+                  .single();
+                if (updated) {
+                  setDocuments((prev) =>
+                    prev.map((d) => (d.id === inserted.id ? updated : d))
+                  );
+                }
+              } else {
+                setDocuments((prev) =>
+                  prev.map((d) =>
+                    d.id === inserted.id
+                      ? { ...d, status: "error" as DocType["status"] }
+                      : d
+                  )
+                );
+              }
+            })
+            .catch(() => {
+              setDocuments((prev) =>
+                prev.map((d) =>
+                  d.id === inserted.id
+                    ? { ...d, status: "error" as DocType["status"] }
+                    : d
+                )
+              );
+            });
+        } catch (extractErr) {
+          console.error("Text extraction failed:", extractErr);
+          await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
           setDocuments((prev) =>
-            prev.map((d) =>
-              d.id === inserted.id
-                ? { ...d, status: "error" as DocType["status"] }
-                : d
-            )
+            prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
           );
-        });
+        }
+      })();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {

@@ -191,7 +191,7 @@ export interface DbDocument {
   extracted_text: string;
   ai_summary: string;
   risk_score: number;
-  status: "uploading" | "processing" | "ready" | "error";
+  status: "uploading" | "extracting" | "processing" | "ready" | "error";
   metadata: any;
   created_at: string;
   updated_at: string;
