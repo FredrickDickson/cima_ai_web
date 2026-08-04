@@ -40,6 +40,7 @@ import Header from "../components/layout/Header";
 import RichTextEditor from "../components/ui/RichTextEditor";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
@@ -460,6 +461,7 @@ function ClauseCard({
 
 export default function ContractReview() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"input" | "analysis">("input");
   const [inputTab, setInputTab] = useState<"paste" | "upload">("paste");
@@ -801,6 +803,7 @@ export default function ContractReview() {
     try {
       const text = await extractTextFromFile(file);
       setContractText(text);
+      showToast(`${file.name} — text fully extracted`);
 
       if (user) {
         const fileExt = file.name.split('.').pop() || 'pdf';

@@ -33,6 +33,7 @@ import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { logCaseEvent } from "../lib/caseEvents";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -155,6 +156,7 @@ function highlightText(text: string, query: string): React.ReactNode {
 
 export default function Documents() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -459,6 +461,7 @@ export default function Documents() {
           if (withText) {
             setDocuments((prev) => prev.map((d) => (d.id === inserted.id ? withText : d)));
           }
+          showToast(`${docName} — text fully extracted`);
 
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
           const {

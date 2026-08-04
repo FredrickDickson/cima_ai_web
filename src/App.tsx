@@ -10,6 +10,7 @@ import {
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TourProvider } from "./contexts/TourContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
@@ -105,6 +106,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <BrowserRouter>
+      <ToastProvider>
       <ThemeProvider>
         <AuthProvider>
           <TourProvider>
@@ -192,6 +194,7 @@ export default function App() {
           </TourProvider>
         </AuthProvider>
       </ThemeProvider>
+      </ToastProvider>
     </BrowserRouter>
     </ErrorBoundary>
   );
