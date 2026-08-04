@@ -29,6 +29,7 @@ import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { SharpenButton } from "../components/ui/SharpenButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
 import { MentionPopup } from "../components/ui/MentionPopup";
@@ -154,6 +155,7 @@ function SourceCard({ source, index }: { source: RetrievedSource; index: number 
 
 export default function Research() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const linkedCaseId = searchParams.get("case_id") ?? "";
   const [query, setQuery] = useState("");
@@ -231,7 +233,8 @@ export default function Research() {
   }
 
   async function deleteSession(sessionId: string) {
-    await supabase.from("research_sessions").delete().eq("id", sessionId);
+    const { error } = await supabase.from("research_sessions").delete().eq("id", sessionId);
+    if (error) { showToast(`Failed to delete session: ${error.message}`, "error"); return; }
     setSavedSessions(p => p.filter(s => s.id !== sessionId));
     if (activeSessionId === sessionId) {
       setActiveSessionId(null);

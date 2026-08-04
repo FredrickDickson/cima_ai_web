@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, AlertCircle, AlertTriangle, Sparkles, Loader2, Check } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import { callCaseAI, buildProceduralCalendarPrompt, parseProceduralCalendarLines, type SuggestedDeadline } from "./caseAI";
 
 type Case = {
@@ -46,6 +47,7 @@ export default function NewCaseModal({
   existingCases?: Case[];
 }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     title: "", matter_number: "", type: "arbitration", framework: "",
     description: "", claimant: "", respondent: "",
@@ -119,7 +121,7 @@ export default function NewCaseModal({
     const toImport = suggested.filter(s => s.selected);
     if (toImport.length === 0) { onCreated(createdCase); return; }
     setImporting(true);
-    await supabase.from("deadlines").insert(
+    const { error } = await supabase.from("deadlines").insert(
       toImport.map(s => ({
         case_id: createdCase.id,
         user_id: user!.id,
@@ -130,6 +132,9 @@ export default function NewCaseModal({
         status: "pending",
       })),
     );
+    if (error) {
+      showToast(`Case created, but the procedural calendar deadlines failed to import: ${error.message}`, "error");
+    }
     setImporting(false);
     onCreated(createdCase);
   }

@@ -13,6 +13,7 @@ import { extractTextFromFile } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
+import { useToast } from "../contexts/ToastContext";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
 import { MentionPopup } from "../components/ui/MentionPopup";
@@ -134,6 +135,7 @@ function formatDate(d: string) {
 
 export default function AIAssistant() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConv, setActiveConv] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -396,7 +398,9 @@ export default function AIAssistant() {
 
   async function deleteConversation(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    await supabase.from("ai_conversations").delete().eq("id", id);
+    if (!confirm("Delete this conversation? This cannot be undone.")) return;
+    const { error } = await supabase.from("ai_conversations").delete().eq("id", id);
+    if (error) { showToast(`Failed to delete conversation: ${error.message}`, "error"); return; }
     setConversations(prev => prev.filter(c => c.id !== id));
     if (activeConv?.id === id) { setActiveConv(null); setMessages([]); }
   }

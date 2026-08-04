@@ -3,6 +3,7 @@ import {
   Scale,
   Sparkles,
   Loader2,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
@@ -13,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -47,6 +49,8 @@ export default function SettlementTab({
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const [positionSaveStatus, setPositionSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const [issues, setIssues] = useState<Issue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
@@ -335,12 +339,22 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
           [field]: value,
         },
       };
-      // Persist to Supabase (fire-and-forget)
+      // Persist to Supabase (fire-and-forget from the caller's perspective —
+      // fires on every keystroke, so feedback is a small persistent status
+      // indicator rather than a toast per edit, which would be very noisy).
+      setPositionSaveStatus("saving");
       supabase
         .from("cases")
         .update({ metadata: { settlement_positions: updated } })
         .eq("id", caseId)
-        .then(() => {});
+        .then(({ error }) => {
+          if (error) {
+            setPositionSaveStatus("error");
+            showToast(`Failed to save settlement position: ${error.message}`, "error");
+          } else {
+            setPositionSaveStatus("saved");
+          }
+        });
       return updated;
     });
   }
@@ -351,9 +365,19 @@ After the table, include a brief "Payment Terms" section in plain prose suitable
       <section className="rounded-xl border border-navy-700 bg-navy-800/50 overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-navy-700">
           <Scale className="h-5 w-5 text-gold-400 shrink-0" />
-          <h2 className="text-base font-semibold text-white">
+          <h2 className="text-base font-semibold text-white flex-1">
             Issue-by-Issue Positions
           </h2>
+          {positionSaveStatus === "saving" && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+            </span>
+          )}
+          {positionSaveStatus === "saved" && (
+            <span className="flex items-center gap-1 text-xs text-emerald-500">
+              <CheckCircle2 className="h-3 w-3" /> Saved
+            </span>
+          )}
         </div>
 
         <div className="p-6">

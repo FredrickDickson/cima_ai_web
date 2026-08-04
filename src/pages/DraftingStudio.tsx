@@ -52,6 +52,7 @@ import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { SharpenButton } from "../components/ui/SharpenButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import { getRelevantRulesContext } from "../lib/documentSearch";
 import { logCaseEvent } from "../lib/caseEvents";
@@ -223,6 +224,7 @@ function severityBorder(severity: string) {
 // ---------------------------------------------------------------------------
 export default function DraftingStudio() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
 
   // Data
@@ -938,9 +940,13 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
   // Copy, export, undo/redo, version restore, load draft
   // ---------------------------------------------------------------------------
   function handleCopy() {
-    navigator.clipboard.writeText(draftContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(draftContent).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => showToast("Could not copy to clipboard — check browser permissions", "error"),
+    );
   }
 
   const draftTitle = selectedTemplate?.title ?? (nlPrompt ? nlPrompt.slice(0, 60) : "Draft");
@@ -961,8 +967,11 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
     try {
       if (format === "docx") await exportToWord(draftContent, draftTitle);
       else await exportToPdf("draft-content-area", draftTitle);
+      showToast("Draft exported");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
+      const message = err instanceof Error ? err.message : "Export failed";
+      setError(message);
+      showToast(message, "error");
     } finally {
       setExporting(false);
     }

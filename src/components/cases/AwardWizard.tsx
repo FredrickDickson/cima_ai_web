@@ -3,6 +3,7 @@ import { X, ChevronRight, ChevronLeft, Loader2, Gavel, AlertCircle, Check } from
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import type { CaseContext } from "./caseAI";
 import { logCaseEvent } from "../../lib/caseEvents";
 
@@ -28,6 +29,7 @@ const STEPS = ["Award Type", "Procedural History", "Issues & Findings", "Relief 
 
 export default function AwardWizard({ caseData, onClose }: { caseData: CaseContext; onClose: () => void }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(0);
@@ -181,8 +183,13 @@ DRAFTING INSTRUCTIONS:
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       if (concludesMatter && closeMatterOnGenerate) {
-        await supabase.from("cases").update({ status: matterStatusOnClose }).eq("id", caseData.id);
-        logCaseEvent(caseData.id, user!.id, "status_changed", `Matter marked ${matterStatusOnClose} after ${awardType} generation`);
+        const { error: statusError } = await supabase.from("cases").update({ status: matterStatusOnClose }).eq("id", caseData.id);
+        if (statusError) {
+          showToast(`Award generated, but the matter status update failed: ${statusError.message}`, "error");
+        } else {
+          logCaseEvent(caseData.id, user!.id, "status_changed", `Matter marked ${matterStatusOnClose} after ${awardType} generation`);
+          showToast(`Matter marked as ${matterStatusOnClose}`);
+        }
       }
       onClose();
       navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
