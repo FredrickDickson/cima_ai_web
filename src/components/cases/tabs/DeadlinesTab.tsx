@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Calendar, Sparkles, Loader2, Check, X, AlertCircle, ClipboardList } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, buildProceduralCalendarPrompt, parseProceduralCalendarLines, type CaseContext, type SuggestedDeadline } from "../caseAI";
 import { logCaseEvent } from "../../../lib/caseEvents";
 
@@ -16,6 +17,7 @@ type Deadline = {
 
 export default function DeadlinesTab({ caseId, caseData }: { caseId: string; caseData?: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -42,10 +44,12 @@ export default function DeadlinesTab({ caseId, caseData }: { caseId: string; cas
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("deadlines")
+    const { data, error } = await supabase.from("deadlines")
       .insert({ ...form, case_id: caseId, user_id: user!.id, status: "pending" })
       .select().maybeSingle();
-    if (data) {
+    if (error) {
+      showToast(`Failed to add deadline: ${error.message}`, "error");
+    } else if (data) {
       setDeadlines(p => [...p, data].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()));
       logCaseEvent(caseId, user!.id, "deadline_added", `Deadline added: "${data.title}" due ${data.due_date}`);
     }
@@ -81,7 +85,7 @@ export default function DeadlinesTab({ caseId, caseData }: { caseId: string; cas
     const toImport = suggested.filter(s => s.selected);
     if (toImport.length === 0) return;
     setImporting(true);
-    const { data } = await supabase.from("deadlines").insert(
+    const { data, error } = await supabase.from("deadlines").insert(
       toImport.map(s => ({
         case_id: caseId,
         user_id: user!.id,
@@ -92,11 +96,13 @@ export default function DeadlinesTab({ caseId, caseData }: { caseId: string; cas
         status: "pending",
       }))
     ).select();
-    if (data) {
+    if (error) {
+      showToast(`Failed to import deadlines: ${error.message}`, "error");
+    } else if (data) {
       setDeadlines(p => [...p, ...data].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()));
+      setSuggested([]);
+      setShowCalendar(false);
     }
-    setSuggested([]);
-    setShowCalendar(false);
     setImporting(false);
   }
 
@@ -299,7 +305,8 @@ Output ONLY the ITEM lines — no explanation, no headers, no other text.`;
               </div>
               <button onClick={async () => {
                 const next = d.status === "completed" ? "pending" : "completed";
-                await supabase.from("deadlines").update({ status: next }).eq("id", d.id);
+                const { error } = await supabase.from("deadlines").update({ status: next }).eq("id", d.id);
+                if (error) { showToast(`Failed to update deadline: ${error.message}`, "error"); return; }
                 setDeadlines(p => p.map(x => x.id === d.id ? { ...x, status: next } : x));
                 if (next === "completed") logCaseEvent(caseId, user!.id, "deadline_completed", `Deadline completed: "${d.title}"`);
               }} className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${d.status === "completed" ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-navy-600 text-slate-400 hover:border-emerald-500/40 hover:text-emerald-400"}`}>

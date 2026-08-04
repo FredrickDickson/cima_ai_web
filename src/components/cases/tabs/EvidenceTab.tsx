@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Loader2, Sparkles, ChevronDown, ChevronUp, Layers, X } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
 import { logCaseEvent } from "../../../lib/caseEvents";
 
@@ -25,6 +26,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function EvidenceTab({ caseId, caseData }: { caseId: string; caseData: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState<Evidence[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,22 +63,26 @@ export default function EvidenceTab({ caseId, caseData }: { caseId: string; case
   }, [items]);
 
   async function linkIssue(evidenceId: string, issueId: string) {
-    const { data } = await supabase.from("evidence_issues")
+    const { data, error } = await supabase.from("evidence_issues")
       .insert({ evidence_id: evidenceId, issue_id: issueId, user_id: user!.id })
       .select().maybeSingle();
+    if (error) { showToast(`Failed to link issue: ${error.message}`, "error"); return; }
     if (data) setLinks(p => ({ ...p, [evidenceId]: [...(p[evidenceId] ?? []), { id: data.id, issue_id: data.issue_id }] }));
   }
 
   async function unlinkIssue(evidenceId: string, linkId: string) {
-    await supabase.from("evidence_issues").delete().eq("id", linkId);
+    const { error } = await supabase.from("evidence_issues").delete().eq("id", linkId);
+    if (error) { showToast(`Failed to unlink issue: ${error.message}`, "error"); return; }
     setLinks(p => ({ ...p, [evidenceId]: (p[evidenceId] ?? []).filter(l => l.id !== linkId) }));
   }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("evidence").insert({ ...form, case_id: caseId, user_id: user!.id }).select().maybeSingle();
-    if (data) {
+    const { data, error } = await supabase.from("evidence").insert({ ...form, case_id: caseId, user_id: user!.id }).select().maybeSingle();
+    if (error) {
+      showToast(`Failed to add evidence: ${error.message}`, "error");
+    } else if (data) {
       setItems(p => [data, ...p]);
       logCaseEvent(caseId, user!.id, "evidence_added", `Evidence added: "${data.title}"`);
     }

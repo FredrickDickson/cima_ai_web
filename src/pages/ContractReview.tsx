@@ -351,6 +351,7 @@ function ClauseCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const results = actionResults[clause.clause_name] ?? {};
+  const { showToast } = useToast();
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -434,7 +435,7 @@ function ClauseCard({
                   <p className="text-xs font-semibold text-navy-700">{action?.label}</p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => navigator.clipboard.writeText(stripMarkdown(result))}
+                      onClick={() => navigator.clipboard.writeText(stripMarkdown(result)).then(() => showToast("Copied to clipboard"))}
                       className="flex items-center gap-1 text-xs text-navy-500 hover:text-navy-800 font-medium"
                     >
                       <Copy size={10} /> Copy
@@ -1101,8 +1102,14 @@ export default function ContractReview() {
       } else {
         await exportToPdf("contract-analysis-report", title);
       }
+      showToast("Report exported");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed. Please try again.");
+      const message = err instanceof Error ? err.message : "Export failed. Please try again.";
+      // The inline `error` banner only renders in the "input" view, but
+      // Export is only reachable from "analysis" — without a toast this
+      // failure would be entirely invisible to the user.
+      setError(message);
+      showToast(message, "error");
     }
   }
 
@@ -1770,7 +1777,7 @@ export default function ContractReview() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigator.clipboard.writeText(stripMarkdown(generatedClauses[clause.clause_type]))}
+                              onClick={() => navigator.clipboard.writeText(stripMarkdown(generatedClauses[clause.clause_type])).then(() => showToast("Copied to clipboard"))}
                               className="flex items-center gap-1.5 text-xs text-navy-600 hover:text-navy-900 font-medium transition-colors"
                             >
                               <Copy size={11} /> Copy
@@ -1849,7 +1856,7 @@ export default function ContractReview() {
                                         <CheckCircle2 size={10} />
                                       </button>
                                     )}
-                                    <button onClick={() => navigator.clipboard.writeText(stripMarkdown(clause.redline_suggestion!))} className="text-xs text-green-600 hover:text-green-800">
+                                    <button onClick={() => navigator.clipboard.writeText(stripMarkdown(clause.redline_suggestion!)).then(() => showToast("Copied to clipboard"))} className="text-xs text-green-600 hover:text-green-800">
                                       <Copy size={10} />
                                     </button>
                                   </div>
@@ -1987,7 +1994,7 @@ export default function ContractReview() {
                         <p className="text-xs font-bold text-navy-950">Suggested Improved Wording</p>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => navigator.clipboard.writeText(stripMarkdown(analysis.arbitration_improved!))}
+                            onClick={() => navigator.clipboard.writeText(stripMarkdown(analysis.arbitration_improved!)).then(() => showToast("Copied to clipboard"))}
                             className="flex items-center gap-1 text-xs text-navy-600 hover:text-navy-900 font-medium"
                           >
                             <Copy size={11} /> Copy

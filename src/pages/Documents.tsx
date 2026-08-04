@@ -540,10 +540,16 @@ export default function Documents() {
     }
   }
 
-  async function handleDelete(id: string) {
-    await supabase.from("documents").delete().eq("id", id);
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) {
+      showToast(`Failed to delete "${name}": ${error.message}`, "error");
+      return;
+    }
     setDocuments((prev) => prev.filter((d) => d.id !== id));
     if (viewerDoc?.id === id) setViewerDoc(null);
+    showToast(`"${name}" deleted`);
   }
 
   async function handleLinkCase(docId: string, caseId: string | null) {
@@ -598,8 +604,13 @@ export default function Documents() {
     setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f)));
   }
 
-  async function handleDeleteFolder(id: string) {
-    await supabase.from("document_folders" as any).delete().eq("id", id);
+  async function handleDeleteFolder(id: string, name: string) {
+    if (!confirm(`Delete folder "${name}"? Documents inside it will be unfiled, not deleted.`)) return;
+    const { error } = await supabase.from("document_folders" as any).delete().eq("id", id);
+    if (error) {
+      showToast(`Failed to delete "${name}": ${error.message}`, "error");
+      return;
+    }
     setFolders((prev) => prev.filter((f) => f.id !== id));
     setDocuments((prev) =>
       prev.map((d) => (d.folder_id === id ? { ...d, folder_id: null } : d))
@@ -611,6 +622,7 @@ export default function Documents() {
       setActiveSection("all");
       setFilterFolderId(null);
     }
+    showToast(`Folder "${name}" deleted`);
   }
 
   function toggleSelectId(id: string, e: React.MouseEvent) {
@@ -1213,7 +1225,7 @@ Provide a structured comparison covering:
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteFolder(folder.id);
+                          handleDeleteFolder(folder.id, folder.name);
                         }}
                         className="hidden group-hover:inline-flex p-0.5 text-slate-400 hover:text-red-500 rounded"
                         aria-label="Delete folder"
@@ -1593,7 +1605,7 @@ Provide a structured comparison covering:
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(viewerDoc.id)}
+                  onClick={() => handleDelete(viewerDoc.id, viewerDoc.name)}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"
                   title="Delete document"
                 >
@@ -2277,7 +2289,7 @@ Provide a structured comparison covering:
             {!compareLoading && compareResult && (
               <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
                 <button
-                  onClick={() => navigator.clipboard.writeText(compareResult)}
+                  onClick={() => navigator.clipboard.writeText(compareResult).then(() => showToast("Copied to clipboard"))}
                   className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   <Copy size={12} /> Copy
@@ -2345,7 +2357,7 @@ Provide a structured comparison covering:
 
             <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
               <button
-                onClick={() => navigator.clipboard.writeText(briefResult)}
+                onClick={() => navigator.clipboard.writeText(briefResult).then(() => showToast("Copied to clipboard"))}
                 className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <Copy size={12} /> Copy

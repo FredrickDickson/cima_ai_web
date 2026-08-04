@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, MapPin, Calendar, Loader2, ChevronDown, Sparkles } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
 import { logCaseEvent } from "../../../lib/caseEvents";
 
@@ -32,6 +33,7 @@ const AI_ACTIONS = [
 
 export default function HearingsTab({ caseId, caseData }: { caseId: string; caseData: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -49,13 +51,15 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("hearings").insert({
+    const { data, error } = await supabase.from("hearings").insert({
       ...form,
       case_id: caseId,
       user_id: user!.id,
       status: "scheduled",
     }).select().maybeSingle();
-    if (data) {
+    if (error) {
+      showToast(`Failed to add hearing: ${error.message}`, "error");
+    } else if (data) {
       setHearings(p => [...p, data].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()));
       logCaseEvent(caseId, user!.id, "hearing_scheduled", `Hearing scheduled: "${data.title}" on ${new Date(data.scheduled_at).toLocaleDateString("en-GB")}`);
     }
@@ -76,7 +80,8 @@ export default function HearingsTab({ caseId, caseData }: { caseId: string; case
   }
 
   async function updateStatus(id: string, status: string) {
-    await supabase.from("hearings").update({ status }).eq("id", id);
+    const { error } = await supabase.from("hearings").update({ status }).eq("id", id);
+    if (error) { showToast(`Failed to update hearing: ${error.message}`, "error"); return; }
     const hearing = hearings.find(h => h.id === id);
     setHearings(p => p.map(h => h.id === id ? { ...h, status } : h));
     if (hearing) logCaseEvent(caseId, user!.id, "hearing_updated", `Hearing "${hearing.title}" marked ${status}`);

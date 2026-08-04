@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, CheckCircle2, ChevronDown, Loader2, Sparkles, ShieldAlert, LayoutList, Copy, Check, FileCheck, X, Layers } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
 import { logCaseEvent } from "../../../lib/caseEvents";
 import ReactMarkdown from "react-markdown";
@@ -21,6 +22,7 @@ type EvidenceLink = { id: string; evidence_id: string };
 
 export default function IssuesTab({ caseId, caseData }: { caseId: string; caseData: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -62,25 +64,29 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
   }, [issues]);
 
   async function linkEvidence(issueId: string, evidenceId: string) {
-    const { data } = await supabase.from("evidence_issues")
+    const { data, error } = await supabase.from("evidence_issues")
       .insert({ issue_id: issueId, evidence_id: evidenceId, user_id: user!.id })
       .select().maybeSingle();
+    if (error) { showToast(`Failed to link evidence: ${error.message}`, "error"); return; }
     if (data) setLinks(p => ({ ...p, [issueId]: [...(p[issueId] ?? []), { id: data.id, evidence_id: data.evidence_id }] }));
   }
 
   async function unlinkEvidence(issueId: string, linkId: string) {
-    await supabase.from("evidence_issues").delete().eq("id", linkId);
+    const { error } = await supabase.from("evidence_issues").delete().eq("id", linkId);
+    if (error) { showToast(`Failed to unlink evidence: ${error.message}`, "error"); return; }
     setLinks(p => ({ ...p, [issueId]: (p[issueId] ?? []).filter(l => l.id !== linkId) }));
   }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("issues").insert({
+    const { data, error } = await supabase.from("issues").insert({
       ...form, case_id: caseId, user_id: user!.id, status: "open",
       issue_number: issues.length > 0 ? Math.max(...issues.map(i => i.issue_number)) + 1 : 1,
     }).select().maybeSingle();
-    if (data) {
+    if (error) {
+      showToast(`Failed to add issue: ${error.message}`, "error");
+    } else if (data) {
       setIssues(p => [...p, data]);
       logCaseEvent(caseId, user!.id, "issue_added", `Issue #${data.issue_number} added: "${data.description.slice(0, 80)}"`);
     }
@@ -91,7 +97,8 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
 
   async function toggleStatus(issue: Issue) {
     const next = issue.status === "open" ? "resolved" : "open";
-    await supabase.from("issues").update({ status: next }).eq("id", issue.id);
+    const { error } = await supabase.from("issues").update({ status: next }).eq("id", issue.id);
+    if (error) { showToast(`Failed to update issue: ${error.message}`, "error"); return; }
     setIssues(p => p.map(i => i.id === issue.id ? { ...i, status: next } : i));
     if (next === "resolved") logCaseEvent(caseId, user!.id, "issue_resolved", `Issue #${issue.issue_number} resolved: "${issue.description.slice(0, 80)}"`);
   }
