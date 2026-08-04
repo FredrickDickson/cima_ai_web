@@ -41,6 +41,7 @@ import {
   Database,
   ArrowDown,
   Menu,
+  MessageSquareQuote,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -252,6 +253,9 @@ export default function DraftingStudio() {
   const [wordCount, setWordCount] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftCitedSources, setDraftCitedSources] = useState<CitedSource[]>([]);
+  const [activePromptText, setActivePromptText] = useState<string | null>(null);
+  const [showPromptPopover, setShowPromptPopover] = useState(false);
+  const promptPopoverRef = useRef<HTMLDivElement>(null);
 
   // Editor state (Feature 1) — Tiptap rich-text legal editor
   const [selectedText, setSelectedText] = useState("");
@@ -317,6 +321,17 @@ export default function DraftingStudio() {
     if (showExportMenu) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showExportMenu]);
+
+  // Close prompt popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (promptPopoverRef.current && !promptPopoverRef.current.contains(e.target as Node)) {
+        setShowPromptPopover(false);
+      }
+    }
+    if (showPromptPopover) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showPromptPopover]);
 
   // Open the AI command bar with Ctrl/Cmd+K while editing a draft
   useEffect(() => {
@@ -397,6 +412,7 @@ export default function DraftingStudio() {
     setNlPrompt("");
     setDraftId(null);
     setDraftCitedSources([]);
+    setActivePromptText(null);
     setSaved(false);
     setError("");
     setShowVersionHistory(false);
@@ -478,6 +494,7 @@ export default function DraftingStudio() {
       setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
+      setActivePromptText(nlPrompt);
       if (data.draft_id && nlLinkedCaseId) {
         logCaseEvent(nlLinkedCaseId, user.id, "draft_created", `Draft generated: "${nlPrompt.slice(0, 80)}"`);
       }
@@ -527,6 +544,7 @@ export default function DraftingStudio() {
       setDraftCitedSources(data.cited_sources ?? []);
       updateWordCount(data.content ?? "");
       setDraftId(data.draft_id ?? null);
+      setActivePromptText(customInstructions || null);
       if (data.draft_id && linkedCaseId) {
         logCaseEvent(linkedCaseId, user.id, "draft_created", `Draft generated: "${selectedTemplate.title}"`);
       }
@@ -902,6 +920,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
           title: selectedTemplate?.title ?? (nlPrompt ? nlPrompt.slice(0, 80) : "Untitled Draft"),
           template_type: selectedTemplate?.template_type ?? "natural_language",
           content: draftContent, jurisdiction: selectedTemplate?.jurisdiction ?? nlJurisdiction ?? "ghana", status: "draft",
+          generation_prompt: nlPrompt || customInstructions || null,
         }).select().maybeSingle();
         if (insertErr) throw insertErr;
         if (newDraft) setDraftId(newDraft.id);
@@ -973,6 +992,7 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
     setSelectedTemplate(null);
     setAiResult("");
     setReviewItems([]);
+    setActivePromptText(draft.generation_prompt ?? null);
     versions.clear();
     setMode("output");
   }
@@ -1307,6 +1327,24 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                         <span className="text-xs font-semibold text-navy-900 max-w-[160px] truncate">{draftTitle}</span>
                         <span className="text-xs text-slate-400">{wordCount.toLocaleString()} words</span>
                         {saved && <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 size={11} /> Saved</span>}
+                        {activePromptText && (
+                          <div className="relative" ref={promptPopoverRef}>
+                            <button onClick={() => setShowPromptPopover(!showPromptPopover)}
+                              className={`p-1 rounded-lg transition-colors ${showPromptPopover ? "text-navy-700 bg-navy-50" : "text-slate-400 hover:text-navy-700 hover:bg-slate-100"}`}
+                              title="View prompt used to generate this draft">
+                              <MessageSquareQuote size={13} />
+                            </button>
+                            {showPromptPopover && (
+                              <div className="absolute left-0 top-full mt-1 w-80 max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-semibold text-navy-900">Original Prompt</span>
+                                  <button onClick={() => setShowPromptPopover(false)} className="p-0.5 text-slate-400 hover:text-slate-600 rounded"><X size={12} /></button>
+                                </div>
+                                <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{activePromptText}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         {/* Output variant tabs: Full / Short / Plain */}

@@ -1,3 +1,5 @@
+import type { TaggedAuthority } from "../lib/mentions";
+
 export type Json = any;
 
 export interface Database {
@@ -252,6 +254,8 @@ export interface Draft {
   status: "draft" | "finalized";
   created_at: string;
   updated_at: string;
+  tagged_authorities: TaggedAuthority[];
+  generation_prompt: string | null;
 }
 
 export interface Hearing {

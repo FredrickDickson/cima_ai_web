@@ -341,6 +341,7 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
       jurisdiction: jurisdiction ?? "ghana",
       status: "draft",
       tagged_authorities: tagged_authorities ?? [],
+      generation_prompt: prompt || custom_instructions || null,
     }).select().maybeSingle();
 
     return new Response(
