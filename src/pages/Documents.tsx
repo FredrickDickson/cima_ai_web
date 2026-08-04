@@ -437,8 +437,22 @@ export default function Documents() {
       if (fileRef.current) fileRef.current.value = "";
       setDocuments((prev) => [inserted, ...prev]);
 
+      // Only PDFs can hit the slow OCR fallback in extractTextFromFile
+      // (DOCX/TXT extraction is always fast) — let the user know upfront
+      // rather than leaving them wondering why the document isn't taggable
+      // yet. search_documents excludes status "extracting" (see migration
+      // 20260804000001), so @mention won't surface it until this finishes.
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        showToast(
+          `Extracting text from "${docName}" — this can take a few minutes for scanned documents. You'll be able to tag it once ready.`,
+          "info",
+        );
+      }
+
       // Fire-and-forget: extract text (incl. possible OCR), then embed.
-      // Neither step blocks the upload UI or the document's taggability.
+      // Neither step blocks the upload UI, but the document only becomes
+      // @mention-taggable once extraction lands (see the migration above).
       (async () => {
         try {
           const { extractTextFromFile } = await import("../lib/fileUtils");
