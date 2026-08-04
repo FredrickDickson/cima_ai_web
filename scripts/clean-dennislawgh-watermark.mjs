@@ -81,7 +81,10 @@ async function cleanLegalLibraryByScan() {
     scanned += rows.length;
     const hits = rows.filter(r => matches(r.content));
     if (hits.length > 0) {
-      console.log(`   After id ${lastId ?? '(start)'}: ${hits.length} match(es) in this page of ${rows.length}`);
+      // Log the actual matched row ids, not the page's pagination cursor —
+      // it's easy to misread "after id X" as "row X matched" when X is just
+      // where this page started scanning from.
+      console.log(`   Page ending at id ${rows[rows.length - 1].id}: ${hits.length} match(es) among rows ${hits.map(r => r.id).join(', ')}`);
       if (!DRY_RUN) {
         for (const row of hits) {
           const { error: updErr } = await supabase

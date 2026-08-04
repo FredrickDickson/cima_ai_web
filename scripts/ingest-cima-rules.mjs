@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import dotenv from 'dotenv';
+import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -181,7 +182,7 @@ async function main() {
   }
 
   // 1. Extract text
-  const fullText = await extractPdfText(PDF_PATH);
+  const fullText = stripWatermarks(await extractPdfText(PDF_PATH));
   console.log(`   Extracted ${fullText.length.toLocaleString()} characters`);
 
   // 2. Chunk
