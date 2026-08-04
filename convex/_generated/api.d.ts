@@ -11,6 +11,7 @@
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_ingestAuth from "../lib/ingestAuth.js";
+import type * as lib_sanitizeText from "../lib/sanitizeText.js";
 import type * as libraryChunks from "../libraryChunks.js";
 import type * as libraryDocuments from "../libraryDocuments.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   http: typeof http;
   "lib/ingestAuth": typeof lib_ingestAuth;
+  "lib/sanitizeText": typeof lib_sanitizeText;
   libraryChunks: typeof libraryChunks;
   libraryDocuments: typeof libraryDocuments;
 }>;

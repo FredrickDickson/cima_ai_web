@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { stripWatermarks } from "../_shared/sanitize-legal-text.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,7 +225,7 @@ Deno.serve(async (req: Request) => {
     // Extract text
     console.log(`[ingest] Extracting text (${mimeType})...`);
     const bytes = new Uint8Array(await fileData.arrayBuffer());
-    const fullText = await extractText(bytes, mimeType);
+    const fullText = stripWatermarks(await extractText(bytes, mimeType));
     console.log(`[ingest] Extracted ${fullText.length} characters`);
 
     if (fullText.trim().length < 50) {

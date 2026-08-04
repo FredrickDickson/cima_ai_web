@@ -55,19 +55,25 @@ function matches(text) {
 async function cleanLegalLibraryByScan() {
   console.log(`\n📄  legal_library (content) — full paginated scan (no server-side ILIKE)`);
   const PAGE = 1000;
-  let offset = 0;
+  // Keyset pagination (WHERE id > lastId), not .range()/OFFSET: OFFSET forces
+  // Postgres to walk and discard every prior row, which reliably hit the
+  // statement timeout past ~40k rows on this table. `id > lastId` uses the
+  // primary key index directly and stays cheap regardless of table size.
+  let lastId = null;
   let scanned = 0;
   let cleaned = 0;
 
   while (true) {
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('legal_library')
       .select('id, content')
       .order('id', { ascending: true })
-      .range(offset, offset + PAGE - 1);
+      .limit(PAGE);
+    if (lastId) query = query.gt('id', lastId);
+    const { data: rows, error } = await query;
 
     if (error) {
-      console.error(`   ❌  Fetch error at offset ${offset}: ${error.message}`);
+      console.error(`   ❌  Fetch error after id ${lastId}: ${error.message}`);
       break;
     }
     if (!rows || rows.length === 0) break;
@@ -75,7 +81,7 @@ async function cleanLegalLibraryByScan() {
     scanned += rows.length;
     const hits = rows.filter(r => matches(r.content));
     if (hits.length > 0) {
-      console.log(`   Offset ${offset}: ${hits.length} match(es) in this page of ${rows.length}`);
+      console.log(`   After id ${lastId ?? '(start)'}: ${hits.length} match(es) in this page of ${rows.length}`);
       if (!DRY_RUN) {
         for (const row of hits) {
           const { error: updErr } = await supabase
@@ -93,8 +99,8 @@ async function cleanLegalLibraryByScan() {
       }
     }
 
+    lastId = rows[rows.length - 1].id;
     if (rows.length < PAGE) break; // last page
-    offset += PAGE;
     process.stdout.write(`   ...scanned ${scanned} rows so far\r`);
   }
 

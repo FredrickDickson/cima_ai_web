@@ -2,6 +2,7 @@ import { v, Infer } from "convex/values";
 import { internalQuery, internalAction, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireIngestSecret } from "./lib/ingestAuth";
+import { stripWatermarks, containsWatermark } from "./lib/sanitizeText";
 
 const chunkResultValidator = v.object({
   _id: v.id("libraryChunks"),
@@ -151,5 +152,49 @@ export const insertBatch = mutation({
       await ctx.db.insert("libraryChunks", { docId: args.docId, ...chunk });
     }
     return args.chunks.length;
+  },
+});
+
+// One-off backfill: strips watermarks (see convex/lib/sanitizeText.ts) that
+// were already ingested before ingest-law-reports.mjs/ingest-legal-documents.mjs
+// started sanitizing extracted text at ingest time. Paginated so a full-table
+// clean can be driven from a Node script one page at a time — see
+// scripts/clean-dennislawgh-watermark-convex.mjs. `dryRun` reports matches
+// without patching, mirroring the existing Supabase backfill script's flag.
+export const stripWatermarksBatch = mutation({
+  args: {
+    secret: v.string(),
+    cursor: v.optional(v.string()),
+    dryRun: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    scanned: v.number(),
+    cleaned: v.number(),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+
+    const page = await ctx.db
+      .query("libraryChunks")
+      .paginate({ cursor: args.cursor ?? null, numItems: 200 });
+
+    let cleaned = 0;
+    for (const chunk of page.page) {
+      if (containsWatermark(chunk.content)) {
+        cleaned++;
+        if (!args.dryRun) {
+          await ctx.db.patch(chunk._id, { content: stripWatermarks(chunk.content) });
+        }
+      }
+    }
+
+    return {
+      scanned: page.page.length,
+      cleaned,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
   },
 });
