@@ -173,6 +173,30 @@ function PdfViewer({ url }: { url: string }) {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       await page.render({ canvasContext: ctx, viewport }).promise;
+      if (cancelled) return;
+      // Unlike text-based viewers, a PDF page is painted onto the canvas as
+      // pixels — there's no string to strip. Find any watermark text via
+      // pdf.js's text layer (same API used for in-document search below)
+      // and paint over its bounding box with the page background instead.
+      try {
+        const pdfjsLib = await import("pdfjs-dist");
+        const content = await page.getTextContent();
+        for (const item of content.items) {
+          if (!("str" in item) || !/dennislawgh/i.test(item.str)) continue;
+          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+          const x = tx[4];
+          const scaleX = Math.hypot(tx[0], tx[1]);
+          const scaleY = Math.hypot(tx[2], tx[3]);
+          const w = item.width * scaleX;
+          const h = (item.height || 1) * scaleY;
+          const y = tx[5] - h; // tx[5] is the text baseline; canvas rect needs the top
+          const pad = 2;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+        }
+      } catch {
+        // Redaction is best-effort — a failure here shouldn't block the page render.
+      }
     })();
     return () => {
       cancelled = true;
@@ -336,7 +360,7 @@ function TextChunkViewer({ chunks }: { chunks: LegalLibraryDocumentChunk[] }) {
               className="whitespace-pre-wrap text-sm text-navy-950"
               style={{ fontFamily: "'Georgia', 'Times New Roman', serif", lineHeight: 1.75 }}
             >
-              {c.content}
+              {stripWatermarks(c.content)}
             </p>
           </section>
         ))}
