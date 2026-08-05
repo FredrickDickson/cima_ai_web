@@ -36,6 +36,7 @@ import type {
   LegalLibraryDocumentWithChunks,
 } from "../types/database";
 import { jurisdictionLabel } from "../lib/jurisdictions";
+import { stripWatermarks } from "../lib/sanitizeText";
 
 // Convex camelCase fields renamed to LegalLibraryDocumentWithChunks's
 // snake_case shape, so the viewer/panels below need zero source-specific
@@ -274,7 +275,10 @@ function DocxViewer({ url }: { url: string }) {
         const res = await fetch(url);
         const buf = await res.arrayBuffer();
         const result = await mammoth.default.convertToHtml({ arrayBuffer: buf });
-        if (!cancelled) setHtml(result.value);
+        // Original uploaded files can still carry the watermark even though
+        // the database `content` copy used for search/AI has been cleaned —
+        // this is a separate render straight from the source file.
+        if (!cancelled) setHtml(stripWatermarks(result.value));
       } catch {
         if (!cancelled) setError("Could not load document.");
       } finally {
