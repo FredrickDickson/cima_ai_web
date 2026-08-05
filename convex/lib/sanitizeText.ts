@@ -8,7 +8,13 @@
  */
 
 const WATERMARK_PATTERNS = [
+  // Full URL/domain form first, so it's consumed as one unit (the bare-word
+  // pattern below would otherwise leave a stray "www..com" behind).
   /(?:https?:\/\/)?(?:www\.)?dennislawgh\.com\/?/gi,
+  // Bare mentions of the site name with no ".com" — e.g. body text citing
+  // another case as "available on the online portal dennislawgh as [...]".
+  // Still exposes the scraping source, so still needs to go.
+  /\bdennislawgh\b/gi,
 ];
 
 export function stripWatermarks(text: string): string {
@@ -20,6 +26,7 @@ export function stripWatermarks(text: string): string {
   return cleaned
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .replace(/ {2,}/g, " ")
     .replace(/^\s+/, "")
     .trim();
 }

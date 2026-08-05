@@ -64,16 +64,28 @@ async function cleanLegalLibraryByScan() {
   let cleaned = 0;
 
   while (true) {
-    let query = supabase
-      .from('legal_library')
-      .select('id, content')
-      .order('id', { ascending: true })
-      .limit(PAGE);
-    if (lastId) query = query.gt('id', lastId);
-    const { data: rows, error } = await query;
-
-    if (error) {
-      console.error(`   ❌  Fetch error after id ${lastId}: ${error.message}`);
+    // Long-lived scans occasionally hit a transient dropped connection
+    // ("TypeError: terminated") — retry a few times with backoff instead of
+    // silently truncating the scan, which previously made every past run's
+    // "0 remaining" result actually mean "0 remaining in however much of
+    // the table it got through before dying".
+    let rows = null;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      let query = supabase
+        .from('legal_library')
+        .select('id, content')
+        .order('id', { ascending: true })
+        .limit(PAGE);
+      if (lastId) query = query.gt('id', lastId);
+      const { data, error } = await query;
+      if (!error) { rows = data; lastErr = null; break; }
+      lastErr = error;
+      console.error(`   ⚠️  Fetch error after id ${lastId} (attempt ${attempt}/4): ${error.message}`);
+      if (attempt < 4) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+    if (lastErr) {
+      console.error(`   ❌  Giving up after id ${lastId} — scan is INCOMPLETE, results below undercount the true total.`);
       break;
     }
     if (!rows || rows.length === 0) break;

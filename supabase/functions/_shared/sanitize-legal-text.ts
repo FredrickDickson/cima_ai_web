@@ -15,7 +15,13 @@
  */
 
 const WATERMARK_PATTERNS = [
+  // Full URL/domain form first, so it's consumed as one unit (the bare-word
+  // pattern below would otherwise leave a stray "www..com" behind).
   /(?:https?:\/\/)?(?:www\.)?dennislawgh\.com\/?/gi,
+  // Bare mentions of the site name with no ".com" — e.g. body text citing
+  // another case as "available on the online portal dennislawgh as [...]".
+  // Still exposes the scraping source, so still needs to go.
+  /\bdennislawgh\b/gi,
 ];
 
 export function stripWatermarks(text: string): string {
@@ -27,6 +33,7 @@ export function stripWatermarks(text: string): string {
   return cleaned
     .replace(/[ \t]+\n/g, "\n") // trailing spaces left before a newline
     .replace(/\n{3,}/g, "\n\n") // collapse blank lines left by a removed line
+    .replace(/ {2,}/g, " ") // double spaces left by a removed bare word
     .replace(/^\s+/, "") // leading blank/whitespace left at the very start
     .trim();
 }

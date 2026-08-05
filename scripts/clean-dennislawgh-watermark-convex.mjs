@@ -37,11 +37,27 @@ async function main() {
 
   do {
     round++;
-    result = await client.mutation(api.libraryChunks.stripWatermarksBatch, {
-      secret,
-      cursor,
-      dryRun: DRY_RUN,
-    });
+    // Retry transient network errors instead of letting one blip abort the
+    // whole run partway through (see the equivalent fix in the Supabase
+    // backfill script, clean-dennislawgh-watermark.mjs).
+    let lastErr;
+    result = undefined;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        result = await client.mutation(api.libraryChunks.stripWatermarksBatch, {
+          secret,
+          cursor,
+          dryRun: DRY_RUN,
+        });
+        lastErr = undefined;
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.error(`   ⚠️  Mutation error on page ${round} (attempt ${attempt}/4): ${err.message}`);
+        if (attempt < 4) await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    }
+    if (lastErr) throw lastErr;
     totalScanned += result.scanned;
     totalCleaned += result.cleaned;
     cursor = result.continueCursor;
