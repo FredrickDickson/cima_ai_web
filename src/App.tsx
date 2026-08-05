@@ -18,6 +18,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
+const Landing = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Research = lazy(() => import("./pages/Research"));
 const Cases = lazy(() => import("./pages/Cases"));
@@ -73,12 +74,16 @@ function LoadingScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ backgroundColor: 'var(--navy-950)' }}>
       {/* Logo mark */}
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--accent-500)' }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
+      <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg">
+        <img 
+          src="/images/logo.jpeg" 
+          alt="CIMA AI Logo" 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            objectFit: 'cover' 
+          }} 
+        />
       </div>
       {/* Spinner */}
       <ClassicLoader size={36} />
@@ -98,7 +103,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -112,6 +117,10 @@ export default function App() {
           <TourProvider>
           <Suspense fallback={<LoadingScreen />}>
           <Routes>
+            <Route
+              path="/"
+              element={<Landing />}
+            />
             <Route
               path="/login"
               element={<RedirectIfAuth><Login /></RedirectIfAuth>}
@@ -137,7 +146,7 @@ export default function App() {
               element={<PrivacyPolicy />}
             />
             <Route
-              path="/"
+              path="/dashboard"
               element={<RequireAuth><Dashboard /></RequireAuth>}
             />
             <Route
