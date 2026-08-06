@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -63,7 +64,7 @@ function CitationChip({ marker, source }: { marker: string; source?: CitedSource
   );
 }
 
-export function CitedMarkdown({ text, sources }: { text: string; sources?: CitedSource[] }) {
+function CitedMarkdownImpl({ text, sources }: { text: string; sources?: CitedSource[] }) {
   if (!sources || sources.length === 0) {
     return <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>;
   }
@@ -92,3 +93,5 @@ export function CitedMarkdown({ text, sources }: { text: string; sources?: Cited
     </ReactMarkdown>
   );
 }
+
+export const CitedMarkdown = memo(CitedMarkdownImpl);

@@ -58,6 +58,7 @@ import { getRelevantRulesContext } from "../lib/documentSearch";
 import { logCaseEvent } from "../lib/caseEvents";
 import type { Template, Case, Draft } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
 import LegalEditor from "../components/drafting/LegalEditor";
 import CommandBar from "../components/drafting/CommandBar";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
@@ -259,6 +260,19 @@ export default function DraftingStudio() {
   const [showPromptPopover, setShowPromptPopover] = useState(false);
   const promptPopoverRef = useRef<HTMLDivElement>(null);
 
+  // Paced reveal for freshly-generated draft text — the TipTap editor must
+  // never receive partial/rapidly-changing content, so we preview the reveal
+  // as plain markdown and only mount/update the editor once it's complete.
+  const [draftPreview, setDraftPreview] = useState("");
+  const pendingDraftRef = useRef<(() => void) | null>(null);
+  const draftReveal = useTypewriterReveal((revealedText, done) => {
+    setDraftPreview(revealedText);
+    if (done) {
+      pendingDraftRef.current?.();
+      pendingDraftRef.current = null;
+    }
+  });
+
   // Editor state (Feature 1) — Tiptap rich-text legal editor
   const [selectedText, setSelectedText] = useState("");
   const editorInstanceRef = useRef<Editor | null>(null);
@@ -271,6 +285,11 @@ export default function DraftingStudio() {
   const [rightTab, setRightTab] = useState<"assistant" | "review" | "research" | "clauses">("assistant");
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState("");
+  const [aiResultPreview, setAiResultPreview] = useState("");
+  const aiResultReveal = useTypewriterReveal((revealedText, done) => {
+    setAiResultPreview(revealedText);
+    if (done) setAiResult(revealedText);
+  });
   const [customPrompt, setCustomPrompt] = useState("");
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -405,6 +424,9 @@ export default function DraftingStudio() {
   // Reset
   // ---------------------------------------------------------------------------
   function handleNewDraft() {
+    draftReveal.cancel();
+    pendingDraftRef.current = null;
+    aiResultReveal.cancel();
     setDraftContent("");
     setLegalNotes("");
     setShortForm("");
@@ -489,22 +511,25 @@ export default function DraftingStudio() {
       });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || "Generation failed"); }
       const data = await res.json();
-      setDraftContent(data.content ?? "");
-      setLegalNotes(data.legal_notes ?? "");
-      setShortForm(data.short_form ?? "");
-      setPlainEnglish(data.plain_english ?? "");
-      setDraftCitedSources(data.cited_sources ?? []);
-      updateWordCount(data.content ?? "");
-      setDraftId(data.draft_id ?? null);
-      setActivePromptText(nlPrompt);
-      if (data.draft_id && nlLinkedCaseId) {
-        logCaseEvent(nlLinkedCaseId, user.id, "draft_created", `Draft generated: "${nlPrompt.slice(0, 80)}"`);
-      }
-      loadDrafts();
+      pendingDraftRef.current = () => {
+        setDraftContent(data.content ?? "");
+        setLegalNotes(data.legal_notes ?? "");
+        setShortForm(data.short_form ?? "");
+        setPlainEnglish(data.plain_english ?? "");
+        setDraftCitedSources(data.cited_sources ?? []);
+        updateWordCount(data.content ?? "");
+        setDraftId(data.draft_id ?? null);
+        setActivePromptText(nlPrompt);
+        if (data.draft_id && nlLinkedCaseId) {
+          logCaseEvent(nlLinkedCaseId, user.id, "draft_created", `Draft generated: "${nlPrompt.slice(0, 80)}"`);
+        }
+        loadDrafts();
+        setGenerating(false);
+      };
+      draftReveal.reveal(data.content ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft generation failed");
       setMode("prompt");
-    } finally {
       setGenerating(false);
     }
   }
@@ -539,22 +564,25 @@ export default function DraftingStudio() {
       });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || "Generation failed"); }
       const data = await res.json();
-      setDraftContent(data.content ?? "");
-      setLegalNotes(data.legal_notes ?? "");
-      setShortForm(data.short_form ?? "");
-      setPlainEnglish(data.plain_english ?? "");
-      setDraftCitedSources(data.cited_sources ?? []);
-      updateWordCount(data.content ?? "");
-      setDraftId(data.draft_id ?? null);
-      setActivePromptText(customInstructions || null);
-      if (data.draft_id && linkedCaseId) {
-        logCaseEvent(linkedCaseId, user.id, "draft_created", `Draft generated: "${selectedTemplate.title}"`);
-      }
-      loadDrafts();
+      pendingDraftRef.current = () => {
+        setDraftContent(data.content ?? "");
+        setLegalNotes(data.legal_notes ?? "");
+        setShortForm(data.short_form ?? "");
+        setPlainEnglish(data.plain_english ?? "");
+        setDraftCitedSources(data.cited_sources ?? []);
+        updateWordCount(data.content ?? "");
+        setDraftId(data.draft_id ?? null);
+        setActivePromptText(customInstructions || null);
+        if (data.draft_id && linkedCaseId) {
+          logCaseEvent(linkedCaseId, user.id, "draft_created", `Draft generated: "${selectedTemplate.title}"`);
+        }
+        loadDrafts();
+        setGenerating(false);
+      };
+      draftReveal.reveal(data.content ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft generation failed");
       setMode("template");
-    } finally {
       setGenerating(false);
     }
   }
@@ -569,6 +597,7 @@ export default function DraftingStudio() {
     const textToProcess = selText || draftContent;
     if (!textToProcess) return;
     setAiActionLoading(actionId);
+    aiResultReveal.cancel();
     setAiResult("");
     setError("");
 
@@ -598,7 +627,7 @@ export default function DraftingStudio() {
         setAiResult(`Applied "${actionId}" to selected text.`);
       } else {
         // Show result in panel — user decides whether to apply
-        setAiResult(result);
+        aiResultReveal.reveal(result);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI action failed");
@@ -993,6 +1022,9 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
     setShowVersionHistory(false);
   }
   function loadDraft(draft: Draft) {
+    draftReveal.cancel();
+    pendingDraftRef.current = null;
+    aiResultReveal.cancel();
     setDraftContent(draft.content);
     setDraftId(draft.id);
     updateWordCount(draft.content);
@@ -1560,21 +1592,21 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                         </div>
 
                         {/* AI Result preview */}
-                        {aiResult && (
+                        {(aiResult || aiResultReveal.revealing) && (
                           <div className="px-3 pb-3 border-t border-slate-100 pt-3">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-xs font-semibold text-navy-900">AI Result</p>
                               <div className="flex items-center gap-1">
-                                <button onClick={applyAiResult}
-                                  className="flex items-center gap-1 px-2 py-1 bg-navy-950 hover:bg-navy-800 text-white text-xs font-medium rounded-lg transition-colors">
+                                <button onClick={applyAiResult} disabled={aiResultReveal.revealing}
+                                  className="flex items-center gap-1 px-2 py-1 bg-navy-950 hover:bg-navy-800 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
                                   <CheckCircle2 size={11} /> Apply
                                 </button>
-                                <button onClick={() => setAiResult("")} className="p-1 text-slate-400 hover:text-slate-600 rounded"><X size={12} /></button>
+                                <button onClick={() => { aiResultReveal.cancel(); setAiResult(""); }} className="p-1 text-slate-400 hover:text-slate-600 rounded"><X size={12} /></button>
                               </div>
                             </div>
                             <div className="bg-slate-50 rounded-lg border border-slate-200 p-3 max-h-60 overflow-y-auto">
                               <div className="prose-doc text-xs leading-relaxed">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiResult.slice(0, 2000)}</ReactMarkdown>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiResultReveal.revealing ? aiResultPreview : aiResult}</ReactMarkdown>
                               </div>
                             </div>
                           </div>
@@ -1877,6 +1909,16 @@ Cover a mix of: commercial protections, dispute resolution, confidentiality, gov
                         )}
                       </div>
                     )}
+                  </div>
+                </div>
+              ) : draftReveal.revealing ? (
+                /* Draft text is being paced onto screen — plain markdown preview only;
+                   the TipTap editor never sees partial content, it mounts once complete. */
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="max-w-3xl mx-auto bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+                    <div className="prose-doc text-sm leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{draftPreview}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ) : (

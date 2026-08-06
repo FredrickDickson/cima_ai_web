@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot, Send, Plus, Search, Scale, FileText, Gavel, Loader2,
   ChevronRight, MessageSquare, Sparkles, User, Clock, Trash2,
@@ -16,6 +16,8 @@ import { useSidebar } from "../contexts/SidebarContext";
 import { useToast } from "../contexts/ToastContext";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
+import { useChatAutoScroll } from "../hooks/useChatAutoScroll";
 import { MentionPopup } from "../components/ui/MentionPopup";
 import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
 import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
@@ -133,6 +135,74 @@ function formatDate(d: string) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+const MessageBubble = memo(function MessageBubble({
+  msg, streaming, copiedId, onCopy,
+}: {
+  msg: AIMessage;
+  streaming: boolean;
+  copiedId: string | null;
+  onCopy: (id: string, text: string) => void;
+}) {
+  return (
+    <div className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+      <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 ${msg.role === "user" ? "bg-navy-700 border border-navy-600" : "bg-gold-500/10 border border-gold-500/20"}`}>
+        {msg.role === "user" ? <User size={13} className="text-slate-300" /> : <Bot size={13} className="text-gold-400" />}
+      </div>
+      <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
+        {msg.content === "" && streaming ? (
+          <div className="flex items-center gap-1.5 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        ) : msg.role === "assistant" ? (
+          <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
+            <CitedMarkdown text={msg.content} sources={msg.cited_sources} />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {msg.attachmentName && (
+              <FileAttachment
+                id={`${msg.id}-attach`}
+                filename={msg.attachmentName}
+                size={msg.attachmentSize}
+              />
+            )}
+            {(() => {
+              // Strip the embedded doc prefix from the visible text
+              const docPrefix = msg.attachmentName
+                ? `[Attached document: ${msg.attachmentName}]\n\n`
+                : null;
+              const separator = "\n\n---\n\n";
+              let visible = msg.content;
+              if (docPrefix && visible.startsWith(docPrefix)) {
+                const sepIdx = visible.indexOf(separator);
+                visible = sepIdx !== -1 ? visible.slice(sepIdx + separator.length) : "";
+              }
+              return visible
+                ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{visible}</p>
+                : null;
+            })()}
+          </div>
+        )}
+        <div className="flex items-center gap-3 mt-1.5">
+          <p className="text-xs text-slate-600">{formatTime(msg.created_at)}</p>
+          {msg.role === "assistant" && msg.content && (
+            <button
+              onClick={() => onCopy(msg.id, msg.content)}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              title="Copy response"
+            >
+              {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              <span className="sr-only">Copy</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function AIAssistant() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -159,6 +229,17 @@ export default function AIAssistant() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const mentions = useAuthorityMentions({ text: input, setText: setInput, textareaRef, userId: user?.id });
 
+  const activeRevealIdRef = useRef<string | null>(null);
+  const citedSourcesRef = useRef<CitedSource[] | undefined>(undefined);
+  const sendTokenRef = useRef(0);
+  const reveal = useTypewriterReveal((revealedText, done) => {
+    const targetId = activeRevealIdRef.current;
+    if (!targetId) return;
+    setMessages(prev => prev.map(m => m.id === targetId
+      ? { ...m, content: revealedText, cited_sources: done ? citedSourcesRef.current : undefined }
+      : m));
+  });
+
   useEffect(() => {
     loadConversations();
     if (user) {
@@ -169,9 +250,7 @@ export default function AIAssistant() {
     }
   }, [user]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useChatAutoScroll(messagesEndRef, messages, reveal.revealing);
 
   async function loadConversations() {
     if (!user) return;
@@ -183,6 +262,10 @@ export default function AIAssistant() {
   }
 
   async function loadMessages(conv: AIConversation) {
+    reveal.complete();
+    activeRevealIdRef.current = null;
+    sendTokenRef.current += 1;
+    setStreaming(false);
     setActiveConv(conv);
     setContext(conv.context ?? "general");
     const { data } = await supabase.from("ai_messages").select("*").eq("conversation_id", conv.id).order("created_at");
@@ -211,6 +294,10 @@ export default function AIAssistant() {
   }
 
   async function startNewConversation() {
+    reveal.complete();
+    activeRevealIdRef.current = null;
+    sendTokenRef.current += 1;
+    setStreaming(false);
     setActiveConv(null);
     setMessages([]);
     setInput("");
@@ -285,6 +372,7 @@ export default function AIAssistant() {
       .then(({ error }) => { if (error) console.error("Failed to save message:", error.message); });
 
     setStreaming(true);
+    const sendToken = ++sendTokenRef.current;
 
     const assistantMsgId = crypto.randomUUID();
     setMessages(prev => [...prev, {
@@ -294,6 +382,9 @@ export default function AIAssistant() {
       content: "",
       created_at: new Date().toISOString(),
     }]);
+    activeRevealIdRef.current = assistantMsgId;
+    citedSourcesRef.current = undefined;
+    reveal.reveal("", { streamEnded: false });
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -364,19 +455,22 @@ export default function AIAssistant() {
 
           if (parsed.__meta) {
             citedSources = parsed.__meta.cited_sources;
+            citedSourcesRef.current = citedSources;
             continue;
           }
 
           const delta = parsed.choices?.[0]?.delta?.content;
           if (delta) {
             content += delta;
-            setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
+            reveal.grow(content);
           }
         }
       }
 
       if (!content) content = "I encountered an issue processing your request.";
-      setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content, cited_sources: citedSources } : m));
+      citedSourcesRef.current = citedSources;
+      reveal.grow(content);
+      reveal.finish();
       await supabase.from("ai_messages").insert({
         conversation_id: conv.id,
         role: "assistant",
@@ -389,10 +483,11 @@ export default function AIAssistant() {
       await (supabase.from("ai_conversations") as any).update({ title: newTitle, updated_at: new Date().toISOString() }).eq("id", conv.id);
       setConversations(prev => prev.map(c => c.id === conv!.id ? { ...c, title: newTitle, updated_at: new Date().toISOString() } : c));
     } catch (err) {
+      if (sendTokenRef.current === sendToken) reveal.cancel();
       const errorMsg = err instanceof Error ? err.message : "An unexpected error occurred.";
       setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: `Error: ${errorMsg}` } : m));
     } finally {
-      setStreaming(false);
+      if (sendTokenRef.current === sendToken) setStreaming(false);
     }
   }
 
@@ -410,7 +505,7 @@ export default function AIAssistant() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
-  function copyToClipboard(id: string, text: string) {
+  const copyToClipboard = useCallback((id: string, text: string) => {
     // Try to copy formatted HTML if possible, fallback to plain text
     const elem = document.getElementById(`msg-${id}`);
     if (elem) {
@@ -428,10 +523,10 @@ export default function AIAssistant() {
     } else {
       navigator.clipboard.writeText(text).catch(() => {});
     }
-    
+
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  }
+  }, []);
 
   const contextInfo = CONTEXTS.find(c => c.value === context);
   const starters = STARTER_PROMPTS[context] ?? STARTER_PROMPTS.general;
@@ -580,62 +675,7 @@ export default function AIAssistant() {
             ) : (
               <>
                 {messages.map(msg => (
-                  <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                    <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 ${msg.role === "user" ? "bg-navy-700 border border-navy-600" : "bg-gold-500/10 border border-gold-500/20"}`}>
-                      {msg.role === "user" ? <User size={13} className="text-slate-300" /> : <Bot size={13} className="text-gold-400" />}
-                    </div>
-                    <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
-                      {msg.content === "" && streaming ? (
-                        <div className="flex items-center gap-1.5 py-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                      ) : msg.role === "assistant" ? (
-                        <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
-                          <CitedMarkdown text={msg.content} sources={msg.cited_sources} />
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {msg.attachmentName && (
-                            <FileAttachment
-                              id={`${msg.id}-attach`}
-                              filename={msg.attachmentName}
-                              size={msg.attachmentSize}
-                            />
-                          )}
-                          {(() => {
-                            // Strip the embedded doc prefix from the visible text
-                            const docPrefix = msg.attachmentName
-                              ? `[Attached document: ${msg.attachmentName}]\n\n`
-                              : null;
-                            const separator = "\n\n---\n\n";
-                            let visible = msg.content;
-                            if (docPrefix && visible.startsWith(docPrefix)) {
-                              const sepIdx = visible.indexOf(separator);
-                              visible = sepIdx !== -1 ? visible.slice(sepIdx + separator.length) : "";
-                            }
-                            return visible
-                              ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{visible}</p>
-                              : null;
-                          })()}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <p className="text-xs text-slate-600">{formatTime(msg.created_at)}</p>
-                        {msg.role === "assistant" && msg.content && (
-                          <button
-                            onClick={() => copyToClipboard(msg.id, msg.content)}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                            title="Copy response"
-                          >
-                            {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                            <span className="sr-only">Copy</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <MessageBubble key={msg.id} msg={msg} streaming={streaming} copiedId={copiedId} onCopy={copyToClipboard} />
                 ))}
                 <div ref={messagesEndRef} />
               </>

@@ -32,6 +32,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
 import { MentionPopup } from "../components/ui/MentionPopup";
 import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
 import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
@@ -169,8 +170,17 @@ export default function Research() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [validityResult, setValidityResult] = useState("");
   const [validityLoading, setValidityLoading] = useState(false);
+  const [validityPreview, setValidityPreview] = useState("");
+  const validityReveal = useTypewriterReveal((revealedText, done) => {
+    setValidityPreview(revealedText);
+    if (done) setValidityResult(revealedText);
+  });
   const [showValidity, setShowValidity] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [analysisPreview, setAnalysisPreview] = useState("");
+  const analysisReveal = useTypewriterReveal((revealedText) => {
+    setAnalysisPreview(revealedText);
+  });
   const queryTextareaRef = useRef<HTMLTextAreaElement>(null);
   const mentions = useAuthorityMentions({ text: query, setText: setQuery, textareaRef: queryTextareaRef, userId: user?.id });
 
@@ -216,6 +226,7 @@ export default function Research() {
       }
       const data: SearchResponse = await res.json();
       setResponse(data);
+      analysisReveal.reveal(data.ai_analysis ?? "");
       if (user) {
         await supabase.from("research_sessions").insert({
           user_id: user.id, query, jurisdiction,
@@ -243,6 +254,8 @@ export default function Research() {
   }
 
   async function loadSession(sessionId: string) {
+    analysisReveal.cancel();
+    validityReveal.cancel();
     const { data } = await supabase.from("research_sessions").select("*").eq("id", sessionId).single();
     if (!data) return;
     const sessionData = data as {
@@ -264,6 +277,7 @@ export default function Research() {
 
   async function validateAuthorities() {
     if (!response?.sources.length) return;
+    validityReveal.cancel();
     setValidityLoading(true);
     setValidityResult("");
     setShowValidity(true);
@@ -332,7 +346,7 @@ Format as a numbered list matching the order above. If you cannot verify the sta
         sections.push(`### AI assessment — not verified against our library\n\n${llmResult}`);
       }
 
-      setValidityResult(sections.join("\n\n---\n\n"));
+      validityReveal.reveal(sections.join("\n\n---\n\n"));
     } catch {
       setValidityResult("Validity check failed. Please try again.");
     } finally {
@@ -555,7 +569,7 @@ Format as a numbered list matching the order above. If you cannot verify the sta
                           </div>
                         ) : (
                           <div className="prose-doc text-sm leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{validityResult}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{validityReveal.revealing ? validityPreview : validityResult}</ReactMarkdown>
                           </div>
                         )}
                       </div>
@@ -587,7 +601,10 @@ Format as a numbered list matching the order above. If you cannot verify the sta
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-6">
                     <div className="prose-doc text-sm leading-relaxed">
-                      <CitedMarkdown text={response.ai_analysis} sources={response.cited_sources} />
+                      <CitedMarkdown
+                        text={analysisReveal.revealing ? analysisPreview : response.ai_analysis}
+                        sources={analysisReveal.revealing ? undefined : response.cited_sources}
+                      />
                     </div>
                   </div>
                 </div>

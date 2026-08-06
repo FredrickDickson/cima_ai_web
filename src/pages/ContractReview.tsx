@@ -45,6 +45,8 @@ import { exportToWord, exportToPdf } from "../lib/exportDraft";
 import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
+import { useChatAutoScroll } from "../hooks/useChatAutoScroll";
 import { MentionPopup } from "../components/ui/MentionPopup";
 import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
 import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
@@ -527,15 +529,19 @@ export default function ContractReview() {
   const questionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const questionMentions = useAuthorityMentions({ text: questionInput, setText: setQuestionInput, textareaRef: questionTextareaRef, userId: user?.id });
   const questionsEndRef = useRef<HTMLDivElement>(null);
+  const [revealingQId, setRevealingQId] = useState<string | null>(null);
+  const [revealedQText, setRevealedQText] = useState("");
+  const questionReveal = useTypewriterReveal((revealedText, done) => {
+    setRevealedQText(revealedText);
+    if (done) setRevealingQId(null);
+  });
 
   useEffect(() => {
     if (activeTab === "questions") loadQuestionThread();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, uploadedDocId]);
 
-  useEffect(() => {
-    questionsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [questionMessages, questionStreaming]);
+  useChatAutoScroll(questionsEndRef, questionMessages, revealedQText);
 
   // Ref to track step interval for cleanup
   const stepIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -671,6 +677,8 @@ export default function ContractReview() {
     });
     setUploadedDocId(a.document_id ?? null);
     tagMentions.hydrateTags((a as unknown as { tagged_authorities?: TaggedAuthority[] }).tagged_authorities ?? []);
+    questionReveal.cancel();
+    setRevealingQId(null);
     setQuestionConversationId(null);
     setQuestionMessages([]);
     setQuestionsLoaded(false);
@@ -696,6 +704,8 @@ export default function ContractReview() {
 
   async function loadQuestionThread() {
     if (!user || !uploadedDocId || questionsLoaded) return;
+    questionReveal.complete();
+    setRevealingQId(null);
     setQuestionsLoaded(true);
     const { data: existing } = await supabase
       .from("ai_conversations")
@@ -767,10 +777,13 @@ export default function ContractReview() {
       const content: string = data.content ?? "I encountered an issue answering that question.";
       const citedSources: CitedSource[] | undefined = data.cited_sources;
 
+      const assistantMsgId = crypto.randomUUID();
       setQuestionMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), conversation_id: convId ?? "", role: "assistant", content, created_at: new Date().toISOString(), cited_sources: citedSources },
+        { id: assistantMsgId, conversation_id: convId ?? "", role: "assistant", content, created_at: new Date().toISOString(), cited_sources: citedSources },
       ]);
+      setRevealingQId(assistantMsgId);
+      questionReveal.reveal(content);
       if (convId) {
         await supabase.from("ai_messages").insert({
           conversation_id: convId,
@@ -2105,7 +2118,10 @@ export default function ContractReview() {
                         >
                           {m.role === "assistant" ? (
                             <div className="leading-relaxed">
-                              <CitedMarkdown text={m.content} sources={m.cited_sources} />
+                              <CitedMarkdown
+                                text={m.id === revealingQId ? revealedQText : m.content}
+                                sources={m.id === revealingQId ? undefined : m.cited_sources}
+                              />
                             </div>
                           ) : (
                             <p className="leading-relaxed whitespace-pre-wrap">{m.content}</p>

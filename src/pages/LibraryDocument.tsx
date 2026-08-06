@@ -24,6 +24,8 @@ import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
+import { useChatAutoScroll } from "../hooks/useChatAutoScroll";
 import { convex } from "../lib/convexClient";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -382,10 +384,14 @@ function DocumentChat({ docId, docTitle }: { docId: string; docTitle: string }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [revealingIdx, setRevealingIdx] = useState<number | null>(null);
+  const [revealedText, setRevealedText] = useState("");
+  const reveal = useTypewriterReveal((revealedText, done) => {
+    setRevealedText(revealedText);
+    if (done) setRevealingIdx(null);
+  });
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  useChatAutoScroll(bottomRef, messages, revealedText);
 
   async function send() {
     const text = input.trim();
@@ -410,7 +416,12 @@ function DocumentChat({ docId, docTitle }: { docId: string; docTitle: string }) 
       if (!res.ok) throw new Error(`AI request failed (${res.status})`);
       const data = await res.json();
       const content = data.content ?? data.choices?.[0]?.message?.content ?? "";
-      setMessages((prev) => [...prev, { role: "assistant", content: content || "No response." }]);
+      const finalContent = content || "No response.";
+      setMessages((prev) => {
+        setRevealingIdx(prev.length);
+        return [...prev, { role: "assistant", content: finalContent }];
+      });
+      reveal.reveal(finalContent);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -443,7 +454,7 @@ function DocumentChat({ docId, docTitle }: { docId: string; docTitle: string }) 
           >
             {m.role === "assistant" ? (
               <div className="prose prose-sm max-w-none prose-p:my-1">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{i === revealingIdx ? revealedText : m.content}</ReactMarkdown>
               </div>
             ) : (
               m.content
