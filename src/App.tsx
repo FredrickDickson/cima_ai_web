@@ -154,7 +154,7 @@ export default function App() {
           <Routes>
             <Route
               path="/"
-              element={<Landing />}
+              element={<RedirectIfAuth><Landing /></RedirectIfAuth>}
             />
             <Route
               path="/login"
