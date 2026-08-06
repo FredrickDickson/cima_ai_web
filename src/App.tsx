@@ -72,23 +72,58 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ backgroundColor: 'var(--navy-950)' }}>
-      {/* Logo mark */}
-      <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg">
-        <img 
-          src="/images/logo.jpeg" 
-          alt="CIMA AI Logo" 
-          style={{ 
-            width: '100%', 
-            height: '100%', 
-            objectFit: 'cover' 
-          }} 
-        />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ 
+      background: "linear-gradient(135deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {/* Background Pattern */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        opacity: 0.3,
+      }}>
+        <div style={{
+          position: "absolute",
+          top: "-10%",
+          right: "-10%",
+          width: "600px",
+          height: "600px",
+          background: "radial-gradient(circle, rgba(139, 14, 30, 0.15) 0%, transparent 70%)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+        }}></div>
+        <div style={{
+          position: "absolute",
+          bottom: "-10%",
+          left: "-10%",
+          width: "600px",
+          height: "600px",
+          background: "radial-gradient(circle, rgba(201, 169, 97, 0.15) 0%, transparent 70%)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+        }}></div>
       </div>
-      {/* Spinner */}
-      <ClassicLoader size={36} />
-      {/* Label */}
-      <p className="text-slate-400 text-sm tracking-wide">Loading CIMA AI...</p>
+      
+      {/* Content */}
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
+        {/* Logo mark */}
+        <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg">
+          <img 
+            src="/images/logo.jpeg" 
+            alt="CIMA AI Logo" 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover' 
+            }} 
+          />
+        </div>
+        {/* Spinner */}
+        <ClassicLoader size={36} />
+        {/* Label */}
+        <p style={{ color: "#6d6d6d", fontSize: "0.875rem", fontWeight: 500, letterSpacing: "0.025em" }}>Loading CIMA AI...</p>
+      </div>
     </div>
   );
 }

@@ -28,7 +28,7 @@ export default function Login() {
     if (error) {
       setError(error);
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   }
 

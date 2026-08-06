@@ -18,7 +18,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useSidebar } from "../../contexts/SidebarContext";
 
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/research", icon: Search, label: "Research" },
   { to: "/cases", icon: Briefcase, label: "Cases" },
   { to: "/documents", icon: FileText, label: "Documents" },
@@ -75,7 +75,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            end={to === "/"}
+            end={to === "/dashboard"}
             data-tour={`sidebar-${to}`}
             onClick={close}
             className={({ isActive }) =>
