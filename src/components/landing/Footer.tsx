@@ -40,8 +40,8 @@ const footerLinks = {
     { name: "Webinars", href: "#webinars" },
   ],
   legal: [
-    { name: "Privacy Policy", href: "#privacy" },
-    { name: "Terms of Service", href: "#terms" },
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
     { name: "Compliance", href: "#compliance" },
     { name: "Cookie Policy", href: "#cookies" },
   ],

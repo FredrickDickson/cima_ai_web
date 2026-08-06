@@ -52,8 +52,16 @@ export default function Sidebar() {
     >
       {/* Logo row */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-navy-800 shrink-0">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gold-500 shrink-0">
-          <Scale className="w-5 h-5 text-navy-950" />
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg overflow-hidden shrink-0">
+          <img 
+            src="/images/logo.jpeg" 
+            alt="CIMA AI Logo" 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover' 
+            }} 
+          />
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-white font-bold text-lg tracking-tight">CIMA</span>
