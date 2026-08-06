@@ -7,6 +7,7 @@ const navItems = [
   { name: "About", href: "#why-cima" },
   { name: "Solutions", href: "#how-it-works" },
   { name: "Features", href: "#features" },
+  { name: "Pricing", href: "#pricing" },
   { name: "Resources", href: "#faq" },
   { name: "Contact", href: "#footer" },
 ];

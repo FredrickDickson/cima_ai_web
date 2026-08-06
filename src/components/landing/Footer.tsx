@@ -35,7 +35,6 @@ const footerLinks = {
   ],
   resources: [
     { name: "Documentation", href: "#docs" },
-    { name: "API Reference", href: "#api" },
     { name: "Case Studies", href: "#case-studies" },
     { name: "Blog", href: "#blog" },
     { name: "Webinars", href: "#webinars" },
@@ -43,7 +42,6 @@ const footerLinks = {
   legal: [
     { name: "Privacy Policy", href: "#privacy" },
     { name: "Terms of Service", href: "#terms" },
-    { name: "Security", href: "#security" },
     { name: "Compliance", href: "#compliance" },
     { name: "Cookie Policy", href: "#cookies" },
   ],
@@ -94,20 +92,18 @@ export function Footer() {
                 width: "3rem",
                 height: "3rem",
                 borderRadius: "0.75rem",
-                background: "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 8px 24px rgba(139, 14, 30, 0.3)",
+                overflow: "hidden",
+                flexShrink: 0,
               }}>
-                <span style={{
-                  fontFamily: "Playfair Display, Georgia, serif",
-                  fontSize: "1.5rem",
-                  fontWeight: 700,
-                  color: "white",
-                }}>
-                  C
-                </span>
+                <img
+                  src="/images/logo.jpeg"
+                  alt="CIMA AI Logo"
+                  style={{ 
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover"
+                  }}
+                />
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{
