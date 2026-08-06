@@ -42,7 +42,7 @@ export default function Register() {
     if (error) {
       setError(error);
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   }
 
