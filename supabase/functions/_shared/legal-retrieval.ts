@@ -39,10 +39,14 @@ export async function getEmbedding(text: string, hfKey: string): Promise<number[
         body: JSON.stringify({ inputs: text, options: { wait_for_model: true } }),
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`getEmbedding: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
+      return null;
+    }
     const data = await res.json();
     return Array.isArray(data[0]) ? data[0] : data;
-  } catch {
+  } catch (err) {
+    console.error("getEmbedding: request threw", err);
     return null;
   }
 }
