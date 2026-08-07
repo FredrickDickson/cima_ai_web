@@ -1,6 +1,7 @@
-import { Bell, Menu, Settings } from "lucide-react";
+import { Bell, HelpCircle, Menu, Settings } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSidebar } from "../../contexts/SidebarContext";
+import { useTour } from "../../contexts/TourContext";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeSwitcher from "../ui/ThemeSwitcher";
@@ -13,6 +14,7 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   const { user, profile } = useAuth();
   const { toggle } = useSidebar();
+  const { start: startTour } = useTour();
   const navigate = useNavigate();
   const displayName = profile?.full_name || user?.email || "User";
   const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
@@ -41,6 +43,14 @@ export default function Header({ title, subtitle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1 md:gap-2 shrink-0">
+        <button
+          onClick={startTour}
+          className="hidden sm:flex p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors"
+          aria-label="Take the tour"
+          title="Take the tour"
+        >
+          <HelpCircle size={18} />
+        </button>
         <button className="p-2 text-slate-400 hover:text-navy-950 hover:bg-slate-100 rounded-lg transition-colors">
           <Bell size={18} />
         </button>

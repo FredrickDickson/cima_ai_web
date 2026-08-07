@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Plus, CheckCircle2, ChevronDown, Loader2, Sparkles, ShieldAlert, LayoutList, Copy, Check, FileCheck } from "lucide-react";
+import { Plus, CheckCircle2, ChevronDown, Loader2, Sparkles, ShieldAlert, LayoutList, Copy, Check, FileCheck, X, Layers } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { callCaseAI, type CaseContext } from "../caseAI";
+import { logCaseEvent } from "../../../lib/caseEvents";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -16,8 +18,11 @@ type Issue = {
   created_at: string;
 };
 
+type EvidenceLink = { id: string; evidence_id: string };
+
 export default function IssuesTab({ caseId, caseData }: { caseId: string; caseData: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -36,20 +41,55 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
   const [jointLoading, setJointLoading] = useState(false);
   const [showJoint, setShowJoint] = useState(false);
   const [jointCopied, setJointCopied] = useState(false);
+  const [evidenceList, setEvidenceList] = useState<{ id: string; title: string }[]>([]);
+  const [links, setLinks] = useState<Record<string, EvidenceLink[]>>({});
 
   useEffect(() => {
     supabase.from("issues").select("*").eq("case_id", caseId).order("issue_number", { ascending: true })
       .then(({ data }) => { setIssues(data ?? []); setLoading(false); });
+    supabase.from("evidence").select("id, title").eq("case_id", caseId)
+      .then(({ data }) => setEvidenceList(data ?? []));
   }, [caseId]);
+
+  useEffect(() => {
+    if (issues.length === 0) { setLinks({}); return; }
+    supabase.from("evidence_issues").select("id, evidence_id, issue_id").in("issue_id", issues.map(i => i.id))
+      .then(({ data }) => {
+        const grouped: Record<string, EvidenceLink[]> = {};
+        for (const row of (data ?? []) as { id: string; evidence_id: string; issue_id: string }[]) {
+          (grouped[row.issue_id] ??= []).push({ id: row.id, evidence_id: row.evidence_id });
+        }
+        setLinks(grouped);
+      });
+  }, [issues]);
+
+  async function linkEvidence(issueId: string, evidenceId: string) {
+    const { data, error } = await supabase.from("evidence_issues")
+      .insert({ issue_id: issueId, evidence_id: evidenceId, user_id: user!.id })
+      .select().maybeSingle();
+    if (error) { showToast(`Failed to link evidence: ${error.message}`, "error"); return; }
+    if (data) setLinks(p => ({ ...p, [issueId]: [...(p[issueId] ?? []), { id: data.id, evidence_id: data.evidence_id }] }));
+  }
+
+  async function unlinkEvidence(issueId: string, linkId: string) {
+    const { error } = await supabase.from("evidence_issues").delete().eq("id", linkId);
+    if (error) { showToast(`Failed to unlink evidence: ${error.message}`, "error"); return; }
+    setLinks(p => ({ ...p, [issueId]: (p[issueId] ?? []).filter(l => l.id !== linkId) }));
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("issues").insert({
+    const { data, error } = await supabase.from("issues").insert({
       ...form, case_id: caseId, user_id: user!.id, status: "open",
       issue_number: issues.length > 0 ? Math.max(...issues.map(i => i.issue_number)) + 1 : 1,
     }).select().maybeSingle();
-    if (data) setIssues(p => [...p, data]);
+    if (error) {
+      showToast(`Failed to add issue: ${error.message}`, "error");
+    } else if (data) {
+      setIssues(p => [...p, data]);
+      logCaseEvent(caseId, user!.id, "issue_added", `Issue #${data.issue_number} added: "${data.description.slice(0, 80)}"`);
+    }
     setForm({ description: "", claimant_position: "", respondent_position: "" });
     setShowForm(false);
     setSaving(false);
@@ -57,8 +97,10 @@ export default function IssuesTab({ caseId, caseData }: { caseId: string; caseDa
 
   async function toggleStatus(issue: Issue) {
     const next = issue.status === "open" ? "resolved" : "open";
-    await supabase.from("issues").update({ status: next }).eq("id", issue.id);
+    const { error } = await supabase.from("issues").update({ status: next }).eq("id", issue.id);
+    if (error) { showToast(`Failed to update issue: ${error.message}`, "error"); return; }
     setIssues(p => p.map(i => i.id === issue.id ? { ...i, status: next } : i));
+    if (next === "resolved") logCaseEvent(caseId, user!.id, "issue_resolved", `Issue #${issue.issue_number} resolved: "${issue.description.slice(0, 80)}"`);
   }
 
   const issueList = issues.map(i => `${i.issue_number}. ${i.description}${i.claimant_position ? ` [Claimant: ${i.claimant_position}]` : ""}${i.respondent_position ? ` [Respondent: ${i.respondent_position}]` : ""}`).join("\n");
@@ -144,9 +186,9 @@ Keep each section concise and professionally worded in the third person. This is
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-slate-400">{issues.filter(i => i.status === "open").length} open / {issues.length} total</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={generateMatrix} disabled={matrixLoading || issues.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-800 border border-navy-700 text-blue-400 hover:border-blue-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
             {matrixLoading ? <Loader2 size={13} className="animate-spin" /> : <LayoutList size={13} />}Issue Matrix
           </button>
@@ -296,20 +338,53 @@ Keep each section concise and professionally worded in the third person. This is
               </div>
               <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform mt-1 ${expanded === issue.id ? "rotate-180" : ""}`} />
             </button>
-            {expanded === issue.id && (issue.claimant_position || issue.respondent_position) && (
-              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {issue.claimant_position && (
-                  <div className="bg-gold-500/5 border border-gold-500/15 rounded-lg p-3">
-                    <p className="text-xs font-medium text-gold-400 mb-1">Claimant Position</p>
-                    <p className="text-xs text-slate-300 leading-relaxed">{issue.claimant_position}</p>
+            {expanded === issue.id && (
+              <div className="px-4 pb-4 space-y-3">
+                {(issue.claimant_position || issue.respondent_position) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {issue.claimant_position && (
+                      <div className="bg-gold-500/5 border border-gold-500/15 rounded-lg p-3">
+                        <p className="text-xs font-medium text-gold-400 mb-1">Claimant Position</p>
+                        <p className="text-xs text-slate-300 leading-relaxed">{issue.claimant_position}</p>
+                      </div>
+                    )}
+                    {issue.respondent_position && (
+                      <div className="bg-red-500/5 border border-red-500/15 rounded-lg p-3">
+                        <p className="text-xs font-medium text-red-400 mb-1">Respondent Position</p>
+                        <p className="text-xs text-slate-300 leading-relaxed">{issue.respondent_position}</p>
+                      </div>
+                    )}
                   </div>
                 )}
-                {issue.respondent_position && (
-                  <div className="bg-red-500/5 border border-red-500/15 rounded-lg p-3">
-                    <p className="text-xs font-medium text-red-400 mb-1">Respondent Position</p>
-                    <p className="text-xs text-slate-300 leading-relaxed">{issue.respondent_position}</p>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-1.5"><Layers size={11} />Linked Evidence</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(links[issue.id] ?? []).length === 0 && <span className="text-xs text-slate-600">None linked yet.</span>}
+                    {(links[issue.id] ?? []).map(link => {
+                      const ev = evidenceList.find(e => e.id === link.evidence_id);
+                      return (
+                        <span key={link.id} className="flex items-center gap-1 text-xs px-2 py-1 bg-navy-800 border border-navy-700 rounded-lg text-slate-300">
+                          {ev?.title ?? "Evidence"}
+                          <button onClick={() => unlinkEvidence(issue.id, link.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                            <X size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
-                )}
+                  {evidenceList.filter(e => !(links[issue.id] ?? []).some(l => l.evidence_id === e.id)).length > 0 && (
+                    <select
+                      value=""
+                      onChange={e => { if (e.target.value) linkEvidence(issue.id, e.target.value); }}
+                      className="text-xs bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 focus:outline-none focus:border-gold-500/50"
+                    >
+                      <option value="">+ Link evidence...</option>
+                      {evidenceList.filter(e => !(links[issue.id] ?? []).some(l => l.evidence_id === e.id)).map(e => (
+                        <option key={e.id} value={e.id}>{e.title}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
             )}
           </div>

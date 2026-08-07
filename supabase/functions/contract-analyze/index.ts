@@ -1,14 +1,51 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { fetchLawsAfricaContext, COUNTRY_MAP } from "../_shared/laws-africa.ts";
+import { fetchLawsAfricaSources, COUNTRY_MAP } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { buildPlaybookGroundingBlock } from "../_shared/strict-grounding.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
+
+interface CitedSource {
+  marker: string;
+  source_name: string;
+  citation?: string;
+  source_type?: string;
+  jurisdiction?: string;
+  content: string;
+  url?: string;
+  doc_id?: string;
+}
+
+interface CaseLawRow {
+  id: string;
+  title: string;
+  content: string;
+  citation: string;
+  jurisdiction?: string;
+  source_type: string;
+  doc_id?: string;
+}
+
+async function fetchCaseLawRows(query: string, supabase: ReturnType<typeof createClient>): Promise<CaseLawRow[]> {
+  if (!query) return [];
+  try {
+    const { data, error } = await supabase.rpc("search_legal_library_fts", {
+      search_query: query,
+      match_count: 8,
+    });
+    if (error || !data) return [];
+    return (data as CaseLawRow[]).filter((r) => r.source_type === "case").slice(0, 4);
+  } catch {
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Document-type-specific review focus
@@ -36,7 +73,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Accept both document_type (new) and industry_type (legacy) params
-    const { text, document_id, case_id, user_id, document_type, industry_type, jurisdiction } = await req.json();
+    const {
+      text, document_id, case_id, user_id, document_type, industry_type, jurisdiction,
+      library_doc_ids, document_ids, tagged_authorities,
+    } = await req.json();
     if (!text || !user_id) throw new Error("text and user_id are required");
 
     const effectiveDocType = document_type ?? industry_type ?? "commercial";
@@ -52,7 +92,50 @@ Deno.serve(async (req: Request) => {
 
     const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
     const lawsQuery = `document review ${effectiveDocType} law ${jurisdiction ?? "ghana"}`;
-    const lawsContext = await fetchLawsAfricaContext(lawsQuery, lawsAfricaKey, countryCode);
+    const [lawsSources, caseLawRows] = await Promise.all([
+      fetchLawsAfricaSources(lawsQuery, lawsAfricaKey, countryCode),
+      fetchCaseLawRows(`${effectiveDocType} contract dispute case law ${jurisdiction ?? "ghana"}`, supabase),
+    ]);
+
+    const lawsContext = lawsSources.length > 0
+      ? `\nApplicable legislation to reference:\n${lawsSources
+          .map((s, i) => `[L${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}\n${s.content}`)
+          .join("\n\n")}`
+      : "";
+    const caseLawContext = caseLawRows.length > 0
+      ? `\nRelevant Ghanaian case law:\n${caseLawRows
+          .map((r, i) => `[C${i + 1}] ${r.citation ?? r.title}\n${(r.content ?? "").slice(0, 800)}`)
+          .join("\n\n")}`
+      : "";
+
+    // Playbook/authority tagging: augments the review (doesn't replace it —
+    // the document itself remains the primary subject of analysis).
+    const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      : null;
+    const playbookBlock = taggedContext ? buildPlaybookGroundingBlock(taggedContext.titles, taggedContext.context) : "";
+
+    const citedSources: CitedSource[] = [
+      ...lawsSources.map((s, i) => ({
+        marker: `L${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+      })),
+      ...caseLawRows.map((r, i) => ({
+        marker: `C${i + 1}`,
+        source_name: r.title,
+        citation: r.citation,
+        source_type: "case",
+        jurisdiction: r.jurisdiction,
+        content: r.content,
+        doc_id: r.doc_id,
+      })),
+      ...(taggedContext?.citedSources ?? []),
+    ];
 
     const res = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
@@ -64,7 +147,8 @@ Deno.serve(async (req: Request) => {
             role: "system",
             content: CIMA_SYSTEM_PROMPT +
               `\n\nDETECTED JURISDICTION: ${jurisdiction ?? "Ghana"}` +
-              `\n\n===CRITICAL OVERRIDE — THIS TASK ONLY===\nThe RESPONSE FORMAT section above does NOT apply here. Do not follow the 7-step response format. Your entire response must be a single valid JSON object and nothing else. No prose, no markdown, no code fences, no text before or after the JSON. Failure to return pure JSON will break the application.`,
+              `\n\n===CRITICAL OVERRIDE — THIS TASK ONLY===\nThe RESPONSE FORMAT section above does NOT apply here. Do not follow the 7-step response format. Your entire response must be a single valid JSON object and nothing else. No prose, no markdown, no code fences, no text before or after the JSON. Failure to return pure JSON will break the application.` +
+              playbookBlock,
           },
           {
           role: "user",
@@ -132,7 +216,8 @@ DEFECT TYPES — classify each clause/provision under one of these:
 - "risk": general commercial or legal risk not covered by the above categories
 
 Document focus: Review using standards and risk factors specific to ${docFocus}.
-${lawsContext ? `\nApplicable legislation to reference:\n${lawsContext}` : ""}
+${lawsContext}
+${caseLawContext}
 
 Requirements:
 - Identify at least 8-12 provisions (clauses), covering all 6 defect categories where present
@@ -141,6 +226,7 @@ Requirements:
 - Use actual party names from the document in the obligations section
 - The ai_insights field must contain substantive paragraphs, not bullet points
 - Be specific and practical in all fields — refer to actual text from the document
+- When a specific piece of legislation, Ghanaian case law, or a tagged playbook/authority source above is genuinely relevant to a point in "ai_summary", a clause's "analysis", "ai_insights", or "recommendations", cite it inline using its exact bracket marker (e.g. "[L1]", "[C1]", "[T1]"). Only cite where truly relevant — do not force citations where none apply.
 
 DOCUMENT TEXT:
 ${excerpt}`,
@@ -206,10 +292,12 @@ ${excerpt}`,
       detected_document_type: String(analysis.detected_document_type ?? ""),
       governing_law_found: Boolean(analysis.governing_law_found),
       governing_law: String(analysis.governing_law ?? ""),
+      cited_sources: citedSources,
+      tagged_authorities: tagged_authorities ?? [],
     }).select().maybeSingle();
 
     return new Response(
-      JSON.stringify({ ...analysis, id: savedAnalysis?.id, contract_text: text }),
+      JSON.stringify({ ...analysis, id: savedAnalysis?.id, contract_text: text, cited_sources: citedSources }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

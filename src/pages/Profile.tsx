@@ -19,6 +19,7 @@ import {
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 
 const ROLES = [
@@ -39,6 +40,7 @@ const JURISDICTIONS = [
 
 export default function Profile() {
   const { user, profile, signOut, refreshProfile } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -213,6 +215,7 @@ export default function Profile() {
         await supabase.from("profiles").delete().eq("id", user.id);
       }
       await signOut();
+      showToast("Your account has been deleted");
       navigate("/login");
     } catch (err) {
       setMessage({ type: "error", text: "Failed to delete account. Please contact support." });

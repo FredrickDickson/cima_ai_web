@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { stripWatermarks } from "../_shared/sanitize-legal-text.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,6 +125,10 @@ function charChunk(text: string, titlePrefix: string, size = 1000, overlap = 150
       });
       idx++;
     }
+    // Once we've reached the end of the text, stop — otherwise `end` stays
+    // pinned at text.length and `start = end - overlap` recomputes to the
+    // same value forever (infinite loop).
+    if (end >= text.length) break;
     start = end - overlap;
   }
   return chunks;
@@ -220,7 +225,7 @@ Deno.serve(async (req: Request) => {
     // Extract text
     console.log(`[ingest] Extracting text (${mimeType})...`);
     const bytes = new Uint8Array(await fileData.arrayBuffer());
-    const fullText = await extractText(bytes, mimeType);
+    const fullText = stripWatermarks(await extractText(bytes, mimeType));
     console.log(`[ingest] Extracted ${fullText.length} characters`);
 
     if (fullText.trim().length < 50) {

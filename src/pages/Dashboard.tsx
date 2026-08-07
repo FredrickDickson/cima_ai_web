@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Briefcase,
   FileText,
@@ -18,6 +18,7 @@ import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useTour } from "../contexts/TourContext";
 import type { Case, DbDocument as Document, Hearing } from "../types/database";
 
 interface Stats {
@@ -29,10 +30,19 @@ interface Stats {
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const { start: startTour } = useTour();
   const [stats, setStats] = useState<Stats>({ activeCases: 0, totalDocuments: 0, researchSessions: 0, upcomingHearings: 0 });
   const [recentCases, setRecentCases] = useState<Case[]>([]);
   const [recentDocs, setRecentDocs] = useState<Document[]>([]);
   const [upcomingHearings, setUpcomingHearings] = useState<Hearing[]>([]);
+
+  const autoStartedTourRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedTourRef.current) return;
+    if (!profile || profile.onboarding_completed_at) return;
+    autoStartedTourRef.current = true;
+    startTour();
+  }, [profile, startTour]);
 
   useEffect(() => {
     if (!user) return;
@@ -114,7 +124,7 @@ export default function Dashboard() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, change }) => (
             <div key={label} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm transition-shadow">
               <div className="flex items-start justify-between mb-4">
@@ -133,7 +143,7 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <div>
           <h2 className="text-base font-semibold text-navy-950 mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {quickActions.map(({ label, icon: Icon, to, desc }) => (
               <Link
                 key={to}
@@ -154,7 +164,7 @@ export default function Dashboard() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Recent Cases */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200">
+          <div className="md:col-span-2 bg-white rounded-xl border border-slate-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Gavel size={16} className="text-navy-600" />

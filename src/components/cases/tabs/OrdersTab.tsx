@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Plus, Gavel, ChevronDown } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
+import { logCaseEvent } from "../../../lib/caseEvents";
 
 type Order = {
   id: string;
@@ -14,6 +16,7 @@ type Order = {
 
 export default function OrdersTab({ caseId }: { caseId: string }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -29,7 +32,7 @@ export default function OrdersTab({ caseId }: { caseId: string }) {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase.from("procedural_orders").insert({
+    const { data, error } = await supabase.from("procedural_orders").insert({
       ...form,
       issued_at: form.issued_at || null,
       case_id: caseId,
@@ -37,7 +40,12 @@ export default function OrdersTab({ caseId }: { caseId: string }) {
       status: "active",
       order_number: orders.length + 1,
     }).select().maybeSingle();
-    if (data) setOrders(p => [...p, data]);
+    if (error) {
+      showToast(`Failed to add order: ${error.message}`, "error");
+    } else if (data) {
+      setOrders(p => [...p, data]);
+      logCaseEvent(caseId, user!.id, "order_added", `Procedural Order PO-${data.order_number} added: "${data.title}"`);
+    }
     setForm({ title: "", content: "", issued_at: "" });
     setShowForm(false);
     setSaving(false);

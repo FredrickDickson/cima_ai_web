@@ -15,6 +15,7 @@ import mammoth from 'mammoth';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -138,6 +139,10 @@ function charChunk(text, titlePrefix, size = 1000, overlap = 150) {
       });
       idx++;
     }
+    // Once we've reached the end of the text, stop — otherwise `end` stays
+    // pinned at text.length and `start = end - overlap` recomputes to the
+    // same value forever (infinite loop).
+    if (end >= text.length) break;
     start = end - overlap;
   }
   return chunks;
@@ -237,7 +242,7 @@ async function main() {
 
       // Extract text
       console.log('   Extracting text...');
-      const fullText = await extractText(fileData, mimeType);
+      const fullText = stripWatermarks(await extractText(fileData, mimeType));
       console.log(`   Extracted ${fullText.length.toLocaleString()} characters`);
 
       // Chunk content

@@ -1,18 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot, Send, Plus, Search, Scale, FileText, Gavel, Loader2,
   ChevronRight, MessageSquare, Sparkles, User, Clock, Trash2,
   Paperclip, X, Briefcase, ShieldAlert,
   PenTool, HandshakeIcon, Award, Target, Menu, Upload, Copy, Check,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import { FileAttachment } from "../components/ui/FileAttachment";
+import { VoiceInputButton } from "../components/ui/VoiceInputButton";
+import { SharpenButton } from "../components/ui/SharpenButton";
 import { extractTextFromFile } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
+import { useToast } from "../contexts/ToastContext";
+import { CitedMarkdown, type CitedSource } from "../lib/citations";
+import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
+import { useChatAutoScroll } from "../hooks/useChatAutoScroll";
+import { MentionPopup } from "../components/ui/MentionPopup";
+import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
+import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
 
 // Rendered inside AppLayout's SidebarProvider so useSidebar() works correctly
 function AppMenuButton() {
@@ -45,6 +53,7 @@ type AIMessage = {
   created_at: string;
   attachmentName?: string;
   attachmentSize?: number;
+  cited_sources?: CitedSource[];
 };
 
 const CONTEXTS = [
@@ -126,8 +135,77 @@ function formatDate(d: string) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+const MessageBubble = memo(function MessageBubble({
+  msg, streaming, copiedId, onCopy,
+}: {
+  msg: AIMessage;
+  streaming: boolean;
+  copiedId: string | null;
+  onCopy: (id: string, text: string) => void;
+}) {
+  return (
+    <div className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+      <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 ${msg.role === "user" ? "bg-navy-700 border border-navy-600" : "bg-gold-500/10 border border-gold-500/20"}`}>
+        {msg.role === "user" ? <User size={13} className="text-slate-300" /> : <Bot size={13} className="text-gold-400" />}
+      </div>
+      <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
+        {msg.content === "" && streaming ? (
+          <div className="flex items-center gap-1.5 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        ) : msg.role === "assistant" ? (
+          <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
+            <CitedMarkdown text={msg.content} sources={msg.cited_sources} />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {msg.attachmentName && (
+              <FileAttachment
+                id={`${msg.id}-attach`}
+                filename={msg.attachmentName}
+                size={msg.attachmentSize}
+              />
+            )}
+            {(() => {
+              // Strip the embedded doc prefix from the visible text
+              const docPrefix = msg.attachmentName
+                ? `[Attached document: ${msg.attachmentName}]\n\n`
+                : null;
+              const separator = "\n\n---\n\n";
+              let visible = msg.content;
+              if (docPrefix && visible.startsWith(docPrefix)) {
+                const sepIdx = visible.indexOf(separator);
+                visible = sepIdx !== -1 ? visible.slice(sepIdx + separator.length) : "";
+              }
+              return visible
+                ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{visible}</p>
+                : null;
+            })()}
+          </div>
+        )}
+        <div className="flex items-center gap-3 mt-1.5">
+          <p className="text-xs text-slate-600">{formatTime(msg.created_at)}</p>
+          {msg.role === "assistant" && msg.content && (
+            <button
+              onClick={() => onCopy(msg.id, msg.content)}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              title="Copy response"
+            >
+              {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              <span className="sr-only">Copy</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function AIAssistant() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConv, setActiveConv] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -149,6 +227,18 @@ export default function AIAssistant() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const mentions = useAuthorityMentions({ text: input, setText: setInput, textareaRef, userId: user?.id });
+
+  const activeRevealIdRef = useRef<string | null>(null);
+  const citedSourcesRef = useRef<CitedSource[] | undefined>(undefined);
+  const sendTokenRef = useRef(0);
+  const reveal = useTypewriterReveal((revealedText, done) => {
+    const targetId = activeRevealIdRef.current;
+    if (!targetId) return;
+    setMessages(prev => prev.map(m => m.id === targetId
+      ? { ...m, content: revealedText, cited_sources: done ? citedSourcesRef.current : undefined }
+      : m));
+  });
 
   useEffect(() => {
     loadConversations();
@@ -160,9 +250,7 @@ export default function AIAssistant() {
     }
   }, [user]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useChatAutoScroll(messagesEndRef, messages, reveal.revealing);
 
   async function loadConversations() {
     if (!user) return;
@@ -174,10 +262,14 @@ export default function AIAssistant() {
   }
 
   async function loadMessages(conv: AIConversation) {
+    reveal.complete();
+    activeRevealIdRef.current = null;
+    sendTokenRef.current += 1;
+    setStreaming(false);
     setActiveConv(conv);
     setContext(conv.context ?? "general");
     const { data } = await supabase.from("ai_messages").select("*").eq("conversation_id", conv.id).order("created_at");
-    setMessages(data ?? []);
+    setMessages((data ?? []).map((m) => ({ ...m, cited_sources: (m as { metadata?: { cited_sources?: CitedSource[] } }).metadata?.cited_sources })));
   }
 
 
@@ -202,6 +294,10 @@ export default function AIAssistant() {
   }
 
   async function startNewConversation() {
+    reveal.complete();
+    activeRevealIdRef.current = null;
+    sendTokenRef.current += 1;
+    setStreaming(false);
     setActiveConv(null);
     setMessages([]);
     setInput("");
@@ -268,10 +364,15 @@ export default function AIAssistant() {
     setUploadedDocText(null);
 
     // Save user message to DB (non-blocking)
-    supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "user", content: userMsg.content } as any)
+    const sentTaggedAuthorities = mentions.activeTaggedAuthorities;
+    supabase.from("ai_messages").insert({
+      conversation_id: conv.id, role: "user", content: userMsg.content,
+      ...(sentTaggedAuthorities.length > 0 ? { metadata: { tagged_authorities: sentTaggedAuthorities } } : {}),
+    } as any)
       .then(({ error }) => { if (error) console.error("Failed to save message:", error.message); });
 
     setStreaming(true);
+    const sendToken = ++sendTokenRef.current;
 
     const assistantMsgId = crypto.randomUUID();
     setMessages(prev => [...prev, {
@@ -281,6 +382,9 @@ export default function AIAssistant() {
       content: "",
       created_at: new Date().toISOString(),
     }]);
+    activeRevealIdRef.current = assistantMsgId;
+    citedSourcesRef.current = undefined;
+    reveal.reveal("", { streamEnded: false });
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -297,9 +401,13 @@ export default function AIAssistant() {
         context,
         conversation_id: conv.id,
         user_id: user.id,
+        stream: true,
       };
       if (attachedCase) body.case_id = attachedCase.id;
       if (attachedDoc) body.document_id = attachedDoc.id;
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(mentions.activeTaggedAuthorities);
+      if (libraryDocIds.length > 0) body.library_doc_ids = libraryDocIds;
+      if (documentIds.length > 0) body.document_ids = documentIds;
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
         method: "POST",
@@ -312,36 +420,92 @@ export default function AIAssistant() {
         throw new Error(`AI service error (${res.status}): ${errBody || res.statusText}`);
       }
 
-      const data = await res.json();
-      const content: string = data.content ?? data.choices?.[0]?.message?.content ?? data.response ?? data.message ?? "I encountered an issue processing your request.";
+      // ai-chat streams DeepSeek's raw SSE body, prefixed with one custom
+      // { __meta: { cited_sources } } frame (cited_sources is our data, not
+      // something DeepSeek's own stream ever includes) — see ai-chat/index.ts.
+      let content = "";
+      let citedSources: CitedSource[] | undefined;
 
-      setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content } : m));
-      await supabase.from("ai_messages").insert({ conversation_id: conv.id, role: "assistant", content } as any);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Streaming is not supported in this browser.");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sepIndex: number;
+        while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex);
+          buffer = buffer.slice(sepIndex + 2);
+
+          const dataLine = rawEvent.split("\n").find((l) => l.startsWith("data:"));
+          if (!dataLine) continue;
+          const payload = dataLine.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+
+          let parsed: { __meta?: { cited_sources?: CitedSource[] }; choices?: { delta?: { content?: string } }[] };
+          try {
+            parsed = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+
+          if (parsed.__meta) {
+            citedSources = parsed.__meta.cited_sources;
+            citedSourcesRef.current = citedSources;
+            continue;
+          }
+
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            content += delta;
+            reveal.grow(content);
+          }
+        }
+      }
+
+      if (!content) content = "I encountered an issue processing your request.";
+      citedSourcesRef.current = citedSources;
+      reveal.grow(content);
+      reveal.finish();
+      await supabase.from("ai_messages").insert({
+        conversation_id: conv.id,
+        role: "assistant",
+        content,
+        ...(citedSources && citedSources.length > 0 ? { metadata: { cited_sources: citedSources } } : {}),
+      } as any);
 
       const newTitle = messages.length === 0 ? sentInput.slice(0, 60) : conv.title;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase.from("ai_conversations") as any).update({ title: newTitle, updated_at: new Date().toISOString() }).eq("id", conv.id);
       setConversations(prev => prev.map(c => c.id === conv!.id ? { ...c, title: newTitle, updated_at: new Date().toISOString() } : c));
     } catch (err) {
+      if (sendTokenRef.current === sendToken) reveal.cancel();
       const errorMsg = err instanceof Error ? err.message : "An unexpected error occurred.";
       setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: `Error: ${errorMsg}` } : m));
     } finally {
-      setStreaming(false);
+      if (sendTokenRef.current === sendToken) setStreaming(false);
     }
   }
 
   async function deleteConversation(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    await supabase.from("ai_conversations").delete().eq("id", id);
+    if (!confirm("Delete this conversation? This cannot be undone.")) return;
+    const { error } = await supabase.from("ai_conversations").delete().eq("id", id);
+    if (error) { showToast(`Failed to delete conversation: ${error.message}`, "error"); return; }
     setConversations(prev => prev.filter(c => c.id !== id));
     if (activeConv?.id === id) { setActiveConv(null); setMessages([]); }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentions.handleTextareaKeyDown(e)) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
-  function copyToClipboard(id: string, text: string) {
+  const copyToClipboard = useCallback((id: string, text: string) => {
     // Try to copy formatted HTML if possible, fallback to plain text
     const elem = document.getElementById(`msg-${id}`);
     if (elem) {
@@ -359,10 +523,10 @@ export default function AIAssistant() {
     } else {
       navigator.clipboard.writeText(text).catch(() => {});
     }
-    
+
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  }
+  }, []);
 
   const contextInfo = CONTEXTS.find(c => c.value === context);
   const starters = STARTER_PROMPTS[context] ?? STARTER_PROMPTS.general;
@@ -511,62 +675,7 @@ export default function AIAssistant() {
             ) : (
               <>
                 {messages.map(msg => (
-                  <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                    <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 ${msg.role === "user" ? "bg-navy-700 border border-navy-600" : "bg-gold-500/10 border border-gold-500/20"}`}>
-                      {msg.role === "user" ? <User size={13} className="text-slate-300" /> : <Bot size={13} className="text-gold-400" />}
-                    </div>
-                    <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
-                      {msg.content === "" && streaming ? (
-                        <div className="flex items-center gap-1.5 py-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                      ) : msg.role === "assistant" ? (
-                        <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {msg.attachmentName && (
-                            <FileAttachment
-                              id={`${msg.id}-attach`}
-                              filename={msg.attachmentName}
-                              size={msg.attachmentSize}
-                            />
-                          )}
-                          {(() => {
-                            // Strip the embedded doc prefix from the visible text
-                            const docPrefix = msg.attachmentName
-                              ? `[Attached document: ${msg.attachmentName}]\n\n`
-                              : null;
-                            const separator = "\n\n---\n\n";
-                            let visible = msg.content;
-                            if (docPrefix && visible.startsWith(docPrefix)) {
-                              const sepIdx = visible.indexOf(separator);
-                              visible = sepIdx !== -1 ? visible.slice(sepIdx + separator.length) : "";
-                            }
-                            return visible
-                              ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{visible}</p>
-                              : null;
-                          })()}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <p className="text-xs text-slate-600">{formatTime(msg.created_at)}</p>
-                        {msg.role === "assistant" && msg.content && (
-                          <button
-                            onClick={() => copyToClipboard(msg.id, msg.content)}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                            title="Copy response"
-                          >
-                            {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                            <span className="sr-only">Copy</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <MessageBubble key={msg.id} msg={msg} streaming={streaming} copiedId={copiedId} onCopy={copyToClipboard} />
                 ))}
                 <div ref={messagesEndRef} />
               </>
@@ -645,6 +754,14 @@ export default function AIAssistant() {
                 )}
               </div>
             )}
+            {mentions.activeTaggedAuthorities.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {mentions.activeTaggedAuthorities.map((tag: TaggedAuthority) => (
+                  <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => mentions.removeTag(tag.id)} variant="dark" />
+                ))}
+                <span className="text-[11px] text-gold-400/80 font-medium">Answering only from tagged sources</span>
+              </div>
+            )}
             <div className="flex items-end gap-2 bg-navy-800 border border-navy-700 rounded-2xl px-3 py-2.5 focus-within:border-gold-500/40 transition-all">
               <button onClick={() => setShowAttach(p => !p)}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 ${showAttach || attachedCase || attachedDoc ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"}`}
@@ -658,10 +775,35 @@ export default function AIAssistant() {
                 title="Upload document for AI context">
                 {extractingFile ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
               </button>
-              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}...`}
-                className="flex-1 text-sm text-slate-200 placeholder-slate-600 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
-                style={{ minHeight: "24px" }} />
+              <VoiceInputButton
+                onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
+                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                title="Dictate your message"
+              />
+              <SharpenButton
+                text={input}
+                onSharpened={setInput}
+                kind="chat message"
+                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                title="Sharpen your message"
+              />
+              <div className="relative flex-1">
+                <textarea ref={textareaRef} value={input} onChange={mentions.handleTextareaChange} onKeyDown={handleKeyDown}
+                  rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}... (type @ to tag a source)`}
+                  className="w-full text-sm text-slate-200 placeholder-white/70 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
+                  style={{ minHeight: "24px" }} />
+                {mentions.popupOpen && (
+                  <MentionPopup
+                    results={mentions.popupResults}
+                    loading={mentions.popupLoading}
+                    activeIndex={mentions.activeIndex}
+                    onHover={mentions.setActiveIndex}
+                    onSelect={mentions.selectSuggestion}
+                    variant="dark"
+                    direction="up"
+                  />
+                )}
+              </div>
               <button onClick={handleSend} disabled={(!input.trim() && !uploadedDocText) || streaming || extractingFile}
                 className="flex items-center justify-center w-8 h-8 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                 {streaming ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

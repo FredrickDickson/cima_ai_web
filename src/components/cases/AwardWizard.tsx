@@ -3,7 +3,9 @@ import { X, ChevronRight, ChevronLeft, Loader2, Gavel, AlertCircle, Check } from
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import type { CaseContext } from "./caseAI";
+import { logCaseEvent } from "../../lib/caseEvents";
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -27,6 +29,7 @@ const STEPS = ["Award Type", "Procedural History", "Issues & Findings", "Relief 
 
 export default function AwardWizard({ caseData, onClose }: { caseData: CaseContext; onClose: () => void }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(0);
@@ -51,6 +54,10 @@ export default function AwardWizard({ caseData, onClose }: { caseData: CaseConte
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [closeMatterOnGenerate, setCloseMatterOnGenerate] = useState(true);
+
+  const concludesMatter = awardType === "Final Award" || awardType === "Consent Award";
+  const matterStatusOnClose = awardType === "Consent Award" ? "settled" : "closed";
 
   // Fetch procedural history from hearings + orders
   useEffect(() => {
@@ -175,6 +182,15 @@ DRAFTING INSTRUCTIONS:
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      if (concludesMatter && closeMatterOnGenerate) {
+        const { error: statusError } = await supabase.from("cases").update({ status: matterStatusOnClose }).eq("id", caseData.id);
+        if (statusError) {
+          showToast(`Award generated, but the matter status update failed: ${statusError.message}`, "error");
+        } else {
+          logCaseEvent(caseData.id, user!.id, "status_changed", `Matter marked ${matterStatusOnClose} after ${awardType} generation`);
+          showToast(`Matter marked as ${matterStatusOnClose}`);
+        }
+      }
       onClose();
       navigate(`/drafting?draft_id=${data.draft_id}&case_id=${caseData.id}`);
     } catch (e) {
@@ -204,8 +220,22 @@ DRAFTING INSTRUCTIONS:
           </button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-0 px-6 py-3 border-b border-navy-800 overflow-x-auto">
+        {/* Step indicator — compact on mobile */}
+        <div className="sm:hidden px-6 py-3 border-b border-navy-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white">{STEPS[step]}</span>
+            <span className="text-xs text-slate-500">Step {step + 1} of {STEPS.length}</span>
+          </div>
+          <div className="h-1 rounded-full bg-navy-800 overflow-hidden">
+            <div
+              className="h-full bg-gold-500 rounded-full transition-all"
+              style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Step indicator — full labels on sm+ */}
+        <div className="hidden sm:flex items-center gap-0 px-6 py-3 border-b border-navy-800 overflow-x-auto">
           {STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-0 shrink-0">
               <div className="flex items-center gap-2">
@@ -283,7 +313,7 @@ DRAFTING INSTRUCTIONS:
                         <p className="text-sm font-medium text-white">{issue.description}</p>
                       </div>
                       {(issue.claimant_position || issue.respondent_position) && (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {issue.claimant_position && (
                             <div className="bg-gold-500/5 border border-gold-500/15 rounded-lg p-2">
                               <p className="text-xs font-medium text-gold-400 mb-0.5">Claimant</p>
@@ -331,7 +361,7 @@ DRAFTING INSTRUCTIONS:
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-300 block mb-1.5">Interest Rate (% p.a.)</label>
                   <input
@@ -377,6 +407,20 @@ DRAFTING INSTRUCTIONS:
                   className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-gold-500/50"
                 />
               </div>
+
+              {concludesMatter && (
+                <label className="flex items-start gap-2.5 p-3 bg-navy-800/50 border border-navy-700 rounded-xl cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={closeMatterOnGenerate}
+                    onChange={e => setCloseMatterOnGenerate(e.target.checked)}
+                    className="mt-0.5 accent-gold-500"
+                  />
+                  <span className="text-xs text-slate-300">
+                    Mark this matter as <span className="font-semibold text-white capitalize">{matterStatusOnClose}</span> once the award is generated.
+                  </span>
+                </label>
+              )}
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">

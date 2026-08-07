@@ -1,0 +1,13 @@
+-- 20260731000003 extended search_legal_library_documents with a new
+-- jurisdiction_filter parameter via CREATE OR REPLACE, but since the
+-- parameter signature changed, Postgres could not replace the original
+-- 5-argument function in place — it created a second, independent overload
+-- instead. With both the 5-arg and 6-arg versions coexisting, any caller
+-- that doesn't pass jurisdiction_filter (authoritySearch.ts, and Library.tsx's
+-- own suggestions-dropdown fetch) hits PGRST203 "Could not choose the best
+-- candidate function" and silently gets zero results.
+--
+-- Drop the stale 5-arg overload so only the 6-arg version (with its
+-- DEFAULT NULL jurisdiction_filter) remains — every existing call site then
+-- resolves unambiguously, no application code changes required.
+DROP FUNCTION IF EXISTS search_legal_library_documents(text, text, text, integer, integer);

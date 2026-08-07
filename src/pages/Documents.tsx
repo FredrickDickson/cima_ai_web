@@ -14,8 +14,10 @@ import {
   File,
   FileText,
   Filter,
+  Folder,
   GitCompare,
   Loader2,
+  Pencil,
   Plus,
   Scale,
   Search,
@@ -29,8 +31,10 @@ import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
+import { logCaseEvent } from "../lib/caseEvents";
 import { useAuth } from "../contexts/AuthContext";
-import type { DbDocument as DocType } from "../types/database";
+import { useToast } from "../contexts/ToastContext";
+import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +42,7 @@ type Section =
   | "all"
   | "recent"
   | "case_linked"
+  | "folder"
   | "contract"
   | "brief"
   | "award"
@@ -90,7 +95,7 @@ const SMART_COLLECTIONS: { key: Section; label: string }[] = [
 
 function statusIcon(status: string) {
   if (status === "ready") return <CheckCircle size={13} className="text-emerald-500" />;
-  if (status === "processing") return <Loader2 size={13} className="text-amber-500 animate-spin" />;
+  if (status === "processing" || status === "extracting") return <Loader2 size={13} className="text-amber-500 animate-spin" />;
   if (status === "error") return <AlertCircle size={13} className="text-red-500" />;
   return <Clock size={13} className="text-slate-400" />;
 }
@@ -151,24 +156,39 @@ function highlightText(text: string, query: string): React.ReactNode {
 
 export default function Documents() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [documents, setDocuments] = useState<DocType[]>([]);
   const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [folders, setFolders] = useState<DbDocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── Filter / Navigation ───────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<Section>("all");
   const [filterCaseId, setFilterCaseId] = useState<string | null>(null);
+  const [filterFolderId, setFilterFolderId] = useState<string | null>(null);
   const [caseFilterExpanded, setCaseFilterExpanded] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  // ── Folders ───────────────────────────────────────────────────────────────
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState("");
 
   // ── Search ────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
   const [semanticResults, setSemanticResults] = useState<string[]>([]);
   const [semanticLoading, setSemanticLoading] = useState(false);
+  const [keywordResults, setKeywordResults] = useState<string[]>([]);
+
+  // Google-style suggestions dropdown
+  const [suggestions, setSuggestions] = useState<DocType[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
 
   // ── Multi-select & Compare ────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -179,6 +199,7 @@ export default function Documents() {
   // ── Viewer ────────────────────────────────────────────────────────────────
   const [viewerDoc, setViewerDoc] = useState<DocType | null>(null);
   const [viewerSearch, setViewerSearch] = useState("");
+  const [showOriginalDoc, setShowOriginalDoc] = useState(false);
   const [aiTab, setAiTab] = useState<"summary" | "analysis" | "timeline">("summary");
 
   // ── AI Action Results ─────────────────────────────────────────────────────
@@ -203,10 +224,15 @@ export default function Documents() {
 
   // ── Case linking ──────────────────────────────────────────────────────────
   const [linkingCase, setLinkingCase] = useState(false);
+  const [linkingFolder, setLinkingFolder] = useState(false);
 
   // ── Semantic debounce timer & abort controller ────────────────────────────
   const semanticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const semanticAbort = useRef<AbortController | null>(null);
+  const keywordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keywordRequestId = useRef(0);
+  const suggestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionRequestId = useRef(0);
 
   // ─── AI Helper ─────────────────────────────────────────────────────────────
 
@@ -233,7 +259,7 @@ export default function Documents() {
       throw new Error(`AI request failed (${res.status})${errText ? `: ${errText}` : ""}`);
     }
     const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
+    const content = data.content;
     if (!content) throw new Error("AI returned an empty response. Please try again.");
     return content;
   }
@@ -254,9 +280,15 @@ export default function Documents() {
         .select("id, title, matter_number")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
-    ]).then(([{ data: docs }, { data: casesData }]) => {
+      supabase
+        .from("document_folders" as any)
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+    ]).then(([{ data: docs }, { data: casesData }, { data: foldersData }]) => {
       setDocuments(docs ?? []);
       setCases((casesData ?? []) as CaseSummary[]);
+      setFolders((foldersData ?? []) as DbDocumentFolder[]);
       setLoading(false);
     });
   }, [user]);
@@ -265,12 +297,15 @@ export default function Documents() {
 
   const counts = useMemo<Record<string, number>>(() => {
     const byType: Record<string, number> = {};
+    const byFolder: Record<string, number> = {};
     for (const doc of documents) {
       byType[doc.type] = (byType[doc.type] ?? 0) + 1;
+      if (doc.folder_id) byFolder[doc.folder_id] = (byFolder[doc.folder_id] ?? 0) + 1;
     }
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     return {
       ...byType,
+      ...byFolder,
       all: documents.length,
       recent: documents.filter(
         (d) => new Date(d.created_at).getTime() > sevenDaysAgo
@@ -294,6 +329,10 @@ export default function Documents() {
       base = base.filter((d) =>
         filterCaseId ? d.case_id === filterCaseId : !!d.case_id
       );
+    } else if (activeSection === "folder") {
+      base = base.filter((d) =>
+        filterFolderId ? d.folder_id === filterFolderId : !!d.folder_id
+      );
     } else if (activeSection !== "all") {
       base = base.filter((d) => d.type === activeSection);
     }
@@ -307,7 +346,17 @@ export default function Documents() {
             (a, b) =>
               semanticResults.indexOf(a.id) - semanticResults.indexOf(b.id)
           );
+      } else if (searchMode === "keyword" && keywordResults.length > 0) {
+        const idSet = new Set(keywordResults);
+        base = base
+          .filter((d) => idSet.has(d.id))
+          .sort(
+            (a, b) =>
+              keywordResults.indexOf(a.id) - keywordResults.indexOf(b.id)
+          );
       } else {
+        // Fallback while the debounced FTS request is still in flight (or failed) —
+        // keeps the list non-empty rather than flashing blank on every keystroke.
         const q = search.toLowerCase();
         base = base.filter(
           (d) =>
@@ -319,7 +368,7 @@ export default function Documents() {
     }
 
     return base;
-  }, [documents, activeSection, filterCaseId, search, searchMode, semanticResults]);
+  }, [documents, activeSection, filterCaseId, filterFolderId, search, searchMode, semanticResults, keywordResults]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -336,36 +385,36 @@ export default function Documents() {
         return;
       }
 
-      let textContent: string;
-      try {
-        const { extractTextFromFile } = await import("../lib/fileUtils");
-        textContent = await extractTextFromFile(file);
-      } catch (extractErr) {
-        setUploadError(
-          extractErr instanceof Error ? extractErr.message : "Failed to read file"
-        );
-        setUploading(false);
-        return;
-      }
-
-      if (!textContent.trim()) {
-        setUploadError("The file appears to be empty or contains no readable text");
-        setUploading(false);
-        return;
-      }
-
       const docName = uploadForm.name.trim() || file.name;
 
+      let storagePath: string | null = null;
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const candidatePath = `${user!.id}/${crypto.randomUUID()}.${fileExt}`;
+      const { error: storageErr } = await supabase.storage
+        .from("documents")
+        .upload(candidatePath, file, { contentType: file.type || undefined });
+      if (storageErr) {
+        console.error("Failed to store original file:", storageErr.message);
+      } else {
+        storagePath = candidatePath;
+      }
+
+      // Row is created before text is extracted (below) — extraction can
+      // involve slow client-side OCR for scanned PDFs (see fileUtils.ts),
+      // and @mention authority tagging (search_documents) matches on `name`
+      // as well as `extracted_text`, so the document is taggable as soon as
+      // this row exists rather than only after OCR finishes.
       const payload: any = {
         user_id: user!.id,
         case_id: uploadForm.caseId || null,
         name: docName,
         type: uploadForm.type as DocType["type"],
         file_path: file.name,
+        storage_path: storagePath,
         file_size: file.size,
         mime_type: file.type || "text/plain",
-        status: "processing",
-        extracted_text: textContent.slice(0, 100000),
+        status: "extracting",
+        extracted_text: "",
         ai_summary: "",
         risk_score: 0,
       };
@@ -378,60 +427,112 @@ export default function Documents() {
 
       if (insertErr) throw insertErr;
 
+      if (inserted?.case_id) {
+        logCaseEvent(inserted.case_id, user!.id, "document_uploaded", `Document uploaded: "${docName}"`);
+      }
+
       setShowUpload(false);
       setUploadForm({ name: "", type: "document", caseId: "" });
       setSelectedFileName("");
       if (fileRef.current) fileRef.current.value = "";
       setDocuments((prev) => [inserted, ...prev]);
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // Only PDFs can hit the slow OCR fallback in extractTextFromFile
+      // (DOCX/TXT extraction is always fast) — let the user know upfront
+      // rather than leaving them wondering why the document isn't taggable
+      // yet. search_documents excludes status "extracting" (see migration
+      // 20260804000001), so @mention won't surface it until this finishes.
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        showToast(
+          `Extracting text from "${docName}" — this can take a few minutes for scanned documents. You'll be able to tag it once ready.`,
+          "info",
+        );
+      }
 
-      fetch(`${supabaseUrl}/functions/v1/embed-document`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          document_id: inserted.id,
-          text_content: textContent,
-          user_id: user!.id,
-        }),
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const { data: updated } = await supabase
-              .from("documents")
-              .select("*")
-              .eq("id", inserted.id)
-              .single();
-            if (updated) {
-              setDocuments((prev) =>
-                prev.map((d) => (d.id === inserted.id ? updated : d))
-              );
-            }
-          } else {
+      // Fire-and-forget: extract text (incl. possible OCR), then embed.
+      // Neither step blocks the upload UI, but the document only becomes
+      // @mention-taggable once extraction lands (see the migration above).
+      (async () => {
+        try {
+          const { extractTextFromFile } = await import("../lib/fileUtils");
+          const textContent = await extractTextFromFile(file);
+
+          if (!textContent.trim()) {
+            await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
             setDocuments((prev) =>
-              prev.map((d) =>
-                d.id === inserted.id
-                  ? { ...d, status: "error" as DocType["status"] }
-                  : d
-              )
+              prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
             );
+            return;
           }
-        })
-        .catch(() => {
+
+          const { data: withText } = await supabase
+            .from("documents")
+            .update({ extracted_text: textContent.slice(0, 100000), status: "processing" })
+            .eq("id", inserted.id)
+            .select()
+            .single();
+          if (withText) {
+            setDocuments((prev) => prev.map((d) => (d.id === inserted.id ? withText : d)));
+          }
+          showToast(`${docName} — text fully extracted`);
+
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          fetch(`${supabaseUrl}/functions/v1/embed-document`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({
+              document_id: inserted.id,
+              text_content: textContent,
+              user_id: user!.id,
+            }),
+          })
+            .then(async (res) => {
+              if (res.ok) {
+                const { data: updated } = await supabase
+                  .from("documents")
+                  .select("*")
+                  .eq("id", inserted.id)
+                  .single();
+                if (updated) {
+                  setDocuments((prev) =>
+                    prev.map((d) => (d.id === inserted.id ? updated : d))
+                  );
+                }
+              } else {
+                setDocuments((prev) =>
+                  prev.map((d) =>
+                    d.id === inserted.id
+                      ? { ...d, status: "error" as DocType["status"] }
+                      : d
+                  )
+                );
+              }
+            })
+            .catch(() => {
+              setDocuments((prev) =>
+                prev.map((d) =>
+                  d.id === inserted.id
+                    ? { ...d, status: "error" as DocType["status"] }
+                    : d
+                )
+              );
+            });
+        } catch (extractErr) {
+          console.error("Text extraction failed:", extractErr);
+          await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
           setDocuments((prev) =>
-            prev.map((d) =>
-              d.id === inserted.id
-                ? { ...d, status: "error" as DocType["status"] }
-                : d
-            )
+            prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
           );
-        });
+        }
+      })();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -439,10 +540,16 @@ export default function Documents() {
     }
   }
 
-  async function handleDelete(id: string) {
-    await supabase.from("documents").delete().eq("id", id);
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) {
+      showToast(`Failed to delete "${name}": ${error.message}`, "error");
+      return;
+    }
     setDocuments((prev) => prev.filter((d) => d.id !== id));
     if (viewerDoc?.id === id) setViewerDoc(null);
+    showToast(`"${name}" deleted`);
   }
 
   async function handleLinkCase(docId: string, caseId: string | null) {
@@ -459,6 +566,63 @@ export default function Documents() {
       prev?.id === docId ? { ...prev, case_id: caseId } : prev
     );
     setLinkingCase(false);
+  }
+
+  async function handleLinkFolder(docId: string, folderId: string | null) {
+    setLinkingFolder(true);
+    const payload: any = { folder_id: folderId, updated_at: new Date().toISOString() };
+    await supabase
+      .from("documents")
+      .update(payload)
+      .eq("id", docId);
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === docId ? { ...d, folder_id: folderId } : d))
+    );
+    setViewerDoc((prev) =>
+      prev?.id === docId ? { ...prev, folder_id: folderId } : prev
+    );
+    setLinkingFolder(false);
+  }
+
+  async function handleCreateFolder(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || !user) return;
+    const { data, error } = await supabase
+      .from("document_folders" as any)
+      .insert({ user_id: user.id, name: trimmed })
+      .select()
+      .single();
+    if (!error && data) {
+      setFolders((prev) => [...prev, data as DbDocumentFolder]);
+    }
+  }
+
+  async function handleRenameFolder(id: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    await supabase.from("document_folders" as any).update({ name: trimmed }).eq("id", id);
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f)));
+  }
+
+  async function handleDeleteFolder(id: string, name: string) {
+    if (!confirm(`Delete folder "${name}"? Documents inside it will be unfiled, not deleted.`)) return;
+    const { error } = await supabase.from("document_folders" as any).delete().eq("id", id);
+    if (error) {
+      showToast(`Failed to delete "${name}": ${error.message}`, "error");
+      return;
+    }
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+    setDocuments((prev) =>
+      prev.map((d) => (d.folder_id === id ? { ...d, folder_id: null } : d))
+    );
+    setViewerDoc((prev) =>
+      prev?.folder_id === id ? { ...prev, folder_id: null } : prev
+    );
+    if (filterFolderId === id) {
+      setActiveSection("all");
+      setFilterFolderId(null);
+    }
+    showToast(`Folder "${name}" deleted`);
   }
 
   function toggleSelectId(id: string, e: React.MouseEvent) {
@@ -738,11 +902,71 @@ Provide a structured comparison covering:
     }
   }
 
+  async function runKeywordSearch(query: string) {
+    if (!query.trim()) {
+      setKeywordResults([]);
+      return;
+    }
+    const requestId = ++keywordRequestId.current;
+    const { data } = await supabase.rpc("search_documents" as any, {
+      search_query: query.trim(),
+      match_count: 100,
+    });
+    if (requestId !== keywordRequestId.current) return; // stale, a newer keystroke has since fired
+    setKeywordResults(((data ?? []) as { id: string }[]).map((d) => d.id));
+  }
+
+  function selectSuggestion(doc: DocType) {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setViewerDoc(doc);
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (suggestions[activeSuggestion]) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeSuggestion]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
   function handleSearchChange(value: string) {
     setSearch(value);
+    setShowSuggestions(!!value.trim());
     if (searchMode === "semantic") {
       if (semanticTimer.current) clearTimeout(semanticTimer.current);
       semanticTimer.current = setTimeout(() => handleSemanticSearch(value), 600);
+    } else {
+      if (keywordTimer.current) clearTimeout(keywordTimer.current);
+      keywordTimer.current = setTimeout(() => runKeywordSearch(value), 200);
+    }
+
+    if (suggestionTimer.current) clearTimeout(suggestionTimer.current);
+    if (value.trim()) {
+      const requestId = ++suggestionRequestId.current;
+      suggestionTimer.current = setTimeout(async () => {
+        const { data } = await supabase.rpc("search_documents" as any, {
+          search_query: value.trim(),
+          match_count: 8,
+        });
+        if (requestId !== suggestionRequestId.current) return;
+        const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
+        const byId = new Map(documents.map((d) => [d.id, d]));
+        setSuggestions(ids.map((id) => byId.get(id)).filter((d): d is DocType => !!d));
+        setActiveSuggestion(0);
+      }, 200);
+    } else {
+      setSuggestions([]);
     }
   }
 
@@ -750,8 +974,10 @@ Provide a structured comparison covering:
     setSearchMode(mode);
     if (mode === "keyword") {
       setSemanticResults([]);
-    } else if (search.trim()) {
-      handleSemanticSearch(search);
+      if (search.trim()) runKeywordSearch(search);
+    } else {
+      setKeywordResults([]);
+      if (search.trim()) handleSemanticSearch(search);
     }
   }
 
@@ -889,6 +1115,134 @@ Provide a structured comparison covering:
               )}
             </div>
 
+            {/* Custom Folders */}
+            <div className="flex items-center justify-between px-2 pt-3 pb-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Folders
+              </p>
+              <button
+                onClick={() => {
+                  setCreatingFolder(true);
+                  setNewFolderName("");
+                }}
+                className="p-0.5 text-slate-400 hover:text-navy-700 hover:bg-slate-100 rounded transition-colors"
+                aria-label="New folder"
+                title="New folder"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+
+            {creatingFolder && (
+              <div className="px-2 pb-1">
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateFolder(newFolderName);
+                      setCreatingFolder(false);
+                    } else if (e.key === "Escape") {
+                      setCreatingFolder(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (newFolderName.trim()) handleCreateFolder(newFolderName);
+                    setCreatingFolder(false);
+                  }}
+                  aria-label="New folder name"
+                  placeholder="Folder name"
+                  className="w-full px-2 py-1 border border-slate-300 rounded-md text-[11px] text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-navy-600"
+                />
+              </div>
+            )}
+
+            {folders.map((folder) => (
+              <div key={folder.id} className="group">
+                {editingFolderId === folder.id ? (
+                  <input
+                    autoFocus
+                    aria-label="Rename folder input"
+                    value={editingFolderName}
+                    onChange={(e) => setEditingFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleRenameFolder(folder.id, editingFolderName);
+                        setEditingFolderId(null);
+                      } else if (e.key === "Escape") {
+                        setEditingFolderId(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (editingFolderName.trim()) handleRenameFolder(folder.id, editingFolderName);
+                      setEditingFolderId(null);
+                    }}
+                    className="w-full px-2 py-1 border border-slate-300 rounded-md text-[11px] text-navy-950 focus:outline-none focus:ring-1 focus:ring-navy-600"
+                  />
+                ) : (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setActiveSection("folder");
+                      setFilterFolderId(folder.id);
+                      setMobileFilterOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setActiveSection("folder");
+                        setFilterFolderId(folder.id);
+                        setMobileFilterOpen(false);
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
+                      activeSection === "folder" && filterFolderId === folder.id
+                        ? "bg-navy-50 text-navy-900 font-semibold border-l-2 border-navy-600"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-navy-900"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Folder size={13} className="shrink-0" />
+                      <span className="truncate">{folder.name}</span>
+                    </span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5 group-hover:hidden">
+                        {counts[folder.id] ?? 0}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingFolderId(folder.id);
+                          setEditingFolderName(folder.name);
+                        }}
+                        className="hidden group-hover:inline-flex p-0.5 text-slate-400 hover:text-navy-700 rounded"
+                        aria-label="Rename folder"
+                        title="Rename folder"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteFolder(folder.id, folder.name);
+                        }}
+                        className="hidden group-hover:inline-flex p-0.5 text-slate-400 hover:text-red-500 rounded"
+                        aria-label="Delete folder"
+                        title="Delete folder"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {folders.length === 0 && !creatingFolder && (
+              <p className="px-2 py-1 text-[11px] text-slate-400">No folders yet</p>
+            )}
+
             <p className="px-2 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
               Collections
             </p>
@@ -933,6 +1287,14 @@ Provide a structured comparison covering:
             >
               <Filter size={18} />
             </button>
+            {/* Mobile upload shortcut — avoids requiring the filter drawer just to add a document */}
+            <button
+              onClick={() => setShowUpload(true)}
+              className="md:hidden p-2 text-white bg-navy-950 hover:bg-navy-800 rounded-lg transition-colors shrink-0"
+              aria-label="Upload document"
+            >
+              <Plus size={18} />
+            </button>
             <div className="flex-1 relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               {semanticLoading && (
@@ -944,6 +1306,9 @@ Provide a structured comparison covering:
               <input
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => setShowSuggestions(!!search.trim() && suggestions.length > 0)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder={
                   searchMode === "semantic"
                     ? "Semantic search..."
@@ -951,6 +1316,31 @@ Provide a structured comparison covering:
                 }
                 className="w-full pl-7 pr-7 py-1.5 border border-slate-300 rounded-lg text-xs text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent"
               />
+
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((doc, i) => (
+                    <button
+                      key={doc.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectSuggestion(doc);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 flex items-center gap-2 transition-colors ${
+                        i === activeSuggestion ? "bg-navy-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <FileText size={12} className="text-navy-400 shrink-0" />
+                      <span className="flex-1 min-w-0 truncate text-xs text-navy-950">
+                        {doc.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0 capitalize">
+                        {doc.type}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* KW / AI toggle */}
@@ -1040,7 +1430,7 @@ Provide a structured comparison covering:
                       {/* Checkbox for comparison */}
                       <button
                         onClick={(e) => toggleSelectId(doc.id, e)}
-                        className="mt-0.5 shrink-0"
+                        className="p-1.5 -ml-1.5 -mb-1.5 mt-0.5 -mr-1.5 shrink-0"
                         title="Select for comparison"
                       >
                         <div
@@ -1153,8 +1543,8 @@ Provide a structured comparison covering:
                   </div>
                 </div>
 
-                {/* Case link */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Case link — hidden on mobile to leave room for the document name; still available at md+ */}
+                <div className="hidden md:flex items-center gap-1 shrink-0">
                   <Briefcase size={12} className="text-slate-400" />
                   <select
                     value={viewerDoc.case_id ?? ""}
@@ -1179,8 +1569,43 @@ Provide a structured comparison covering:
                   )}
                 </div>
 
+                {/* Folder assign — same mobile treatment as the case link above */}
+                <div className="hidden md:flex items-center gap-1 shrink-0">
+                  <Folder size={12} className="text-slate-400" />
+                  <select
+                    value={viewerDoc.folder_id ?? ""}
+                    onChange={(e) =>
+                      handleLinkFolder(viewerDoc.id, e.target.value || null)
+                    }
+                    disabled={linkingFolder}
+                    className="text-[11px] bg-white border border-slate-200 rounded-md px-1.5 py-1 text-slate-600 focus:outline-none focus:ring-1 focus:ring-navy-600 max-w-[140px] disabled:opacity-50"
+                  >
+                    <option value="">No folder</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                  {linkingFolder && (
+                    <Loader2
+                      size={11}
+                      className="animate-spin text-slate-400 shrink-0"
+                    />
+                  )}
+                </div>
+
+                {viewerDoc.storage_path && (
+                  <button
+                    onClick={() => setShowOriginalDoc(true)}
+                    className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-navy-700 hover:text-navy-900 hover:bg-navy-50 rounded-md transition-colors shrink-0"
+                    title="View original file"
+                  >
+                    <File size={13} /> <span className="hidden sm:inline">View Original</span>
+                  </button>
+                )}
                 <button
-                  onClick={() => handleDelete(viewerDoc.id)}
+                  onClick={() => handleDelete(viewerDoc.id, viewerDoc.name)}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"
                   title="Delete document"
                 >
@@ -1188,7 +1613,7 @@ Provide a structured comparison covering:
                 </button>
                 <button
                   onClick={() => setViewerDoc(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors shrink-0"
+                  className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors shrink-0"
                 >
                   <X size={14} />
                 </button>
@@ -1256,7 +1681,7 @@ Provide a structured comparison covering:
             </div>
 
             {/* AI Panel */}
-            <div className="w-full md:w-80 shrink-0 flex flex-col overflow-hidden bg-white border-t md:border-t-0 md:border-l border-slate-200">
+            <div className="w-full md:w-80 shrink-0 flex flex-col max-h-[45vh] md:max-h-none overflow-hidden bg-white border-t md:border-t-0 md:border-l border-slate-200">
               {/* Tabs */}
               <div className="flex border-b border-slate-200 shrink-0">
                 {(["summary", "analysis", "timeline"] as const).map((tab) => (
@@ -1578,8 +2003,8 @@ Provide a structured comparison covering:
             </div>
           </div>
         ) : (
-          /* Empty / Welcome state */
-          <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-8">
+          /* Empty / Welcome state — desktop only; on mobile the list already fills the screen when nothing is selected */
+          <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-slate-50 p-8">
             <div className="text-center max-w-sm">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white border border-slate-200 mx-auto mb-4 shadow-sm">
                 <FileText size={24} className="text-navy-300" />
@@ -1793,8 +2218,8 @@ Provide a structured comparison covering:
 
       {/* ── Compare Modal ──────────────────────────────────────────────────────── */}
       {showCompare && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[80vh] my-4 sm:my-0 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <GitCompare size={16} className="text-navy-600" />
@@ -1814,7 +2239,7 @@ Provide a structured comparison covering:
             </div>
 
             {/* Document labels */}
-            <div className="flex gap-2 px-6 py-3 bg-slate-50 border-b border-slate-100 shrink-0">
+            <div className="flex flex-wrap gap-2 px-6 py-3 bg-slate-50 border-b border-slate-100 shrink-0">
               {Array.from(selectedIds).map((id, idx) => {
                 const doc = documents.find((d) => d.id === id);
                 return doc ? (
@@ -1862,9 +2287,9 @@ Provide a structured comparison covering:
             </div>
 
             {!compareLoading && compareResult && (
-              <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+              <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
                 <button
-                  onClick={() => navigator.clipboard.writeText(compareResult)}
+                  onClick={() => navigator.clipboard.writeText(compareResult).then(() => showToast("Copied to clipboard"))}
                   className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   <Copy size={12} /> Copy
@@ -1905,8 +2330,8 @@ Provide a structured comparison covering:
 
       {/* ── Brief Modal ────────────────────────────────────────────────────────── */}
       {showBriefModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] my-4 sm:my-0 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <Bot size={16} className="text-navy-600" />
@@ -1930,9 +2355,9 @@ Provide a structured comparison covering:
               </div>
             </div>
 
-            <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
               <button
-                onClick={() => navigator.clipboard.writeText(briefResult)}
+                onClick={() => navigator.clipboard.writeText(briefResult).then(() => showToast("Copied to clipboard"))}
                 className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <Copy size={12} /> Copy
@@ -1967,6 +2392,145 @@ Provide a structured comparison covering:
           </div>
         </div>
       )}
+
+      {/* ── Original Document Modal ───────────────────────────────────────────── */}
+      {showOriginalDoc && viewerDoc && (
+        <OriginalDocumentModal
+          doc={viewerDoc}
+          onClose={() => setShowOriginalDoc(false)}
+        />
+      )}
     </AppLayout>
+  );
+}
+
+// ─── Original Document Modal ────────────────────────────────────────────────
+
+function OriginalDocumentModal({
+  doc,
+  onClose,
+}: {
+  doc: DocType;
+  onClose: () => void;
+}) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const docxContainerRef = useRef<HTMLDivElement>(null);
+
+  const ext = (doc.storage_path ?? "").split(".").pop()?.toLowerCase() ?? "";
+  const isPdf = ext === "pdf";
+  const isDocx = ext === "docx" || ext === "doc";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!doc.storage_path) {
+        setError("Original file is not available for this document.");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: signErr } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(doc.storage_path, 3600);
+
+      if (cancelled) return;
+      if (signErr || !data?.signedUrl) {
+        setError("Could not load the original file.");
+        setLoading(false);
+        return;
+      }
+      setSignedUrl(data.signedUrl);
+
+      if (isDocx) {
+        try {
+          const res = await fetch(data.signedUrl);
+          const buffer = await res.arrayBuffer();
+          const { renderAsync } = await import("docx-preview");
+          if (cancelled || !docxContainerRef.current) return;
+          await renderAsync(buffer, docxContainerRef.current);
+        } catch {
+          if (!cancelled) setError("Could not render this document.");
+        }
+      }
+
+      if (!cancelled) setLoading(false);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [doc.storage_path, isDocx]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-none sm:rounded-2xl shadow-xl w-full h-full sm:max-w-5xl sm:h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <FileText size={16} className="text-navy-600 shrink-0" />
+            <h2 className="text-base font-bold text-navy-950 truncate">
+              {doc.name}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-hidden relative">
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
+              <Loader2 size={24} className="text-navy-600 animate-spin mb-3" />
+              <p className="text-sm text-navy-900">
+                Loading original document...
+              </p>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <AlertCircle size={24} className="text-red-400 mb-3" />
+              <p className="text-sm font-medium text-red-600">{error}</p>
+            </div>
+          )}
+
+          {!error && isPdf && signedUrl && (
+            <iframe
+              src={signedUrl}
+              title={doc.name}
+              className="w-full h-full border-0"
+            />
+          )}
+
+          {!error && isDocx && (
+            <div className="w-full h-full overflow-auto bg-slate-100 p-6">
+              <div ref={docxContainerRef} className="mx-auto" />
+            </div>
+          )}
+
+          {!error && !isPdf && !isDocx && !loading && signedUrl && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <File size={24} className="text-slate-300" />
+              <p className="text-sm text-slate-500">
+                Preview not available for this file type.
+              </p>
+              <a
+                href={signedUrl}
+                download={doc.name}
+                className="flex items-center gap-1.5 px-3 py-2 bg-navy-950 text-white text-xs font-semibold rounded-lg hover:bg-navy-800 transition-colors"
+              >
+                Download original
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

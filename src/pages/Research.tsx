@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import {
   Search,
   Gavel,
@@ -25,8 +25,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppLayout from "../components/layout/AppLayout";
 import Header from "../components/layout/Header";
+import { VoiceInputButton } from "../components/ui/VoiceInputButton";
+import { SharpenButton } from "../components/ui/SharpenButton";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
+import { CitedMarkdown, type CitedSource } from "../lib/citations";
+import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
+import { useTypewriterReveal } from "../hooks/useTypewriterReveal";
+import { MentionPopup } from "../components/ui/MentionPopup";
+import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
+import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
 
 const JURISDICTIONS = [
   { value: "", label: "All Jurisdictions" },
@@ -60,6 +69,7 @@ interface RetrievedSource {
   content: string;
   similarity?: number;
   url?: string;
+  doc_id?: string;
 }
 
 interface TavilyResult {
@@ -74,6 +84,7 @@ interface SearchResponse {
   ai_analysis: string;
   tavily_results: TavilyResult[];
   sources_count: number;
+  cited_sources?: CitedSource[];
 }
 
 function sourceTypeColor(type: string) {
@@ -128,11 +139,15 @@ function SourceCard({ source, index }: { source: RetrievedSource; index: number 
           <blockquote className="mt-3 pl-3 border-l-2 border-gold-400 bg-amber-50/50 rounded-r-lg py-2 pr-3">
             <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{source.content}</p>
           </blockquote>
-          {source.url && (
+          {source.doc_id ? (
+            <Link to={`/library/${source.doc_id}`} className="inline-flex items-center gap-1.5 mt-2.5 text-xs text-navy-600 hover:text-navy-900 font-medium">
+              <ExternalLink size={12} /> View in Library
+            </Link>
+          ) : source.url ? (
             <a href={source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2.5 text-xs text-navy-600 hover:text-navy-900 font-medium">
               <ExternalLink size={12} /> View source
             </a>
-          )}
+          ) : null}
         </div>
       )}
     </div>
@@ -141,6 +156,7 @@ function SourceCard({ source, index }: { source: RetrievedSource; index: number 
 
 export default function Research() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const linkedCaseId = searchParams.get("case_id") ?? "";
   const [query, setQuery] = useState("");
@@ -154,8 +170,19 @@ export default function Research() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [validityResult, setValidityResult] = useState("");
   const [validityLoading, setValidityLoading] = useState(false);
+  const [validityPreview, setValidityPreview] = useState("");
+  const validityReveal = useTypewriterReveal((revealedText, done) => {
+    setValidityPreview(revealedText);
+    if (done) setValidityResult(revealedText);
+  });
   const [showValidity, setShowValidity] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [analysisPreview, setAnalysisPreview] = useState("");
+  const analysisReveal = useTypewriterReveal((revealedText) => {
+    setAnalysisPreview(revealedText);
+  });
+  const queryTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentions = useAuthorityMentions({ text: query, setText: setQuery, textareaRef: queryTextareaRef, userId: user?.id });
 
   function toggleType(type: string) {
     setSelectedTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
@@ -183,10 +210,15 @@ export default function Research() {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const { data: { session } } = await supabase.auth.getSession();
+      const { libraryDocIds, documentIds } = splitTaggedAuthorityIds(mentions.activeTaggedAuthorities);
       const res = await fetch(`${supabaseUrl}/functions/v1/legal-search`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ query, jurisdiction, source_types: selectedTypes.length > 0 ? selectedTypes : undefined, user_id: user?.id }),
+        body: JSON.stringify({
+          query, jurisdiction, source_types: selectedTypes.length > 0 ? selectedTypes : undefined, user_id: user?.id,
+          ...(libraryDocIds.length > 0 ? { library_doc_ids: libraryDocIds } : {}),
+          ...(documentIds.length > 0 ? { document_ids: documentIds } : {}),
+        }),
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -194,10 +226,12 @@ export default function Research() {
       }
       const data: SearchResponse = await res.json();
       setResponse(data);
+      analysisReveal.reveal(data.ai_analysis ?? "");
       if (user) {
         await supabase.from("research_sessions").insert({
           user_id: user.id, query, jurisdiction,
           results: data.sources, ai_analysis: data.ai_analysis,
+          tagged_authorities: mentions.activeTaggedAuthorities,
           ...(linkedCaseId ? { case_id: linkedCaseId } : {}),
         } as never);
         loadSavedResearch();
@@ -210,7 +244,8 @@ export default function Research() {
   }
 
   async function deleteSession(sessionId: string) {
-    await supabase.from("research_sessions").delete().eq("id", sessionId);
+    const { error } = await supabase.from("research_sessions").delete().eq("id", sessionId);
+    if (error) { showToast(`Failed to delete session: ${error.message}`, "error"); return; }
     setSavedSessions(p => p.filter(s => s.id !== sessionId));
     if (activeSessionId === sessionId) {
       setActiveSessionId(null);
@@ -219,12 +254,18 @@ export default function Research() {
   }
 
   async function loadSession(sessionId: string) {
+    analysisReveal.cancel();
+    validityReveal.cancel();
     const { data } = await supabase.from("research_sessions").select("*").eq("id", sessionId).single();
     if (!data) return;
-    const sessionData = data as { query: string; jurisdiction: string; results: RetrievedSource[]; ai_analysis: string };
+    const sessionData = data as {
+      query: string; jurisdiction: string; results: RetrievedSource[]; ai_analysis: string;
+      tagged_authorities?: TaggedAuthority[];
+    };
     setQuery(sessionData.query);
     setJurisdiction(sessionData.jurisdiction || "");
     setActiveSessionId(sessionId);
+    mentions.hydrateTags(sessionData.tagged_authorities ?? []);
     setResponse({
       sources: sessionData.results ?? [],
       ai_analysis: sessionData.ai_analysis ?? "",
@@ -236,33 +277,76 @@ export default function Research() {
 
   async function validateAuthorities() {
     if (!response?.sources.length) return;
+    validityReveal.cancel();
     setValidityLoading(true);
     setValidityResult("");
     setShowValidity(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const { data: { session } } = await supabase.auth.getSession();
-      const sourceList = response.sources
-        .map((s, i) => `${i + 1}. ${s.source_name}${s.citation ? ` — ${s.citation}` : ""}${s.jurisdiction ? ` (${s.jurisdiction})` : ""}`)
-        .join("\n");
-      const prompt = `You are a legal citator assistant. For each authority listed below, assess its current validity as good law.
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` };
+
+      const withDocId = response.sources.filter((s) => s.doc_id);
+      const withoutDocId = response.sources.filter((s) => !s.doc_id);
+      const sections: string[] = [];
+
+      // Sources that exist in our Legal Library get a real, grounded citator
+      // run instead of an LLM guess.
+      if (withDocId.length > 0) {
+        const lines = await Promise.all(
+          withDocId.map(async (s) => {
+            try {
+              const res = await fetch(`${supabaseUrl}/functions/v1/case-citator`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ doc_id: s.doc_id }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Citator check failed");
+              const citations = (data.citations ?? []) as { treatment: string }[];
+              const positive = citations.filter((c) => c.treatment === "followed" || c.treatment === "applied").length;
+              const negative = citations.filter((c) => c.treatment === "overruled" || c.treatment === "disapproved").length;
+              const summary =
+                citations.length === 0
+                  ? `No later case in our library discusses this decision (checked against ${data.run?.corpus_doc_count ?? 0} case documents). This does not confirm the case remains good law.`
+                  : `${positive} positive and ${negative} negative treatment record(s) found among ${citations.length} citing case(s) in our library.`;
+              return `**${s.source_name}** — Verified via Smart Citator ✓\n${summary}`;
+            } catch {
+              return `**${s.source_name}** — Smart Citator check failed. Open this case in the Library to retry.`;
+            }
+          }),
+        );
+        sections.push(`### Verified via Smart Citator (grounded in our Legal Library)\n\n${lines.join("\n\n")}`);
+      }
+
+      // Everything else (external/web sources not in our corpus) falls back
+      // to an honestly-labeled, ungrounded LLM assessment.
+      if (withoutDocId.length > 0) {
+        const sourceList = withoutDocId
+          .map((s, i) => `${i + 1}. ${s.source_name}${s.citation ? ` — ${s.citation}` : ""}${s.jurisdiction ? ` (${s.jurisdiction})` : ""}`)
+          .join("\n");
+        const prompt = `You are a legal citator assistant. For each authority listed below, assess its current validity as good law based on your training knowledge — none of these are in our verified Legal Library corpus, so this is an unverified estimate, not a grounded check.
 
 Authorities retrieved:
 ${sourceList}
 
 For EACH authority, provide:
 - **Status**: Good Law ✓ | Caution ⚠ | Overruled/Superseded ✗ | Unable to verify
-- **Reason**: One sentence explaining the status (e.g., "Confirmed good law under Ghana ADR Act 2010", "Distinguished in subsequent decisions but not overruled", "Superseded by 2021 UNCITRAL Rules amendment")
+- **Reason**: One sentence explaining the status
 - **Note**: Any important limitation on how the authority should be used
 
-Format as a numbered list matching the order above. Be specific about Ghanaian law where applicable. If you cannot verify the status with confidence, say so honestly rather than guessing.`;
-      const res = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], context: "research" }),
-      });
-      const data = await res.json();
-      setValidityResult(data.choices?.[0]?.message?.content ?? "No result returned.");
+Format as a numbered list matching the order above. If you cannot verify the status with confidence, say so honestly rather than guessing.`;
+        const res = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ messages: [{ role: "user", content: prompt }], context: "research" }),
+        });
+        const data = await res.json();
+        const llmResult = data.content ?? data.choices?.[0]?.message?.content ?? "No result returned.";
+        sections.push(`### AI assessment — not verified against our library\n\n${llmResult}`);
+      }
+
+      validityReveal.reveal(sections.join("\n\n---\n\n"));
     } catch {
       setValidityResult("Validity check failed. Please try again.");
     } finally {
@@ -338,13 +422,46 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
             <form onSubmit={handleSearch} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-navy-950 mb-2">Research Query</label>
-                <textarea
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all resize-none"
-                  placeholder="e.g. What are the grounds for challenging an arbitral award under the New York Convention?"
-                />
+                {mentions.activeTaggedAuthorities.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    {mentions.activeTaggedAuthorities.map((tag: TaggedAuthority) => (
+                      <TaggedAuthorityChip key={tag.marker} type={tag.type} label={tag.label} onRemove={() => mentions.removeTag(tag.id)} />
+                    ))}
+                    <span className="text-[11px] text-navy-600 font-medium">Answering only from tagged sources</span>
+                  </div>
+                )}
+                <div className="relative">
+                  <textarea
+                    ref={queryTextareaRef}
+                    value={query}
+                    onChange={mentions.handleTextareaChange}
+                    onKeyDown={(e) => { mentions.handleTextareaKeyDown(e); }}
+                    rows={3}
+                    className="w-full px-4 py-3 pr-16 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all resize-none"
+                    placeholder="e.g. What are the grounds for challenging an arbitral award under the New York Convention? Type @ to tag specific cases, legislation, or documents."
+                  />
+                  <VoiceInputButton
+                    onTranscript={(text) => setQuery((prev) => (prev ? `${prev} ${text}` : text))}
+                    className="absolute top-2 right-2"
+                    title="Dictate your research query"
+                  />
+                  <SharpenButton
+                    text={query}
+                    onSharpened={setQuery}
+                    kind="research query"
+                    className="absolute top-2 right-9"
+                    title="Sharpen your query"
+                  />
+                  {mentions.popupOpen && (
+                    <MentionPopup
+                      results={mentions.popupResults}
+                      loading={mentions.popupLoading}
+                      activeIndex={mentions.activeIndex}
+                      onHover={mentions.setActiveIndex}
+                      onSelect={mentions.selectSuggestion}
+                    />
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-full sm:w-48">
@@ -452,7 +569,7 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
                           </div>
                         ) : (
                           <div className="prose-doc text-sm leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{validityResult}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{validityReveal.revealing ? validityPreview : validityResult}</ReactMarkdown>
                           </div>
                         )}
                       </div>
@@ -484,7 +601,10 @@ Format as a numbered list matching the order above. Be specific about Ghanaian l
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-6">
                     <div className="prose-doc text-sm leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{response.ai_analysis}</ReactMarkdown>
+                      <CitedMarkdown
+                        text={analysisReveal.revealing ? analysisPreview : response.ai_analysis}
+                        sources={analysisReveal.revealing ? undefined : response.cited_sources}
+                      />
                     </div>
                   </div>
                 </div>

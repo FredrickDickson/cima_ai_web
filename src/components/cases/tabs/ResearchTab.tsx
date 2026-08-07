@@ -3,6 +3,7 @@ import { BookOpen, Search, ChevronDown, Clock, X, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import type { CaseContext } from "../caseAI";
 
 type ResearchSession = {
@@ -24,6 +25,7 @@ const FRAMEWORK_TO_JURISDICTION: Record<string, string> = {
 
 export default function ResearchTab({ caseId, caseData }: { caseId: string; caseData: CaseContext }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,11 +55,15 @@ export default function ResearchTab({ caseId, caseData }: { caseId: string; case
 
   async function linkSession(sessionId: string) {
     setLinking(sessionId);
-    await supabase.from("research_sessions").update({ case_id: caseId } as never).eq("id", sessionId);
-    const session = unlinked.find(s => s.id === sessionId);
-    if (session) {
-      setSessions(p => [session, ...p]);
-      setUnlinked(p => p.filter(s => s.id !== sessionId));
+    const { error } = await supabase.from("research_sessions").update({ case_id: caseId } as never).eq("id", sessionId);
+    if (error) {
+      showToast(`Failed to link session: ${error.message}`, "error");
+    } else {
+      const session = unlinked.find(s => s.id === sessionId);
+      if (session) {
+        setSessions(p => [session, ...p]);
+        setUnlinked(p => p.filter(s => s.id !== sessionId));
+      }
     }
     setLinking(null);
   }

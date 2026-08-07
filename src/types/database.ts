@@ -1,3 +1,5 @@
+import type { TaggedAuthority } from "../lib/mentions";
+
 export type Json = any;
 
 export interface Database {
@@ -53,6 +55,26 @@ export interface Database {
         Insert: Omit<LegalLibraryEntry, "id" | "created_at">;
         Update: Partial<Omit<LegalLibraryEntry, "id" | "created_at">>;
       };
+      legal_library_documents: {
+        Row: LegalLibraryDocument;
+        Insert: Omit<LegalLibraryDocument, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<LegalLibraryDocument, "id" | "created_at">>;
+      };
+      case_citations: {
+        Row: CaseCitation;
+        Insert: Omit<CaseCitation, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<CaseCitation, "id" | "created_at">>;
+      };
+      case_citator_runs: {
+        Row: CaseCitatorRun;
+        Insert: Omit<CaseCitatorRun, "id" | "created_at">;
+        Update: never;
+      };
+      case_briefs: {
+        Row: CaseBrief;
+        Insert: Omit<CaseBrief, "generated_at" | "updated_at">;
+        Update: Partial<Omit<CaseBrief, "doc_id">>;
+      };
       contract_analyses: {
         Row: ContractAnalysis;
         Insert: Omit<ContractAnalysis, "id" | "created_at" | "updated_at">;
@@ -97,6 +119,16 @@ export interface Database {
         Insert: Omit<Evidence, "id" | "created_at">;
         Update: Partial<Omit<Evidence, "id" | "created_at">>;
       };
+      evidence_issues: {
+        Row: EvidenceIssueLink;
+        Insert: Omit<EvidenceIssueLink, "id" | "created_at">;
+        Update: never;
+      };
+      case_events: {
+        Row: CaseEvent;
+        Insert: Omit<CaseEvent, "id" | "created_at">;
+        Update: never;
+      };
       procedural_orders: {
         Row: ProceduralOrder;
         Insert: Omit<ProceduralOrder, "id">;
@@ -119,6 +151,7 @@ export interface Profile {
   jurisdiction: string | null;
   avatar_url: string | null;
   title: string | null;
+  onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -151,15 +184,24 @@ export interface DbDocument {
   name: string;
   type: "contract" | "brief" | "award" | "evidence" | "statute" | "document";
   file_path: string;
+  storage_path?: string | null;
+  folder_id?: string | null;
   file_size: number;
   mime_type: string;
   extracted_text: string;
   ai_summary: string;
   risk_score: number;
-  status: "uploading" | "processing" | "ready" | "error";
+  status: "uploading" | "extracting" | "processing" | "ready" | "error";
   metadata: any;
   created_at: string;
   updated_at: string;
+}
+
+export interface DbDocumentFolder {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
 }
 
 export interface AIConversation {
@@ -212,6 +254,8 @@ export interface Draft {
   status: "draft" | "finalized";
   created_at: string;
   updated_at: string;
+  tagged_authorities: TaggedAuthority[];
+  generation_prompt: string | null;
 }
 
 export interface Hearing {
@@ -246,6 +290,106 @@ export interface LegalLibraryEntry {
   jurisdiction: string;
   citation: string;
   created_at: string;
+  doc_id: string | null;
+  chunk_index: number | null;
+}
+
+export interface LegalLibraryParty {
+  role: string;
+  name: string;
+}
+
+export interface LegalLibraryDocument {
+  id: string;
+  title: string;
+  source_type: string; // 'case' | 'statute'
+  jurisdiction: string;
+  citation: string;
+  court: string;
+  decided_year: number | null;
+  parties: LegalLibraryParty[];
+  legislation_number: string;
+  storage_path: string | null;
+  original_format: string; // 'docx' | 'pdf' | 'htm-text'
+  source_collection: string;
+  extracted_char_count: number;
+  ingestion_status: "pending" | "processing" | "completed" | "failed";
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LegalLibraryDocumentChunk {
+  id: string;
+  chunk_index: number | null;
+  title: string;
+  citation: string;
+  content: string;
+}
+
+export interface LegalLibraryDocumentWithChunks extends LegalLibraryDocument {
+  chunks: LegalLibraryDocumentChunk[];
+}
+
+// Documents ingested after Supabase's free tier filled up live in Convex
+// instead (see the Legal Library / Convex migration plan) — `source` tags
+// which backend a given document came from so list/search/viewer code never
+// has to guess by ID shape (Convex IDs vs Postgres UUIDs).
+export interface LibraryDocumentRef {
+  source: "supabase" | "convex";
+}
+
+export type UnifiedLibraryDocument = LegalLibraryDocument & LibraryDocumentRef;
+
+export type CaseTreatment = "followed" | "applied" | "distinguished" | "disapproved" | "overruled" | "mentioned";
+export type CaseCitationConfidence = "low" | "medium" | "high";
+
+export interface CaseCitation {
+  id: string;
+  cited_doc_id: string;
+  citing_doc_id: string;
+  treatment: CaseTreatment;
+  context_snippet: string;
+  citing_chunk_id: string | null;
+  reasoning: string;
+  confidence: CaseCitationConfidence;
+  model: string;
+  analysis_run_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaseCitatorRun {
+  id: string;
+  cited_doc_id: string;
+  candidates_screened: number;
+  treatments_found: number;
+  corpus_doc_count: number;
+  status: "completed" | "failed";
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface CaseBriefConcurrenceDissent {
+  judge: string;
+  type: "concurrence" | "dissent";
+  summary: string;
+}
+
+export interface CaseBrief {
+  doc_id: string;
+  area_of_law: string;
+  facts: string;
+  issues: string[];
+  holding: string;
+  procedural_history: string;
+  principles: string[];
+  concurrences_dissents: CaseBriefConcurrenceDissent[];
+  raw_model_output: string;
+  parse_status: "ok" | "partial" | "failed";
+  model: string;
+  generated_at: string;
+  updated_at: string;
 }
 
 export interface ContractAnalysis {
@@ -273,6 +417,8 @@ export interface ContractAnalysis {
   detected_document_type?: string;
   governing_law_found: boolean;
   governing_law: string;
+  cited_sources?: any;
+  tagged_authorities?: any;
   created_at: string;
   updated_at: string;
 }
@@ -307,6 +453,23 @@ export interface Evidence {
   title: string;
   type: string;
   summary: string;
+  created_at: string;
+}
+
+export interface EvidenceIssueLink {
+  id: string;
+  evidence_id: string;
+  issue_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface CaseEvent {
+  id: string;
+  case_id: string;
+  user_id: string;
+  event_type: string;
+  description: string;
   created_at: string;
 }
 

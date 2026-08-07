@@ -2,6 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
+import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
+import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,31 +12,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-async function getEmbedding(text: string, hfKey: string): Promise<number[] | null> {
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
-      {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: text, options: { wait_for_model: true } }),
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data[0]) ? data[0] : data;
-  } catch {
-    return null;
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
-    const { query, jurisdiction, source_types, user_id } = await req.json();
+    const { query, jurisdiction, source_types, user_id, library_doc_ids, document_ids } = await req.json();
     if (!query) throw new Error("query is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -46,6 +31,61 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Strict grounding: when the user has @-tagged specific cases/legislation/
+    // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
+    // and answer only from the tagged sources.
+    if ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0) {
+      const tagged = await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids);
+      if (tagged) {
+        const groundedSources = tagged.citedSources.map((s) => ({
+          id: s.doc_id ?? s.marker,
+          source_name: s.source_name,
+          citation: s.citation,
+          source_type: s.source_type ?? "document",
+          jurisdiction: s.jurisdiction,
+          content: s.content,
+          doc_id: s.doc_id,
+        }));
+
+        const jurisdictionLabel = COUNTRY_NAMES[COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh"] ?? jurisdiction ?? "Ghana";
+        const synthesisPrompt = `JURISDICTION: ${jurisdictionLabel}
+QUERY: ${query}
+
+Answer the query using only the tagged authority text provided below. Cite each tagged authority using its exact marker (e.g. "[T1]") inline.${buildStrictGroundingBlock(tagged.titles, tagged.context)}`;
+
+        const dsRes = await fetch("https://api.deepseek.com/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: CIMA_SYSTEM_PROMPT },
+              { role: "user", content: synthesisPrompt },
+            ],
+            temperature: 0.1,
+            max_tokens: 4096,
+          }),
+        });
+
+        let aiAnalysis = "";
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          aiAnalysis = dsData.choices?.[0]?.message?.content ?? "";
+        }
+
+        return new Response(
+          JSON.stringify({
+            sources: groundedSources,
+            ai_analysis: aiAnalysis,
+            tavily_results: [],
+            sources_count: groundedSources.length,
+            cited_sources: tagged.citedSources,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const sources: {
       id: string;
       source_name: string;
@@ -55,16 +95,26 @@ Deno.serve(async (req: Request) => {
       content: string;
       similarity?: number;
       url?: string;
+      doc_id?: string;
     }[] = [];
 
-    // Fetch Laws.Africa legislation first — guaranteed slots in AI context
-    const lawsSources: typeof sources = [];
-    if (lawsAfricaKey) {
-      try {
-        const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-        const results = await fetchLawsAfricaSources(query, lawsAfricaKey, countryCode);
-        for (const s of results) {
-          lawsSources.push({
+    // Determine resolved country code for jurisdiction-aware filtering
+    const resolvedCountryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+    const isAfricanJurisdiction = Object.values(COUNTRY_MAP).includes(resolvedCountryCode);
+    const jurisdictionLabel = COUNTRY_NAMES[resolvedCountryCode] ?? jurisdiction ?? "Ghana";
+    const effectiveSourceTypes = source_types ?? [];
+
+    // Phase A — independent retrieval calls run concurrently instead of one
+    // after another. librarySources/docChunks (Phase B below) both need the
+    // same pre-computed embedding, so that's resolved here too, but nothing
+    // else waits on anything else in this phase.
+    const [lawsSources, queryEmbedding, courtListenerResults, tavilyResults] = await Promise.all([
+      (async (): Promise<typeof sources> => {
+        if (!lawsAfricaKey) return [];
+        try {
+          const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
+          const results = await fetchLawsAfricaSources(query, lawsAfricaKey, countryCode);
+          return results.map((s) => ({
             id: s.id,
             source_name: s.source_name,
             citation: s.citation,
@@ -72,127 +122,68 @@ Deno.serve(async (req: Request) => {
             jurisdiction: s.jurisdiction,
             content: s.content,
             url: s.url,
-          });
-        }
-      } catch { /* non-fatal */ }
-    }
-
-    const queryEmbedding = hfKey ? await getEmbedding(query, hfKey) : null;
-
-    if (queryEmbedding) {
-      const { data: libResults } = await supabase.rpc("match_legal_library", {
-        query_embedding: queryEmbedding,
-        match_count: 6,
-        filter_jurisdiction: jurisdiction || null,
-        filter_source_type: source_types?.[0] || null,
-      });
-      for (const r of (libResults ?? [])) {
-        sources.push({
-          id: r.id,
-          source_name: r.title,
-          citation: r.citation,
-          source_type: r.source_type,
-          jurisdiction: r.jurisdiction,
-          content: r.content,
-          similarity: r.similarity,
-        });
-      }
-
-      if (user_id) {
-        const { data: docChunks } = await supabase.rpc("match_document_chunks", {
-          query_embedding: queryEmbedding,
-          match_count: 3,
-          filter_user_id: user_id,
-        });
-        for (const r of (docChunks ?? [])) {
-          sources.push({
-            id: r.id,
-            source_name: `Document: ${r.document_name ?? "Uploaded Document"}`,
-            source_type: "document",
-            content: r.content,
-            similarity: r.similarity,
-          });
-        }
-      }
-    }
-
-    if (sources.length === 0) {
-      const { data: ftsResults } = await supabase.rpc("search_legal_library_fts", {
-        search_query: query,
-        match_count: 5,
-      });
-      for (const r of (ftsResults ?? [])) {
-        sources.push({
-          id: r.id,
-          source_name: r.title,
-          citation: r.citation,
-          source_type: r.source_type,
-          jurisdiction: r.jurisdiction,
-          content: r.content,
-        });
-      }
-    }
-
-    // Determine resolved country code for jurisdiction-aware filtering
-    const resolvedCountryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";
-    const isAfricanJurisdiction = Object.values(COUNTRY_MAP).includes(resolvedCountryCode);
-    const jurisdictionLabel = COUNTRY_NAMES[resolvedCountryCode] ?? jurisdiction ?? "Ghana";
-
-    const effectiveSourceTypes = source_types ?? [];
-    // CourtListener only indexes US courts — skip entirely for African jurisdictions
-    if (!isAfricanJurisdiction && courtlistenerKey && (effectiveSourceTypes.length === 0 || effectiveSourceTypes.includes("case"))) {
-      try {
-        const clRes = await fetch(
-          `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(query)}&type=o&format=json&page_size=3`,
-          { headers: { "Authorization": `Token ${courtlistenerKey}` } }
-        );
-        if (clRes.ok) {
-          const clData = await clRes.json();
-          for (const item of (clData.results ?? []).slice(0, 3)) {
-            sources.push({
-              id: `cl-${item.id}`,
-              source_name: item.caseName ?? "CourtListener Case",
-              citation: item.citation?.[0] ?? item.dateFiled ?? "",
-              source_type: "case",
-              jurisdiction: "international",
-              content: item.snippet ?? item.description ?? "",
-              url: `https://www.courtlistener.com${item.absolute_url ?? ""}`,
-            });
-          }
-        }
-      } catch { /* non-fatal */ }
-    }
-
-    let tavilyResults: { title: string; url: string; content: string; score: number }[] = [];
-    if (tavilyKey) {
-      try {
-        const tvRes = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: tavilyKey,
-            query: `legal: ${query}${jurisdiction ? ` ${jurisdiction}` : ""}`,
-            search_depth: "advanced",
-            max_results: 5,
-            include_domains: [
-              "lawsghana.com", "ghanaweb.com", "ghanalegal.com",
-              "uncitral.un.org", "iccwbo.org", "lcia.org",
-              "lawfareblog.com", "kluwerlawonline.com", "italaw.com",
-              "globalarbitrationreview.com",
-            ],
-          }),
-        });
-        if (tvRes.ok) {
-          const tvData = await tvRes.json();
-          tavilyResults = (tvData.results ?? []).map((r: { title: string; url: string; content: string; score: number }) => ({
-            title: r.title,
-            url: r.url,
-            content: r.content,
-            score: r.score ?? 0,
           }));
+        } catch {
+          return [];
         }
-      } catch { /* non-fatal */ }
+      })(),
+      hfKey ? getEmbedding(query, hfKey) : Promise.resolve(null),
+      (async (): Promise<typeof sources> => {
+        // CourtListener only indexes US courts — skip entirely for African jurisdictions
+        if (isAfricanJurisdiction || !courtlistenerKey) return [];
+        if (!(effectiveSourceTypes.length === 0 || effectiveSourceTypes.includes("case"))) return [];
+        try {
+          const clRes = await fetch(
+            `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(query)}&type=o&format=json&page_size=3`,
+            { headers: { "Authorization": `Token ${courtlistenerKey}` } }
+          );
+          if (!clRes.ok) return [];
+          const clData = await clRes.json();
+          return (clData.results ?? []).slice(0, 3).map((item: { id: string; caseName?: string; citation?: string[]; dateFiled?: string; snippet?: string; description?: string; absolute_url?: string }) => ({
+            id: `cl-${item.id}`,
+            source_name: item.caseName ?? "CourtListener Case",
+            citation: item.citation?.[0] ?? item.dateFiled ?? "",
+            source_type: "case",
+            jurisdiction: "international",
+            content: item.snippet ?? item.description ?? "",
+            url: `https://www.courtlistener.com${item.absolute_url ?? ""}`,
+          }));
+        } catch {
+          return [];
+        }
+      })(),
+      searchTavily(query, jurisdiction, tavilyKey),
+    ]);
+
+    // Phase B — depends on queryEmbedding from Phase A, but the two calls
+    // here are independent of each other.
+    const [librarySources, docChunksResult] = await Promise.all([
+      searchLegalLibrary(query, supabase, {
+        embedding: queryEmbedding,
+        jurisdiction: jurisdiction || undefined,
+        sourceType: source_types?.[0] || undefined,
+        matchCount: 6,
+      }),
+      (queryEmbedding && user_id)
+        ? supabase.rpc("match_document_chunks", {
+            query_embedding: queryEmbedding,
+            match_count: 3,
+            filter_user_id: user_id,
+          })
+        : Promise.resolve({ data: null }),
+    ]);
+
+    sources.push(...librarySources);
+    for (const r of (docChunksResult.data ?? [])) {
+      sources.push({
+        id: r.id,
+        source_name: `Document: ${r.document_name ?? "Uploaded Document"}`,
+        source_type: "document",
+        content: r.content,
+        similarity: r.similarity,
+      });
     }
+    sources.push(...courtListenerResults);
 
     // Laws.Africa legislation always appears first; fill remaining slots with other sources
     const allSources = [...lawsSources, ...sources];
@@ -220,12 +211,36 @@ Deno.serve(async (req: Request) => {
           .join("\n\n")}`
       : "";
 
-    const otherSourcesBlock = relevantSources.length > 0
-      ? `\n\nAdditional Sources:\n${relevantSources
-          .slice(0, 8)
+    const cappedOtherSources = relevantSources.slice(0, 8);
+    const otherSourcesBlock = cappedOtherSources.length > 0
+      ? `\n\nAdditional Sources:\n${cappedOtherSources
           .map((s, i) => `[${i + 1}] ${s.source_name}${s.citation ? ` (${s.citation})` : ""}:\n${s.content.slice(0, 600)}`)
           .join("\n\n")}`
       : "";
+
+    // Mirrors the exact numbering used in legislationBlock/otherSourcesBlock above
+    // so [L1]/[1] markers in ai_analysis can be resolved back to a real source.
+    const citedSources = [
+      ...lawsSources.map((s, i) => ({
+        marker: `L${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+      })),
+      ...cappedOtherSources.map((s, i) => ({
+        marker: `${i + 1}`,
+        source_name: s.source_name,
+        citation: s.citation,
+        source_type: s.source_type,
+        jurisdiction: s.jurisdiction,
+        content: s.content,
+        url: s.url,
+        doc_id: s.doc_id,
+      })),
+    ];
 
     // Fix 2: Jurisdiction-aware synthesis prompt that explicitly instructs the AI
     // to discard off-jurisdiction sources and fall back to training knowledge if needed
@@ -269,7 +284,13 @@ No external sources were retrieved for this query. Provide a comprehensive legal
     }
 
     return new Response(
-      JSON.stringify({ sources: allSources, ai_analysis: aiAnalysis, tavily_results: tavilyResults, sources_count: allSources.length }),
+      JSON.stringify({
+        sources: allSources,
+        ai_analysis: aiAnalysis,
+        tavily_results: tavilyResults,
+        sources_count: allSources.length,
+        cited_sources: citedSources,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   Search,
   Briefcase,
   FileText,
+  BookOpen,
   Bot,
   LogOut,
   ChevronRight,
@@ -17,10 +18,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useSidebar } from "../../contexts/SidebarContext";
 
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/research", icon: Search, label: "Research" },
   { to: "/cases", icon: Briefcase, label: "Cases" },
   { to: "/documents", icon: FileText, label: "Documents" },
+  { to: "/library", icon: BookOpen, label: "Legal Library" },
   { to: "/drafting", icon: PenTool, label: "Drafting Studio" },
   { to: "/review", icon: ClipboardCheck, label: "Document Review" },
   { to: "/assistant", icon: Bot, label: "AI Assistant" },
@@ -50,8 +52,16 @@ export default function Sidebar() {
     >
       {/* Logo row */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-navy-800 shrink-0">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gold-500 shrink-0">
-          <Scale className="w-5 h-5 text-navy-950" />
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg overflow-hidden shrink-0">
+          <img 
+            src="/images/logo.jpeg" 
+            alt="CIMA AI Logo" 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover' 
+            }} 
+          />
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-white font-bold text-lg tracking-tight">CIMA</span>
@@ -73,7 +83,8 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            end={to === "/"}
+            end={to === "/dashboard"}
+            data-tour={`sidebar-${to}`}
             onClick={close}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
