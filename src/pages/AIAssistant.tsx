@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import { FileAttachment } from "../components/ui/FileAttachment";
+import { MessageLoading } from "../components/ui/message-loading";
 import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { SharpenButton } from "../components/ui/SharpenButton";
 import { extractTextFromFile } from "../lib/fileUtils";
@@ -150,10 +151,8 @@ const MessageBubble = memo(function MessageBubble({
       </div>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
         {msg.content === "" && streaming ? (
-          <div className="flex items-center gap-1.5 py-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+          <div className="py-1">
+            <MessageLoading />
           </div>
         ) : msg.role === "assistant" ? (
           <div id={`msg-${msg.id}`} className="prose-ai text-sm leading-relaxed">
