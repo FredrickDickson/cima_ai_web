@@ -1,11 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse, HttpError } from "../_shared/http-error.ts";
+import { requireString, requireUUID } from "../_shared/validate.ts";
 
 async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
   try {
@@ -36,21 +35,36 @@ function chunkText(text: string, chunkSize = 800, overlap = 100): string[] {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
+  let ownedDocumentId: string | undefined;
+
   try {
-    const { document_id, text_content, user_id } = await req.json();
-    if (!document_id || !text_content || !user_id) {
-      throw new Error("document_id, text_content, and user_id are required");
-    }
+    const verifiedUser = await requireUser(req);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    await enforceRateLimit(supabase, verifiedUser.id, "embed-document", 10, 60);
+
+    const body = await req.json();
+    const document_id = requireUUID(body.document_id, "document_id");
+    const text_content = requireString(body.text_content, "text_content", { maxLength: 2000000 });
+    const user_id = verifiedUser.id;
+
+    // document_id/user_id used to be trusted straight from the body, letting
+    // any caller overwrite another user's document (status/extracted_text/
+    // ai_summary/risk_score) by naming its id. Verify ownership before any
+    // writes.
+    const { data: ownedDoc } = await supabase.from("documents").select("id").eq("id", document_id).eq("user_id", user_id).maybeSingle();
+    if (!ownedDoc) throw new HttpError(403, "document_id does not belong to the current user");
+    ownedDocumentId = document_id;
 
     await supabase.from("documents").update({ status: "processing" }).eq("id", document_id);
 
@@ -143,19 +157,17 @@ ${excerpt}`,
 
     return new Response(
       JSON.stringify({ success: true, chunks_count: chunks.length, risk_score: riskScore }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    try {
-      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const body = await (req.clone()).json().catch(() => ({}));
-      if (body.document_id) {
-        await supabase.from("documents").update({ status: "error" }).eq("id", body.document_id);
-      }
-    } catch { /* ignore */ }
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Only mark a document as errored if ownership was already confirmed
+    // above — never trust an unverified id from a failed/forged request.
+    if (ownedDocumentId) {
+      try {
+        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await supabase.from("documents").update({ status: "error" }).eq("id", ownedDocumentId);
+      } catch { /* ignore */ }
+    }
+    return errorResponse(error, cors);
   }
 });

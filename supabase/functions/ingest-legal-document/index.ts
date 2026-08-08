@@ -1,12 +1,30 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { stripWatermarks } from "../_shared/sanitize-legal-text.ts";
+import { enforceRateLimit, clientIp } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse, HttpError } from "../_shared/http-error.ts";
+import { requireString } from "../_shared/validate.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+/**
+ * This is an internal pipeline endpoint (invoked by the legal-documents
+ * storage-upload trigger), not a user-facing one — so it's gated by a shared
+ * secret instead of a user session, mirroring convex/lib/ingestAuth.ts's
+ * requireIngestSecret pattern for the same kind of internal-only function.
+ */
+function requireIngestSecret(req: Request): void {
+  const expected = Deno.env.get("INGEST_SECRET");
+  const provided = req.headers.get("x-ingest-secret");
+  if (!expected || provided !== expected) {
+    throw new HttpError(401, "Unauthorized: invalid or missing ingest secret");
+  }
+}
+
+/** Escapes ILIKE metacharacters so caller-supplied text (citation/filename)
+ * can't widen the delete pattern beyond a literal-prefix match. */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, (c) => `\\${c}`);
+}
 
 // ─── TEXT EXTRACTION ─────────────────────────────────────────────────────────
 
@@ -161,8 +179,9 @@ async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] 
 // ─── MAIN HANDLER ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -172,25 +191,14 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
-    const body = await req.json();
-    const {
-      storage_path,
-      source_type = "statute",
-      jurisdiction = "ghana",
-      citation: citationOverride,
-    }: {
-      storage_path: string;
-      source_type?: string;
-      jurisdiction?: string;
-      citation?: string;
-    } = body;
+    requireIngestSecret(req);
+    await enforceRateLimit(supabase, clientIp(req), "ingest-legal-document", 30, 60);
 
-    if (!storage_path) {
-      return new Response(
-        JSON.stringify({ error: "storage_path is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const body = await req.json();
+    const storage_path = requireString(body.storage_path, "storage_path", { maxLength: 500 });
+    const source_type = requireString(body.source_type ?? "statute", "source_type", { maxLength: 50 });
+    const jurisdiction = requireString(body.jurisdiction ?? "ghana", "jurisdiction", { maxLength: 100 });
+    const citationOverride = body.citation === undefined ? undefined : requireString(body.citation, "citation", { maxLength: 300 });
 
     const fileName = storage_path.split("/").pop() ?? storage_path;
     const titlePrefix = citationOverride ?? fileName.replace(/\.[^/.]+$/, "");
@@ -236,11 +244,15 @@ Deno.serve(async (req: Request) => {
     const chunks = chunkByArticle(fullText, titlePrefix);
     console.log(`[ingest] ${chunks.length} chunks`);
 
-    // Remove existing library entries for this document
+    // Remove existing library entries for this document (re-ingest replace).
+    // titlePrefix can come from caller-supplied citation/filename text, so
+    // its ILIKE metacharacters (%, _) are escaped first — otherwise a
+    // crafted citation could widen this into a mass delete across unrelated
+    // legal_library rows.
     await supabase
       .from("legal_library")
       .delete()
-      .ilike("title", `${titlePrefix}%`);
+      .ilike("title", `${escapeLikePattern(titlePrefix)}%`);
 
     // Embed + insert in batches of 10
     let inserted = 0;
@@ -283,7 +295,7 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ success: true, chunks_inserted: inserted, file: fileName }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -304,9 +316,6 @@ Deno.serve(async (req: Request) => {
       }
     } catch { /* ignore */ }
 
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(err, cors);
   }
 });

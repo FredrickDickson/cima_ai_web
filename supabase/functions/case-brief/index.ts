@@ -1,12 +1,11 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse } from "../_shared/http-error.ts";
+import { requireUUID } from "../_shared/validate.ts";
 
 const MAX_CHARS = 45000;
 
@@ -21,17 +20,23 @@ const EMPTY_BRIEF = {
 };
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
-    const { doc_id, force_regenerate } = await req.json();
-    if (!doc_id) throw new Error("doc_id is required");
+    const verifiedUser = await requireUser(req);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    await enforceRateLimit(supabase, verifiedUser.id, "case-brief", 10, 60);
+
+    const body = await req.json();
+    const doc_id = requireUUID(body.doc_id, "doc_id");
+    const force_regenerate = body.force_regenerate === true;
 
     if (!force_regenerate) {
       const { data: existing } = await supabase
@@ -41,7 +46,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (existing) {
         return new Response(JSON.stringify({ brief: existing, cached: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
     }
@@ -154,12 +159,9 @@ If there are no concurring or dissenting opinions in the text, return an empty a
     if (saveError) throw new Error(`Failed to save brief: ${saveError.message}`);
 
     return new Response(JSON.stringify({ brief: saved, cached: false }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return errorResponse(error, cors);
   }
 });

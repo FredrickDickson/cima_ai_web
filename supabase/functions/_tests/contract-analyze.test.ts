@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { functionsUrl, authHeaders, SUPABASE_URL, SUPABASE_SERVICE_KEY } from "./helpers";
+import { describe, it, expect, beforeAll } from "vitest";
+import { functionsUrl, authHeaders, getTestUserToken, SUPABASE_URL } from "./helpers";
 
 const skip = !SUPABASE_URL;
+let token: string;
 
 const sampleContract = `
 SERVICE AGREEMENT
@@ -18,24 +19,36 @@ and Company B ("Client") on January 1, 2026.
 `;
 
 describe.skipIf(skip)("contract-analyze edge function", () => {
+  beforeAll(async () => {
+    token = await getTestUserToken();
+  });
+
   it("handles CORS preflight", async () => {
     const res = await fetch(functionsUrl("contract-analyze"), { method: "OPTIONS" });
     expect(res.status).toBe(200);
   });
 
+  it("rejects requests without a valid session", async () => {
+    const res = await fetch(functionsUrl("contract-analyze"), {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ text: sampleContract }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  // Fans out to Laws.Africa + case-law search + an 8192-token DeepSeek
+  // completion — routinely takes 30-40s, past vitest's default 30s timeout.
   it("analyzes a contract and returns structured results", async () => {
     const res = await fetch(functionsUrl("contract-analyze"), {
       method: "POST",
-      headers: authHeaders(SUPABASE_SERVICE_KEY),
-      body: JSON.stringify({
-        text: sampleContract,
-        user_id: "00000000-0000-0000-0000-000000000000",
-      }),
+      headers: authHeaders(token),
+      body: JSON.stringify({ text: sampleContract }),
     });
     expect(res.ok).toBe(true);
     const data = await res.json();
     expect(data).toHaveProperty("overall_risk_score");
     expect(data).toHaveProperty("ai_summary");
     expect(typeof data.overall_risk_score).toBe("number");
-  });
+  }, 60000);
 });

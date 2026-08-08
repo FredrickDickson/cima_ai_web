@@ -1,6 +1,15 @@
-const SUPABASE_URL = 'https://oojiqylyojckcxezrjfz.supabase.co';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vamlxeWx5b2pja2N4ZXpyamZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQ2MTc0NywiZXhwIjoyMDk1MDM3NzQ3fQ.qbVHPXf5Eq5pX0fKYbs7XTaUAKxia_CWGXQuWhXjn1U';
-const USER_ID = '6a68e6c2-6287-474f-a395-2a6cd900bab9';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const USER_ID = process.env.SEED_DEMO_USER_ID || '6a68e6c2-6287-474f-a395-2a6cd900bab9';
+
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error('Missing SUPABASE_URL/VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env');
+  process.exit(1);
+}
 
 const headers = {
   'apikey': SERVICE_KEY,

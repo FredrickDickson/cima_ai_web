@@ -1,12 +1,11 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse } from "../_shared/http-error.ts";
+import { requireUUID } from "../_shared/validate.ts";
 
 const MAX_CANDIDATES = 15;
 const TREATMENTS = ["followed", "applied", "distinguished", "disapproved", "overruled", "mentioned"];
@@ -126,19 +125,28 @@ Return JSON exactly matching this shape:
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
-    const { doc_id, force_refresh } = await req.json();
-    if (!doc_id) throw new Error("doc_id is required");
+    const verifiedUser = await requireUser(req);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    // This is the most expensive endpoint in the app (up to 15 DeepSeek
+    // calls per request) — a tight limit specifically here in addition to
+    // the shared per-endpoint rate limiting below.
+    await enforceRateLimit(supabase, verifiedUser.id, "case-citator", 3, 60);
+
+    const body = await req.json();
+    const doc_id = requireUUID(body.doc_id, "doc_id");
+    const force_refresh = body.force_refresh === true;
 
     const { data: cited, error: citedError } = await supabase
       .from("legal_library_documents")
@@ -164,7 +172,7 @@ Deno.serve(async (req: Request) => {
           .eq("cited_doc_id", doc_id)
           .order("created_at", { ascending: false });
         return new Response(JSON.stringify({ run: existingRun, citations: citations ?? [] }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
     }
@@ -297,12 +305,9 @@ Deno.serve(async (req: Request) => {
       .order("created_at", { ascending: false });
 
     return new Response(JSON.stringify({ run, citations: citations ?? [] }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return errorResponse(error, cors);
   }
 });

@@ -42,6 +42,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
+import { validateFile } from "../lib/fileUtils";
 import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
@@ -149,6 +150,7 @@ const CLAUSE_ACTIONS = [
 const STEPS = ["Parsing text", "Identifying clauses", "Risk scoring", "Checking compliance", "Extracting obligations", "Generating insights"];
 
 async function extractTextFromFile(file: File): Promise<string> {
+  await validateFile(file);
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
     const pdfjsLib = await import("pdfjs-dist");
@@ -157,7 +159,8 @@ async function extractTextFromFile(file: File): Promise<string> {
     const pages: string[] = [];
     let totalTextLength = 0;
 
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const MAX_PDF_PAGES = 300;
+    for (let i = 1; i <= Math.min(pdf.numPages, MAX_PDF_PAGES); i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
       const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");

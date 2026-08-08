@@ -11,6 +11,11 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { searchLegalLibrary, searchTavily, type RetrievedLibrarySource, type TavilyResult } from "../_shared/legal-retrieval.ts";
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse } from "../_shared/http-error.ts";
+import { optionalUUID, optionalUUIDArray, requireArray, optionalEnum } from "../_shared/validate.ts";
 
 interface CitedSource {
   marker: string;
@@ -55,11 +60,10 @@ function formatAccraRulesContext(rows: AccraRuleRow[]): string {
   return `\n\nRelevant Accra Arbitration Rules 2025:\n${entries.join("\n\n")}`;
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+const CONTEXTS = [
+  "research", "drafting", "analysis", "review", "arbitration",
+  "case_strategy", "settlement", "evidence", "award", "general",
+] as const;
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -78,16 +82,19 @@ interface ChatRequest {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
+    const verifiedUser = await requireUser(req);
+
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     if (!DEEPSEEK_API_KEY) {
       return new Response(
         JSON.stringify({ error: "AI service not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
@@ -98,10 +105,27 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const {
-      messages, context = "general", stream = false,
-      library_doc_id, library_doc_ids, document_ids, user_id,
-    }: ChatRequest = await req.json();
+    await enforceRateLimit(supabase, verifiedUser.id, "ai-chat", 20, 60);
+
+    const body: ChatRequest = await req.json();
+    const messages = requireArray(body.messages, "messages", {
+      maxItems: 50,
+      itemValidator: (m) => {
+        if (typeof m !== "object" || m === null) throw new Error("messages[] must be objects");
+        const msg = m as Message;
+        if (!["user", "assistant", "system"].includes(msg.role)) throw new Error("invalid message role");
+        if (typeof msg.content !== "string" || msg.content.length > 20000) {
+          throw new Error("message content must be a string up to 20000 characters");
+        }
+        return msg;
+      },
+    });
+    const context = optionalEnum(body.context, "context", CONTEXTS) ?? "general";
+    const stream = body.stream === true;
+    const library_doc_id = optionalUUID(body.library_doc_id, "library_doc_id");
+    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const user_id = verifiedUser.id;
 
     const userQuery = extractLegalQuery(messages);
     const jurisdictionCode = detectJurisdiction(
@@ -220,7 +244,7 @@ Deno.serve(async (req: Request) => {
       const errorText = await response.text();
       return new Response(
         JSON.stringify({ error: `AI service error: ${errorText}` }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: response.status, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
@@ -248,7 +272,7 @@ Deno.serve(async (req: Request) => {
       });
       return new Response(combined, {
         headers: {
-          ...corsHeaders,
+          ...cors,
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
         },
@@ -258,13 +282,10 @@ Deno.serve(async (req: Request) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content ?? "";
     return new Response(JSON.stringify({ content, cited_sources: citedSources }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(err, cors);
   }
 });
 

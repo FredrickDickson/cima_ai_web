@@ -4,12 +4,11 @@ import { fetchLawsAfricaSources, COUNTRY_MAP, type LawsAfricaSource } from "../_
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse, HttpError } from "../_shared/http-error.ts";
+import { requireString, optionalString, optionalUUID, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
 
 interface CitedSource {
   marker: string;
@@ -68,16 +67,22 @@ interface MatterParty {
 async function fetchMatterContext(
   supabase: ReturnType<typeof createClient>,
   caseId: string,
+  userId: string,
 ): Promise<string> {
   try {
-    const [caseRes, issuesRes, evidenceRes] = await Promise.all([
-      supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
+    // Ownership check first: this used to fetch cases/issues/evidence by
+    // case_id alone, so any caller who knew/guessed a case_id could pull
+    // another user's full matter — parties, issues, evidence — into their
+    // draft. Verify the case belongs to the caller before fetching anything
+    // else linked to it.
+    const caseRes = await supabase.from("cases").select("*").eq("id", caseId).eq("user_id", userId).maybeSingle();
+    const c = caseRes.data;
+    if (!c) return "";
+
+    const [issuesRes, evidenceRes] = await Promise.all([
       supabase.from("issues").select("*").eq("case_id", caseId).order("issue_number"),
       supabase.from("evidence").select("title, type, summary").eq("case_id", caseId).limit(10),
     ]);
-
-    const c = caseRes.data;
-    if (!c) return "";
 
     const lines: string[] = [];
     lines.push(`Matter: ${c.title}${c.matter_number ? ` (${c.matter_number})` : ""}`);
@@ -121,25 +126,40 @@ async function fetchMatterContext(
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
-    const {
-      prompt, template_type, jurisdiction, variables, custom_instructions, case_id, user_id, template_id,
-      library_doc_ids, document_ids, tagged_authorities,
-    } = await req.json();
-    if (!user_id) throw new Error("user_id is required");
+    const verifiedUser = await requireUser(req);
 
-    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
-    const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    await enforceRateLimit(supabase, verifiedUser.id, "generate-draft", 10, 60);
+
+    const body = await req.json();
+    const prompt = optionalString(body.prompt, "prompt", 8000);
+    const template_type = optionalString(body.template_type, "template_type", 100);
+    const jurisdiction = optionalString(body.jurisdiction, "jurisdiction", 100);
+    const variables = (body.variables && typeof body.variables === "object") ? body.variables : undefined;
+    const custom_instructions = optionalString(body.custom_instructions, "custom_instructions", 4000);
+    const case_id = optionalUUID(body.case_id, "case_id");
+    const template_id = optionalUUID(body.template_id, "template_id");
+    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const tagged_authorities = body.tagged_authorities === undefined
+      ? undefined
+      : requireArray(body.tagged_authorities, "tagged_authorities", { maxItems: 20, itemValidator: (v) => v });
+    const user_id = verifiedUser.id;
+
+    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
+    const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
+
     // ---- Fetch matter context if a case is linked ----
-    const matterContext = case_id ? await fetchMatterContext(supabase, case_id) : "";
+    const matterContext = case_id ? await fetchMatterContext(supabase, case_id, user_id) : "";
 
     let templateContent = "";
     let templateTitle = template_type ?? "Legal Document";
@@ -357,12 +377,9 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
         jurisdiction: jurisdiction ?? "ghana",
         cited_sources: citedSources,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(error, cors);
   }
 });

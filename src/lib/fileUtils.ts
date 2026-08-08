@@ -1,6 +1,55 @@
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
+export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+const MAX_PDF_PAGES = 300;
+
+const MAGIC_BYTES: Record<string, number[]> = {
+  pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
+  docx: [0x50, 0x4b, 0x03, 0x04], // PK.. (zip container)
+};
+
+async function readMagicBytes(file: File, length: number): Promise<number[]> {
+  const buf = await file.slice(0, length).arrayBuffer();
+  return Array.from(new Uint8Array(buf));
+}
+
+function matchesMagicBytes(actual: number[], expected: number[]): boolean {
+  return expected.every((byte, i) => actual[i] === byte);
+}
+
+/**
+ * Rejects files before they're parsed (or uploaded) based on size and actual
+ * file content, not just the filename extension / browser-supplied MIME type
+ * — both of which are trivially spoofable and previously the only checks
+ * performed. Throws a user-facing Error on rejection.
+ */
+export async function validateFile(file: File): Promise<void> {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB) — the limit is ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB.`);
+  }
+
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf") || file.type === "application/pdf") {
+    const bytes = await readMagicBytes(file, 4);
+    if (!matchesMagicBytes(bytes, MAGIC_BYTES.pdf)) {
+      throw new Error("This file has a .pdf name but its contents don't look like a real PDF.");
+    }
+    return;
+  }
+  if (name.endsWith(".docx")) {
+    const bytes = await readMagicBytes(file, 4);
+    if (!matchesMagicBytes(bytes, MAGIC_BYTES.docx)) {
+      throw new Error("This file has a .docx name but its contents don't look like a real DOCX.");
+    }
+    return;
+  }
+  // .txt and other plain-text fallbacks have no reliable magic-byte
+  // signature to check — file size and downstream text decoding are the
+  // only practical guards.
+}
+
 export async function extractTextFromFile(file: File): Promise<string> {
+  await validateFile(file);
   const name = file.name.toLowerCase();
 
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
@@ -12,7 +61,8 @@ export async function extractTextFromFile(file: File): Promise<string> {
     const pages: string[] = [];
     let totalTextLength = 0;
 
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
+    for (let i = 1; i <= pageCount; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
       const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { validatePassword } from "../../lib/passwordPolicy";
 
 const ROLES = [
   { value: "lawyer", label: "Lawyer / Advocate" },
@@ -32,8 +33,9 @@ export default function Register() {
       setError("You must accept the Terms of Service and Privacy Policy to continue.");
       return;
     }
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordError = validatePassword(form.password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     setLoading(true);

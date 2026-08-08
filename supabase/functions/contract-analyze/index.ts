@@ -5,12 +5,11 @@ import { fetchLawsAfricaSources, COUNTRY_MAP } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildPlaybookGroundingBlock } from "../_shared/strict-grounding.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse, HttpError } from "../_shared/http-error.ts";
+import { requireString, optionalString, optionalUUID, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
 
 interface CitedSource {
   marker: string;
@@ -67,25 +66,52 @@ const DOCUMENT_TYPE_FOCUS: Record<string, string> = {
 };
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
+    const verifiedUser = await requireUser(req);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    await enforceRateLimit(supabase, verifiedUser.id, "contract-analyze", 10, 60);
+
     // Accept both document_type (new) and industry_type (legacy) params
-    const {
-      text, document_id, case_id, user_id, document_type, industry_type, jurisdiction,
-      library_doc_ids, document_ids, tagged_authorities,
-    } = await req.json();
-    if (!text || !user_id) throw new Error("text and user_id are required");
+    const body = await req.json();
+    const text = requireString(body.text, "text", { maxLength: 300000 });
+    const document_id = optionalUUID(body.document_id, "document_id");
+    const case_id = optionalUUID(body.case_id, "case_id");
+    const document_type = optionalString(body.document_type, "document_type", 50);
+    const industry_type = optionalString(body.industry_type, "industry_type", 50);
+    const jurisdiction = optionalString(body.jurisdiction, "jurisdiction", 100);
+    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const tagged_authorities = body.tagged_authorities === undefined
+      ? undefined
+      : requireArray(body.tagged_authorities, "tagged_authorities", { maxItems: 20, itemValidator: (v) => v });
+    const user_id = verifiedUser.id;
+
+    // Ownership checks: document_id/case_id used to be trusted straight from
+    // the request body and attached to the saved analysis with no check that
+    // the caller actually owns them — reject instead of silently attributing
+    // an analysis to someone else's document/case.
+    if (document_id) {
+      const { data: doc } = await supabase.from("documents").select("id").eq("id", document_id).eq("user_id", user_id).maybeSingle();
+      if (!doc) throw new HttpError(403, "document_id does not belong to the current user");
+    }
+    if (case_id) {
+      const { data: c } = await supabase.from("cases").select("id").eq("id", case_id).eq("user_id", user_id).maybeSingle();
+      if (!c) throw new HttpError(403, "case_id does not belong to the current user");
+    }
 
     const effectiveDocType = document_type ?? industry_type ?? "commercial";
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceKey);
 
     const excerpt = text.slice(0, 100000);
     const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
@@ -298,12 +324,9 @@ ${excerpt}`,
 
     return new Response(
       JSON.stringify({ ...analysis, id: savedAnalysis?.id, contract_text: text, cited_sources: citedSources }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(error, cors);
   }
 });

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Scale, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { validatePassword } from "../../lib/passwordPolicy";
 
 export default function ResetPassword() {
   const { user, loading: authLoading, updatePassword, signOut } = useAuth();
@@ -15,8 +16,9 @@ export default function ResetPassword() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (password !== confirmPassword) {

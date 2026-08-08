@@ -5,21 +5,20 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { requireUser } from "../_shared/auth.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { errorResponse, HttpError } from "../_shared/http-error.ts";
+import { requireString, optionalString, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: cors });
   }
 
   try {
-    const { query, jurisdiction, source_types, user_id, library_doc_ids, document_ids } = await req.json();
-    if (!query) throw new Error("query is required");
+    const verifiedUser = await requireUser(req);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,6 +29,24 @@ Deno.serve(async (req: Request) => {
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
 
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    await enforceRateLimit(supabase, verifiedUser.id, "legal-search", 20, 60);
+
+    const body = await req.json();
+    const query = requireString(body.query, "query", { maxLength: 2000 });
+    const jurisdiction = optionalString(body.jurisdiction, "jurisdiction", 100);
+    const source_types = body.source_types === undefined
+      ? undefined
+      : requireArray(body.source_types, "source_types", {
+          maxItems: 10,
+          itemValidator: (v) => {
+            if (typeof v !== "string" || v.length > 50) throw new HttpError(400, "source_types[] must be short strings");
+            return v;
+          },
+        });
+    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const user_id = verifiedUser.id;
 
     // Strict grounding: when the user has @-tagged specific cases/legislation/
     // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
@@ -81,7 +98,7 @@ Answer the query using only the tagged authority text provided below. Cite each 
             sources_count: groundedSources.length,
             cited_sources: tagged.citedSources,
           }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
     }
@@ -291,12 +308,9 @@ No external sources were retrieved for this query. Provide a comprehensive legal
         sources_count: allSources.length,
         cited_sources: citedSources,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(error, cors);
   }
 });

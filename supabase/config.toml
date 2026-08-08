@@ -16,6 +16,13 @@ port = 54323
 enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/reset-password"]
+# Matches the client-side check in src/lib/passwordPolicy.ts. NOT pushed to
+# the live project by this change — site_url above is still the local dev
+# value, so `supabase config push`/`db push --include-all` would also
+# overwrite the production site_url with localhost. Apply this one setting
+# via the Supabase dashboard (Authentication > Policies > Password
+# requirements) instead, until site_url here is reconciled with prod.
+minimum_password_length = 8
 
 [auth.email]
 # Pinned explicitly so future `config push` runs don't silently depend on
