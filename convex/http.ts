@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { reciprocalRankFusion } from "./lib/rrf";
 
 const http = httpRouter();
 
@@ -28,33 +29,27 @@ http.route({
     const sourceType = typeof b.sourceType === "string" ? b.sourceType : undefined;
     const matchCount = typeof b.matchCount === "number" ? b.matchCount : 6;
 
-    let hits: Array<{
-      _id: string;
-      docId: string;
-      title: string;
-      citation?: string;
-      sourceType: string;
-      jurisdiction: string;
-      content: string;
-      similarity?: number;
-    }> = [];
-
-    if (embedding) {
-      hits = await ctx.runAction(internal.libraryChunks.vectorSearch, {
-        embedding,
-        matchCount,
-        jurisdiction,
-        sourceType,
-      });
-    }
-    if (hits.length === 0) {
-      hits = await ctx.runQuery(internal.libraryChunks.fullTextSearch, {
+    // Hybrid: run vector + keyword search concurrently and fuse by rank
+    // (Reciprocal Rank Fusion) instead of "vector, and only fall back to
+    // keyword if vector found literally nothing" — mirrors the same fix in
+    // supabase/functions/_shared/legal-retrieval.ts's searchLegalLibrary().
+    const [vectorHits, ftsHits] = await Promise.all([
+      embedding
+        ? ctx.runAction(internal.libraryChunks.vectorSearch, {
+          embedding,
+          matchCount,
+          jurisdiction,
+          sourceType,
+        })
+        : Promise.resolve([]),
+      ctx.runQuery(internal.libraryChunks.fullTextSearch, {
         searchQuery: query,
         jurisdiction,
         sourceType,
         matchCount,
-      });
-    }
+      }),
+    ]);
+    const hits = reciprocalRankFusion([vectorHits, ftsHits]).slice(0, matchCount);
 
     // Field names match RetrievedLibrarySource in
     // supabase/functions/_shared/legal-retrieval.ts exactly, so the Deno side

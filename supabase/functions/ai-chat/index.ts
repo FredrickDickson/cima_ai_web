@@ -11,6 +11,8 @@ import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
 import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { searchLegalLibrary, searchTavily, type RetrievedLibrarySource, type TavilyResult } from "../_shared/legal-retrieval.ts";
+import { rewriteQueryForRetrieval } from "../_shared/query-rewrite.ts";
+import { validateCitations, markerSetFrom } from "../_shared/validate-citations.ts";
 import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -147,6 +149,15 @@ Deno.serve(async (req: Request) => {
       : null;
 
     const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];
+    // Follow-up questions ("what about interim measures?") depend on earlier
+    // turns — extractLegalQuery() only looks at the last message, so on a
+    // multi-turn conversation, fold the conversation into a standalone
+    // retrieval query before searching. Falls back to the plain extraction
+    // if the rewrite call fails or there's no history yet.
+    const retrievalQuery = (!taggedContext && userQuery && messages.length > 1)
+      ? (await rewriteQueryForRetrieval(messages, DEEPSEEK_API_KEY)) ?? userQuery
+      : userQuery;
+
     // Every mode searches the full legal-library corpus (case law + statutes)
     // and the web, matching what the standalone Research page already does —
     // previously only Laws.Africa legislation was fetched, and only for
@@ -154,10 +165,10 @@ Deno.serve(async (req: Request) => {
     const [lawsSources, accraRows, librarySources, webResults]: [LawsAfricaSource[], AccraRuleRow[], RetrievedLibrarySource[], TavilyResult[]] = taggedContext
       ? [[], [], [], []]
       : await Promise.all([
-          userQuery ? fetchLawsAfricaSources(userQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve([]),
-          (userQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesRows(userQuery) : Promise.resolve([]),
-          userQuery ? searchLegalLibrary(userQuery, supabase, { hfKey: HUGGINGFACE_API_KEY, jurisdiction: jurisdictionCode, matchCount: 6 }) : Promise.resolve([]),
-          userQuery ? searchTavily(userQuery, jurisdictionLabel, TAVILY_API_KEY) : Promise.resolve([]),
+          retrievalQuery ? fetchLawsAfricaSources(retrievalQuery, LAWS_AFRICA_API_KEY, jurisdictionCode) : Promise.resolve([]),
+          (retrievalQuery && RULES_CONTEXTS.includes(context)) ? fetchAccraRulesRows(retrievalQuery) : Promise.resolve([]),
+          retrievalQuery ? searchLegalLibrary(retrievalQuery, supabase, { hfKey: HUGGINGFACE_API_KEY, jurisdiction: jurisdictionCode, matchCount: 6 }) : Promise.resolve([]),
+          retrievalQuery ? searchTavily(retrievalQuery, jurisdictionLabel, TAVILY_API_KEY) : Promise.resolve([]),
         ]);
 
     const lawsContext = lawsSources.length > 0
@@ -249,6 +260,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (stream) {
+      // No citation_warnings on the streaming path — validating would mean
+      // buffering the entire streamed response before forwarding any of it,
+      // which defeats the point of streaming. Only the non-streaming path
+      // below gets server-side citation validation.
       // cited_sources never appears in DeepSeek's own stream (it's our data,
       // not the model's) — prepend one custom SSE frame carrying it before
       // piping DeepSeek's chunks through untouched, so the frontend can pull
@@ -281,7 +296,8 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content ?? "";
-    return new Response(JSON.stringify({ content, cited_sources: citedSources }), {
+    const citation_warnings = validateCitations(content, markerSetFrom(citedSources));
+    return new Response(JSON.stringify({ content, cited_sources: citedSources, citation_warnings }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (err) {

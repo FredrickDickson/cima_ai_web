@@ -1,0 +1,90 @@
+[
+  {
+    "id": "icc-interim-measures",
+    "query": "Standard for interim measures in ICC arbitration",
+    "jurisdiction": "",
+    "expected_title_substring": "ICC Arbitration Rules",
+    "expected_content_substring": "Conservatory and Interim Measures",
+    "notes": "Regression case for the FTS AND-query bug fixed in 20260807000000_fts_or_fallback.sql — 'Standard for' doesn't literally appear near Article 28, so this only worked previously via the OR fallback, not a real ranked hit."
+  },
+  {
+    "id": "icc-emergency-arbitrator",
+    "query": "Can a party apply for an emergency arbitrator under the ICC Rules before the tribunal is formed?",
+    "jurisdiction": "",
+    "expected_title_substring": "ICC Arbitration Rules",
+    "expected_content_substring": "Emergency Arbitrator",
+    "notes": "Paraphrased, no exact heading words shared with 'Emergency Arbitrator' provisions."
+  },
+  {
+    "id": "uncitral-model-law-scope",
+    "query": "What is the scope of application of the UNCITRAL Model Law on International Commercial Arbitration?",
+    "jurisdiction": "international",
+    "expected_title_substring": "UNCITRAL Model Law on International Commercial Arbitration",
+    "expected_content_substring": "",
+    "notes": ""
+  },
+  {
+    "id": "uncitral-rules-2013",
+    "query": "UNCITRAL Arbitration Rules 2013 transparency rules",
+    "jurisdiction": "international",
+    "expected_title_substring": "UNCITRAL Arbitration Rules 2013",
+    "expected_content_substring": "",
+    "notes": "Keyword-heavy exact-title query — should be trivial for BM25/FTS; a good hybrid-search sanity check."
+  },
+  {
+    "id": "uncitral-mediation-model-law",
+    "query": "Model law provisions on enforcement of international settlement agreements resulting from mediation",
+    "jurisdiction": "international",
+    "expected_title_substring": "UNCITRAL Model Law on International Commercial Mediation",
+    "expected_content_substring": "",
+    "notes": ""
+  },
+  {
+    "id": "lcia-rules-2020",
+    "query": "Under the LCIA Rules, how many arbitrators are appointed by default if the parties have not agreed?",
+    "jurisdiction": "international",
+    "expected_title_substring": "LCIA Arbitration Rules 2020",
+    "expected_content_substring": "",
+    "notes": ""
+  },
+  {
+    "id": "accra-arbitration-rules-interim",
+    "query": "Powers of the tribunal to order interim and conservatory measures under the Accra Arbitration Rules",
+    "jurisdiction": "ghana",
+    "expected_title_substring": "Accra Arbitration",
+    "expected_content_substring": "INTERIM AND CONSERVATORY MEASURES",
+    "notes": "Matches the exact chunk found live in the earlier security-hardening session (RULE 27)."
+  },
+  {
+    "id": "accra-arbitration-rules-costs",
+    "query": "How does the Center handle deposits and costs of arbitration under the Accra Arbitration Rules?",
+    "jurisdiction": "ghana",
+    "expected_title_substring": "Accra Arbitration",
+    "expected_content_substring": "COSTS AND DEPOSITS",
+    "notes": ""
+  },
+  {
+    "id": "ghana-adr-act-case",
+    "query": "Ghana court case applying section 59 of the Alternative Dispute Resolution Act 2010",
+    "jurisdiction": "ghana",
+    "expected_title_substring": "ALTERNATIVE DISPUTE RESOLUTION ACT",
+    "expected_content_substring": "",
+    "notes": "The ADR Act itself isn't a standalone corpus entry (verified) — only case law citing it. This tests whether retrieval can still find the right case."
+  },
+  {
+    "id": "ghana-constitution-fundamental-rights",
+    "query": "Fundamental human rights provisions in the 1992 Constitution of Ghana",
+    "jurisdiction": "ghana",
+    "expected_title_substring": "Constitution of the Republic of Ghana",
+    "expected_content_substring": "",
+    "notes": ""
+  },
+  {
+    "id": "customary-arbitration-committee",
+    "query": "Case involving a customary arbitration committee decision by a House of Chiefs",
+    "jurisdiction": "ghana",
+    "expected_title_substring": "ARBITRATION COMMITTEE",
+    "expected_content_substring": "",
+    "notes": "Paraphrased query against real case titles found in the corpus (e.g. 'ARBITRATION COMMITTEE OF THE CENTRAL REGIONAL HOUSE OF CHIEFS')."
+  }
+]

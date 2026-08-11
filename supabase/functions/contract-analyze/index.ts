@@ -10,6 +10,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, optionalString, optionalUUID, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
+import { validateCitations, markerSetFrom } from "../_shared/validate-citations.ts";
 
 interface CitedSource {
   marker: string;
@@ -323,7 +324,16 @@ ${excerpt}`,
     }).select().maybeSingle();
 
     return new Response(
-      JSON.stringify({ ...analysis, id: savedAnalysis?.id, contract_text: text, cited_sources: citedSources }),
+      JSON.stringify({
+        ...analysis,
+        id: savedAnalysis?.id,
+        contract_text: text,
+        cited_sources: citedSources,
+        // Validated against the full raw model output (not just one field) —
+        // citations can appear in ai_summary, ai_insights, clause analyses,
+        // or recommendations, and `raw` contains all of them as text.
+        citation_warnings: validateCitations(raw, markerSetFrom(citedSources)),
+      }),
       { headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (error) {

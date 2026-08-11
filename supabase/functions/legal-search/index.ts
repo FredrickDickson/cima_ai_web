@@ -10,6 +10,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, optionalString, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
+import { validateCitations, markerSetFrom } from "../_shared/validate-citations.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req);
@@ -97,6 +98,7 @@ Answer the query using only the tagged authority text provided below. Cite each 
             tavily_results: [],
             sources_count: groundedSources.length,
             cited_sources: tagged.citedSources,
+            citation_warnings: validateCitations(aiAnalysis, markerSetFrom(tagged.citedSources)),
           }),
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
@@ -177,6 +179,7 @@ Answer the query using only the tagged authority text provided below. Cite each 
     const [librarySources, docChunksResult] = await Promise.all([
       searchLegalLibrary(query, supabase, {
         embedding: queryEmbedding,
+        hfKey,
         jurisdiction: jurisdiction || undefined,
         sourceType: source_types?.[0] || undefined,
         matchCount: 6,
@@ -307,6 +310,7 @@ No external sources were retrieved for this query. Provide a comprehensive legal
         tavily_results: tavilyResults,
         sources_count: allSources.length,
         cited_sources: citedSources,
+        citation_warnings: validateCitations(aiAnalysis, markerSetFrom(citedSources)),
       }),
       { headers: { ...cors, "Content-Type": "application/json" } }
     );

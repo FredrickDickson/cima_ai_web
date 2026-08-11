@@ -9,6 +9,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, optionalString, optionalUUID, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
+import { validateCitations, markerSetFrom } from "../_shared/validate-citations.ts";
 
 interface CitedSource {
   marker: string;
@@ -376,6 +377,7 @@ A plain-language explanation written for a non-lawyer. Cover: what this document
         template_title: templateTitle,
         jurisdiction: jurisdiction ?? "ghana",
         cited_sources: citedSources,
+        citation_warnings: validateCitations(fullContent, markerSetFrom(citedSources)),
       }),
       { headers: { ...cors, "Content-Type": "application/json" } }
     );

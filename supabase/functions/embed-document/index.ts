@@ -5,6 +5,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, requireUUID } from "../_shared/validate.ts";
+import { chunkByArticle } from "../_shared/chunking.ts";
 
 async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
   try {
@@ -22,16 +23,6 @@ async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] 
   } catch {
     return texts.map(() => null);
   }
-}
-
-function chunkText(text: string, chunkSize = 800, overlap = 100): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + chunkSize));
-    start += chunkSize - overlap;
-  }
-  return chunks;
 }
 
 Deno.serve(async (req: Request) => {
@@ -62,13 +53,18 @@ Deno.serve(async (req: Request) => {
     // any caller overwrite another user's document (status/extracted_text/
     // ai_summary/risk_score) by naming its id. Verify ownership before any
     // writes.
-    const { data: ownedDoc } = await supabase.from("documents").select("id").eq("id", document_id).eq("user_id", user_id).maybeSingle();
+    const { data: ownedDoc } = await supabase.from("documents").select("id, name").eq("id", document_id).eq("user_id", user_id).maybeSingle();
     if (!ownedDoc) throw new HttpError(403, "document_id does not belong to the current user");
     ownedDocumentId = document_id;
 
     await supabase.from("documents").update({ status: "processing" }).eq("id", document_id);
 
-    const chunks = chunkText(text_content);
+    // Structure-aware chunking (split on Article/Rule/Section/Chapter/Part
+    // headings, falling back to sentence-boundary-snapped 1000/150-char
+    // windows) — matches every other ingestion path in this codebase.
+    // Previously this used naive fixed 800/100-char windows, the one
+    // inconsistent chunking strategy left in the app.
+    const chunks = chunkByArticle(text_content, ownedDoc.name ?? "Document").map((c) => c.content);
     const allEmbeddings: (number[] | null)[] = [];
 
     if (hfKey) {
