@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-export type Theme = 'professional-serenity' | 'modern-trust' | 'bold-authority';
+export type Theme = 'white-burgundy' | 'professional-serenity' | 'modern-trust' | 'bold-authority';
 
 interface ThemeContextType {
   theme: Theme;
@@ -10,6 +10,35 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const themes: Record<Theme, Record<string, string>> = {
+  'white-burgundy': {
+    '--navy-50': '#ffffff',
+    '--navy-100': '#fff7f8',
+    '--navy-200': '#f9e4e7',
+    '--navy-300': '#efc2c8',
+    '--navy-400': '#df929d',
+    '--navy-500': '#c85d6c',
+    '--navy-600': '#a93446',
+    '--navy-700': '#8b0e1e',
+    '--navy-800': '#751222',
+    '--navy-900': '#591120',
+    '--navy-950': '#3d0b15',
+    '--gold-50': '#ffffff',
+    '--gold-100': '#fff7f8',
+    '--gold-200': '#f9e4e7',
+    '--gold-300': '#efc2c8',
+    '--gold-400': '#df929d',
+    '--gold-500': '#c85d6c',
+    '--gold-600': '#a93446',
+    '--gold-700': '#8b0e1e',
+    '--gold-800': '#751222',
+    '--gold-900': '#591120',
+    '--gold-950': '#3d0b15',
+    '--accent-500': '#8b0e1e',
+    '--accent-600': '#751222',
+    '--accent-hover': '#591120',
+    '--link-color': '#8b0e1e',
+    '--link-hover': '#591120',
+  },
   'professional-serenity': {
     '--navy-50': '#f0f9ff',
     '--navy-100': '#e0f2fe',
@@ -102,7 +131,7 @@ const themes: Record<Theme, Record<string, string>> = {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('cima-theme');
-    return (saved as Theme) || 'professional-serenity';
+    return (saved as Theme) || 'white-burgundy';
   });
 
   const setTheme = (newTheme: Theme) => {
