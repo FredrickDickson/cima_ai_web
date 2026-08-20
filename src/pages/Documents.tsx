@@ -456,7 +456,7 @@ export default function Documents() {
       (async () => {
         try {
           const { extractTextFromFile } = await import("../lib/fileUtils");
-          const textContent = await extractTextFromFile(file);
+          const { text: textContent, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
 
           if (!textContent.trim()) {
             await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
@@ -468,14 +468,21 @@ export default function Documents() {
 
           const { data: withText } = await supabase
             .from("documents")
-            .update({ extracted_text: textContent.slice(0, 100000), status: "processing" })
+            .update({ extracted_text: textContent, status: "processing" })
             .eq("id", inserted.id)
             .select()
             .single();
           if (withText) {
             setDocuments((prev) => prev.map((d) => (d.id === inserted.id ? withText : d)));
           }
-          showToast(`${docName} — text fully extracted`);
+          if (truncated) {
+            showToast(
+              `${docName} — extracted ${extractedPages} of ${totalPages} pages (some pages could not be processed)`,
+              "info",
+            );
+          } else {
+            showToast(`${docName} — text fully extracted (${totalPages} page${totalPages === 1 ? "" : "s"})`);
+          }
 
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
           const {

@@ -1,7 +1,18 @@
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
-const MAX_PDF_PAGES = 300;
+export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
+// Not a real-world document-length limit — every page is processed. This
+// only guards against a corrupt/malicious PDF lying about its page count
+// (e.g. reporting millions) and hanging the browser tab indefinitely.
+const MAX_PDF_PAGES = 20000;
+const MAX_OCR_PAGES = 20000;
+
+export interface ExtractedText {
+  text: string;
+  truncated: boolean;
+  extractedPages: number;
+  totalPages: number;
+}
 
 const MAGIC_BYTES: Record<string, number[]> = {
   pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
@@ -48,7 +59,7 @@ export async function validateFile(file: File): Promise<void> {
   // only practical guards.
 }
 
-export async function extractTextFromFile(file: File): Promise<string> {
+export async function extractTextFromFile(file: File): Promise<ExtractedText> {
   await validateFile(file);
   const name = file.name.toLowerCase();
 
@@ -62,12 +73,18 @@ export async function extractTextFromFile(file: File): Promise<string> {
     let totalTextLength = 0;
 
     const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
+    let failedPages = 0;
     for (let i = 1; i <= pageCount; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
-      pages.push(pageText);
-      totalTextLength += pageText.trim().length;
+      try {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
+        pages.push(pageText);
+        totalTextLength += pageText.trim().length;
+      } catch (pageErr) {
+        console.error(`Failed to extract page ${i}:`, pageErr);
+        failedPages++;
+      }
     }
 
     if (totalTextLength < 50 && pdf.numPages > 0) {
@@ -75,32 +92,53 @@ export async function extractTextFromFile(file: File): Promise<string> {
       const Tesseract = await import("tesseract.js");
       const ocrPages: string[] = [];
 
-      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-        await page.render({ canvasContext: ctx, viewport }).promise;
+      const ocrPageCount = Math.min(pdf.numPages, MAX_OCR_PAGES);
+      let ocrFailedPages = 0;
+      for (let i = 1; i <= ocrPageCount; i++) {
+        try {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            ocrFailedPages++;
+            continue;
+          }
+          await page.render({ canvasContext: ctx, viewport }).promise;
 
-        const dataUrl = canvas.toDataURL("image/png");
-        const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
-        const { data: { text } } = await recognize(dataUrl, "eng");
-        ocrPages.push(text);
+          const dataUrl = canvas.toDataURL("image/png");
+          const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
+          const { data: { text } } = await recognize(dataUrl, "eng");
+          ocrPages.push(text);
+        } catch (pageErr) {
+          console.error(`OCR failed for page ${i}:`, pageErr);
+          ocrFailedPages++;
+        }
       }
-      return ocrPages.join("\n\n");
+      return {
+        text: ocrPages.join("\n\n"),
+        truncated: pdf.numPages > ocrPageCount || ocrFailedPages > 0,
+        extractedPages: ocrPageCount - ocrFailedPages,
+        totalPages: pdf.numPages,
+      };
     }
 
-    return pages.join("\n\n");
+    return {
+      text: pages.join("\n\n"),
+      truncated: pdf.numPages > pageCount || failedPages > 0,
+      extractedPages: pageCount - failedPages,
+      totalPages: pdf.numPages,
+    };
   }
 
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");
     const result = await mammoth.default.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    return result.value;
+    return { text: result.value, truncated: false, extractedPages: 1, totalPages: 1 };
   }
 
-  return file.text();
+  const text = await file.text();
+  return { text, truncated: false, extractedPages: 1, totalPages: 1 };
 }

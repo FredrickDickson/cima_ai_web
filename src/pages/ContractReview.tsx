@@ -149,7 +149,14 @@ const CLAUSE_ACTIONS = [
 
 const STEPS = ["Parsing text", "Identifying clauses", "Risk scoring", "Checking compliance", "Extracting obligations", "Generating insights"];
 
-async function extractTextFromFile(file: File): Promise<string> {
+interface ExtractedText {
+  text: string;
+  truncated: boolean;
+  extractedPages: number;
+  totalPages: number;
+}
+
+async function extractTextFromFile(file: File): Promise<ExtractedText> {
   await validateFile(file);
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
@@ -159,46 +166,78 @@ async function extractTextFromFile(file: File): Promise<string> {
     const pages: string[] = [];
     let totalTextLength = 0;
 
-    const MAX_PDF_PAGES = 300;
-    for (let i = 1; i <= Math.min(pdf.numPages, MAX_PDF_PAGES); i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
-      pages.push(pageText);
-      totalTextLength += pageText.trim().length;
+    // Not a real-world document-length limit — every page is processed. This
+    // only guards against a corrupt/malicious PDF lying about its page count
+    // (e.g. reporting millions) and hanging the browser tab indefinitely.
+    const MAX_PDF_PAGES = 20000;
+    const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
+    let failedPages = 0;
+    for (let i = 1; i <= pageCount; i++) {
+      try {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
+        pages.push(pageText);
+        totalTextLength += pageText.trim().length;
+      } catch (pageErr) {
+        console.error(`Failed to extract page ${i}:`, pageErr);
+        failedPages++;
+      }
     }
 
     if (totalTextLength < 50 && pdf.numPages > 0) {
       console.log("No embedded text found in PDF, falling back to OCR...");
       const Tesseract = await import("tesseract.js");
       const ocrPages: string[] = [];
-      
-      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Limit OCR to 10 pages for perf
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        
-        const dataUrl = canvas.toDataURL("image/png");
-        const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
-        const { data: { text } } = await recognize(dataUrl, "eng");
-        ocrPages.push(text);
+
+      const MAX_OCR_PAGES = 20000;
+      const ocrPageCount = Math.min(pdf.numPages, MAX_OCR_PAGES);
+      let ocrFailedPages = 0;
+      for (let i = 1; i <= ocrPageCount; i++) {
+        try {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            ocrFailedPages++;
+            continue;
+          }
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          const dataUrl = canvas.toDataURL("image/png");
+          const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
+          const { data: { text } } = await recognize(dataUrl, "eng");
+          ocrPages.push(text);
+        } catch (pageErr) {
+          console.error(`OCR failed for page ${i}:`, pageErr);
+          ocrFailedPages++;
+        }
       }
-      return ocrPages.join("\n\n");
+      return {
+        text: ocrPages.join("\n\n"),
+        truncated: pdf.numPages > ocrPageCount || ocrFailedPages > 0,
+        extractedPages: ocrPageCount - ocrFailedPages,
+        totalPages: pdf.numPages,
+      };
     }
 
-    return pages.join("\n\n");
+    return {
+      text: pages.join("\n\n"),
+      truncated: pdf.numPages > pageCount || failedPages > 0,
+      extractedPages: pageCount - failedPages,
+      totalPages: pdf.numPages,
+    };
   }
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");
     const result = await mammoth.default.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    return result.value;
+    return { text: result.value, truncated: false, extractedPages: 1, totalPages: 1 };
   }
-  return file.text();
+  const text = await file.text();
+  return { text, truncated: false, extractedPages: 1, totalPages: 1 };
 }
 
 type AnalysisTab = "overview" | "clauses" | "obligations" | "risks" | "missing" | "redlines" | "arbitration" | "ai_insights" | "questions";
@@ -818,20 +857,27 @@ export default function ContractReview() {
     setError("");
     setFileName(file.name);
     try {
-      const text = await extractTextFromFile(file);
+      const { text, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
       setContractText(text);
-      showToast(`${file.name} — text fully extracted`);
+      if (truncated) {
+        showToast(
+          `${file.name} — extracted ${extractedPages} of ${totalPages} pages (some pages could not be processed)`,
+          "info",
+        );
+      } else {
+        showToast(`${file.name} — text fully extracted (${totalPages} page${totalPages === 1 ? "" : "s"})`);
+      }
 
       if (user) {
         const fileExt = file.name.split('.').pop() || 'pdf';
         const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-        
+
         const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
         if (uploadError) {
           console.error("File upload failed:", uploadError);
           // Continue anyway - document analysis can still work without file storage
         }
-        
+
         const payload: any = {
           user_id: user.id,
           case_id: linkedCaseId || null,
@@ -840,7 +886,7 @@ export default function ContractReview() {
           file_path: filePath,
           file_size: file.size,
           mime_type: file.type || "text/plain",
-          extracted_text: text.slice(0, 50000),
+          extracted_text: text,
           ai_summary: "",
           risk_score: 0,
           status: "ready",
@@ -884,7 +930,7 @@ export default function ContractReview() {
           case_id: linkedCaseId || null,
           name: fileName || "Pasted Document",
           type: "contract",
-          extracted_text: plainText.slice(0, 50000),
+          extracted_text: plainText,
           ai_summary: "",
           risk_score: 0,
           status: "ready",
@@ -1918,7 +1964,8 @@ export default function ContractReview() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
-                              setRedlineText(await extractTextFromFile(file));
+                              const { text: redlineExtracted } = await extractTextFromFile(file);
+                              setRedlineText(redlineExtracted);
                             } catch (err) {
                               console.error("Failed to extract text from file:", err);
                               setError("Failed to read file. Please try again.");

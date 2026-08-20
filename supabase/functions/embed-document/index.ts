@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const document_id = requireUUID(body.document_id, "document_id");
-    const text_content = requireString(body.text_content, "text_content", { maxLength: 2000000 });
+    const text_content = requireString(body.text_content, "text_content", { maxLength: 20000000 });
     const user_id = verifiedUser.id;
 
     // document_id/user_id used to be trusted straight from the body, letting
@@ -152,7 +152,7 @@ ${excerpt}`,
       risk_score: riskScore,
       metadata,
       status: "ready",
-      extracted_text: text_content.slice(0, 100000),
+      extracted_text: text_content,
     }).eq("id", document_id);
 
     return new Response(

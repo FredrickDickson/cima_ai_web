@@ -280,8 +280,16 @@ export default function AIAssistant() {
     setUploadedDocSize(file.size);
     setExtractingFile(true);
     try {
-      const text = await extractTextFromFile(file);
+      const { text, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
       setUploadedDocText(text);
+      if (truncated) {
+        showToast(
+          `${file.name} — extracted ${extractedPages} of ${totalPages} pages (some pages could not be processed)`,
+          "info",
+        );
+      } else {
+        showToast(`${file.name} — text fully extracted (${totalPages} page${totalPages === 1 ? "" : "s"})`);
+      }
     } catch (err) {
       console.error("Failed to extract text:", err);
       // chip stays visible even if extraction fails
