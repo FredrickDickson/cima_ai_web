@@ -547,16 +547,20 @@ export default function Documents() {
     }
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    const { error } = await supabase.from("documents").delete().eq("id", id);
+  async function handleDelete(doc: DocType) {
+    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from("documents").delete().eq("id", doc.id);
     if (error) {
-      showToast(`Failed to delete "${name}": ${error.message}`, "error");
+      showToast(`Failed to delete "${doc.name}": ${error.message}`, "error");
       return;
     }
-    setDocuments((prev) => prev.filter((d) => d.id !== id));
-    if (viewerDoc?.id === id) setViewerDoc(null);
-    showToast(`"${name}" deleted`);
+    if (doc.storage_path) {
+      const { error: storageError } = await supabase.storage.from("documents").remove([doc.storage_path]);
+      if (storageError) console.error("Failed to remove stored file:", storageError);
+    }
+    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    if (viewerDoc?.id === doc.id) setViewerDoc(null);
+    showToast(`"${doc.name}" deleted`);
   }
 
   async function handleLinkCase(docId: string, caseId: string | null) {
@@ -1503,6 +1507,18 @@ Provide a structured comparison covering:
                           {doc.risk_score}
                         </span>
                       )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(doc);
+                        }}
+                        className="p-1.5 -mr-1.5 mt-0.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"
+                        aria-label="Delete document"
+                        title="Delete document"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   );
                 })}
@@ -1612,7 +1628,7 @@ Provide a structured comparison covering:
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(viewerDoc.id, viewerDoc.name)}
+                  onClick={() => handleDelete(viewerDoc)}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"
                   title="Delete document"
                 >
