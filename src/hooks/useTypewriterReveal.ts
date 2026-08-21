@@ -2,6 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export const TYPEWRITER_CHARS_PER_SECOND = 180;
 
+// Caps how often a reveal tick is actually committed to React state (and
+// thus re-parsed by ReactMarkdown / re-scrolled). The reveal position itself
+// still advances every animation frame so pacing stays accurate — this only
+// throttles how often that position is *emitted*. Without this, onTick fires
+// on nearly every frame (~60/sec), and each of those re-renders can flip a
+// still-growing raw Markdown string across a syntax boundary (e.g. a heading
+// or table gaining its closing characters), snapping the DOM into a
+// different shape dozens of times a second — that's what reads as jitter.
+const MIN_EMIT_INTERVAL_MS = 80;
+
 // Advances `from` toward `text.length` by `rawChars`, then snaps forward to
 // the next whitespace so words aren't split mid-letter. The snap can reveal
 // more than `rawChars` — callers must charge the overshoot back against
@@ -32,6 +42,7 @@ export function useTypewriterReveal(
   const revealedLenRef = useRef(0);
   const carryRef = useRef(0);
   const lastTsRef = useRef(0);
+  const lastEmitTsRef = useRef(0);
   const frameRef = useRef<number | null>(null);
   const tokenRef = useRef(0);
 
@@ -55,11 +66,18 @@ export function useTypewriterReveal(
     // Charge any whitespace-snap overshoot back against the budget so the
     // long-run average reveal rate still matches charsPerSecond.
     carryRef.current = budget - (to - from);
+    revealedLenRef.current = to;
     const caughtUp = to >= target.length;
     const done = caughtUp && streamEndedRef.current;
 
-    if (to !== from) {
-      revealedLenRef.current = to;
+    // Always emit on done/caughtUp so the visible text never lags behind the
+    // internally-tracked position once the loop finishes or parks — only the
+    // in-between frames get throttled.
+    const shouldEmit = to !== from
+      && (done || caughtUp || now - lastEmitTsRef.current >= MIN_EMIT_INTERVAL_MS);
+
+    if (shouldEmit) {
+      lastEmitTsRef.current = now;
       onTickRef.current(target.slice(0, to), done);
     }
 
@@ -95,6 +113,7 @@ export function useTypewriterReveal(
     revealedLenRef.current = 0;
     carryRef.current = 0;
     lastTsRef.current = 0;
+    lastEmitTsRef.current = 0;
     setRevealing(true);
     resume();
   }, [resume, stop]);

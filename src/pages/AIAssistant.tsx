@@ -151,7 +151,7 @@ const MessageBubble = memo(function MessageBubble({
       </div>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-navy-800 border border-navy-700 text-slate-200 rounded-tr-sm" : "bg-navy-800/40 border border-navy-700 text-slate-300 rounded-tl-sm"}`}>
         {msg.content === "" && streaming ? (
-          <div className="py-1">
+          <div className="h-6 flex items-center">
             <MessageLoading />
           </div>
         ) : msg.role === "assistant" ? (
