@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       ...(library_doc_ids ?? []),
     ];
     const taggedContext = (mergedLibraryDocIds.length > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, mergedLibraryDocIds, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, mergedLibraryDocIds, document_ids, userQuery, HUGGINGFACE_API_KEY)
       : null;
 
     const RULES_CONTEXTS = ["arbitration", "drafting", "research", "review", "settlement", "evidence", "award"];

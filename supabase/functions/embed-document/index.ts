@@ -16,10 +16,17 @@ async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] 
         body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
       }
     );
-    if (!res.ok) return texts.map(() => null);
+    if (!res.ok) {
+      console.error(`getEmbeddings: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
+      return texts.map(() => null);
+    }
     const data = await res.json();
+    if (!Array.isArray(data)) {
+      console.error("getEmbeddings: unexpected HuggingFace response shape", JSON.stringify(data).slice(0, 500));
+    }
     return Array.isArray(data) ? data : texts.map(() => null);
-  } catch {
+  } catch (err) {
+    console.error("getEmbeddings: request threw", err);
     return texts.map(() => null);
   }
 }

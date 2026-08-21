@@ -157,6 +157,7 @@ Deno.serve(async (req: Request) => {
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
+    const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
 
     // ---- Fetch matter context if a case is linked ----
     const matterContext = case_id ? await fetchMatterContext(supabase, case_id, user_id) : "";
@@ -184,8 +185,9 @@ Deno.serve(async (req: Request) => {
     // Strict grounding: when the user has @-tagged specific cases/legislation/
     // documents, skip the Laws.Africa/Accra Rules lookup entirely and draft
     // only from the tagged sources.
+    const draftQuery = prompt || templateTitle;
     const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids, draftQuery, hfKey)
       : null;
 
     // Fetch relevant legislation from Laws.Africa + Accra Arbitration Rules

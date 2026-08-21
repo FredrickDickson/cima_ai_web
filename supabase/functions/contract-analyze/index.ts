@@ -112,6 +112,7 @@ Deno.serve(async (req: Request) => {
 
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY")!;
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
+    const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
 
     const excerpt = text.slice(0, 100000);
     const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
@@ -137,7 +138,7 @@ Deno.serve(async (req: Request) => {
     // Playbook/authority tagging: augments the review (doesn't replace it —
     // the document itself remains the primary subject of analysis).
     const taggedContext = ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0)
-      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids)
+      ? await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids, excerpt.slice(0, 3000), hfKey)
       : null;
     const playbookBlock = taggedContext ? buildPlaybookGroundingBlock(taggedContext.titles, taggedContext.context) : "";
 

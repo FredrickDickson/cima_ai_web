@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     // documents, skip Laws.Africa/vector search/CourtListener/Tavily entirely
     // and answer only from the tagged sources.
     if ((library_doc_ids?.length ?? 0) > 0 || (document_ids?.length ?? 0) > 0) {
-      const tagged = await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids);
+      const tagged = await fetchTaggedAuthorityContext(supabase, user_id, library_doc_ids, document_ids, query, hfKey);
       if (tagged) {
         const groundedSources = tagged.citedSources.map((s) => ({
           id: s.doc_id ?? s.marker,
