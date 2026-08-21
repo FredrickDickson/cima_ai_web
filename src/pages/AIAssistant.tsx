@@ -10,7 +10,7 @@ import { FileAttachment } from "../components/ui/FileAttachment";
 import { MessageLoading } from "../components/ui/message-loading";
 import { VoiceInputButton } from "../components/ui/VoiceInputButton";
 import { SharpenButton } from "../components/ui/SharpenButton";
-import { extractTextFromFile } from "../lib/fileUtils";
+import { extractTextWithRetry, describeExtractionError } from "../lib/fileUtils";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useSidebar } from "../contexts/SidebarContext";
@@ -220,6 +220,7 @@ export default function AIAssistant() {
   const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
   const [uploadedDocSize, setUploadedDocSize] = useState<number | undefined>(undefined);
   const [uploadedDocText, setUploadedDocText] = useState<string | null>(null);
+  const [uploadedDocError, setUploadedDocError] = useState<string | null>(null);
   const [extractingFile, setExtractingFile] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -278,9 +279,10 @@ export default function AIAssistant() {
     // Show the chip immediately so the user sees it was picked
     setUploadedDocName(file.name);
     setUploadedDocSize(file.size);
+    setUploadedDocError(null);
     setExtractingFile(true);
     try {
-      const { text, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
+      const { text, truncated, extractedPages, totalPages } = await extractTextWithRetry(file);
       setUploadedDocText(text);
       if (truncated) {
         showToast(
@@ -292,8 +294,18 @@ export default function AIAssistant() {
       }
     } catch (err) {
       console.error("Failed to extract text:", err);
-      // chip stays visible even if extraction fails
-      setUploadedDocText("[Failed to read document text. It may be an unsupported format or corrupted file.]");
+      // Chip stays visible so the user can see what was picked and remove
+      // it, but the failure must never masquerade as real document content
+      // — that content gets embedded verbatim into the prompt sent to the
+      // AI (see handleSend below), so a fake placeholder string here would
+      // silently corrupt the AI's answer instead of visibly blocking send.
+      const { error_reason } = describeExtractionError(err);
+      setUploadedDocText(null);
+      setUploadedDocError(
+        error_reason === "empty_extraction"
+          ? "No text could be extracted from this file — it may be blank, corrupted, or an unsupported format."
+          : "Failed to read this document. Please try again or use a different file.",
+      );
     } finally {
       setExtractingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -313,6 +325,7 @@ export default function AIAssistant() {
     setUploadedDocName(null);
     setUploadedDocSize(undefined);
     setUploadedDocText(null);
+    setUploadedDocError(null);
   }
 
   async function handleSend() {
@@ -369,6 +382,7 @@ export default function AIAssistant() {
     setUploadedDocName(null);
     setUploadedDocSize(undefined);
     setUploadedDocText(null);
+    setUploadedDocError(null);
 
     // Save user message to DB (non-blocking)
     const sentTaggedAuthorities = mentions.activeTaggedAuthorities;
@@ -755,11 +769,14 @@ export default function AIAssistant() {
                   <FileAttachment
                     filename={uploadedDocName}
                     size={uploadedDocSize}
-                    onRemove={() => { setUploadedDocName(null); setUploadedDocText(null); setUploadedDocSize(undefined); }}
-                    className={extractingFile ? "opacity-50 animate-pulse pointer-events-none" : ""}
+                    onRemove={() => { setUploadedDocName(null); setUploadedDocText(null); setUploadedDocError(null); setUploadedDocSize(undefined); }}
+                    className={extractingFile ? "opacity-50 animate-pulse pointer-events-none" : uploadedDocError ? "border-red-500/50" : ""}
                   />
                 )}
               </div>
+            )}
+            {uploadedDocError && (
+              <p className="text-xs text-red-400 mb-3 -mt-2">{uploadedDocError}</p>
             )}
             {mentions.activeTaggedAuthorities.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-3">

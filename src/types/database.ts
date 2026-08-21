@@ -177,6 +177,25 @@ export interface Party {
   counsel?: string;
 }
 
+// Written either by the client on a failed extraction (Documents.tsx,
+// ContractReview.tsx, AIAssistant.tsx — see fileUtils.ts's
+// describeExtractionError) or by embed-document's DeepSeek analysis step on
+// success. The two shapes don't currently coexist on the same row (status
+// "error" only ever carries error_reason/error_detail), but both are kept
+// optional here rather than as a discriminated union so a partial/legacy row
+// (e.g. metadata: {} from ContractReview.tsx's upload path) still type-checks.
+export interface DbDocumentMetadata {
+  error_reason?: "empty_extraction" | "extraction_exception";
+  error_detail?: string;
+  chunks_count?: number;
+  document_type?: string;
+  parties?: string[];
+  key_dates?: { label: string; date: string }[];
+  key_provisions?: string[];
+  issues_identified?: string[];
+  risk_summary?: string;
+}
+
 export interface DbDocument {
   id: string;
   user_id: string;
@@ -192,7 +211,7 @@ export interface DbDocument {
   ai_summary: string;
   risk_score: number;
   status: "uploading" | "extracting" | "processing" | "ready" | "error";
-  metadata: any;
+  metadata: DbDocumentMetadata;
   created_at: string;
   updated_at: string;
 }

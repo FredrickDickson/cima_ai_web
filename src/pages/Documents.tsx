@@ -455,27 +455,10 @@ export default function Documents() {
       // @mention-taggable once extraction lands (see the migration above).
       (async () => {
         try {
-          const { extractTextFromFile } = await import("../lib/fileUtils");
+          const { extractTextWithRetry } = await import("../lib/fileUtils");
 
-          async function extractOnce() {
-            const result = await extractTextFromFile(file);
-            if (!result.text.trim()) throw new Error("EMPTY_EXTRACTION");
-            return result;
-          }
-
-          let extracted;
-          try {
-            extracted = await extractOnce();
-          } catch {
-            // A transient browser hiccup (memory pressure, a backgrounded
-            // tab throttling the rAF-driven extraction loop, etc.) on a
-            // large document can succeed on a second attempt — retry once
-            // before giving up. A second failure propagates to the outer
-            // catch below as normal.
-            extracted = await extractOnce();
-          }
-
-          const { text: textContent, truncated, extractedPages, totalPages } = extracted;
+          const extracted = await extractTextWithRetry(file);
+          const { text: textContent, truncated, extractedPages, totalPages, ocrPages, avgConfidence, lowConfidencePages } = extracted;
 
           const { data: withText } = await supabase
             .from("documents")
@@ -489,6 +472,11 @@ export default function Documents() {
           if (truncated) {
             showToast(
               `${docName} — extracted ${extractedPages} of ${totalPages} pages (some pages could not be processed)`,
+              "info",
+            );
+          } else if (ocrPages > 0 && lowConfidencePages > 0) {
+            showToast(
+              `${docName} — text fully extracted (${totalPages} page${totalPages === 1 ? "" : "s"}), but OCR quality was low on ${lowConfidencePages} scanned page${lowConfidencePages === 1 ? "" : "s"} (avg confidence ${Math.round(avgConfidence ?? 0)}%) — review for accuracy`,
               "info",
             );
           } else {
@@ -545,13 +533,8 @@ export default function Documents() {
             });
         } catch (extractErr) {
           console.error("Text extraction failed:", extractErr);
-          const isEmptyResult = extractErr instanceof Error && extractErr.message === "EMPTY_EXTRACTION";
-          const metadata = isEmptyResult
-            ? { error_reason: "empty_extraction" }
-            : {
-                error_reason: "extraction_exception",
-                error_detail: (extractErr instanceof Error ? extractErr.message : String(extractErr)).slice(0, 300),
-              };
+          const { describeExtractionError } = await import("../lib/fileUtils");
+          const metadata = describeExtractionError(extractErr);
           await supabase.from("documents").update({ status: "error", metadata }).eq("id", inserted.id);
           setDocuments((prev) =>
             prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"], metadata } : d))

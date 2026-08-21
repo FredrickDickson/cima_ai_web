@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
-import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
   ClipboardCheck,
   Upload,
@@ -42,7 +41,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { exportToWord, exportToPdf } from "../lib/exportDraft";
-import { validateFile } from "../lib/fileUtils";
+import { extractTextWithRetry, describeExtractionError } from "../lib/fileUtils";
 import type { ContractClauseAnalysis, MissingClause, ContractAnalysis, Case } from "../types/database";
 import { CitedMarkdown, type CitedSource } from "../lib/citations";
 import { useAuthorityMentions } from "../hooks/useAuthorityMentions";
@@ -148,97 +147,6 @@ const CLAUSE_ACTIONS = [
 ];
 
 const STEPS = ["Parsing text", "Identifying clauses", "Risk scoring", "Checking compliance", "Extracting obligations", "Generating insights"];
-
-interface ExtractedText {
-  text: string;
-  truncated: boolean;
-  extractedPages: number;
-  totalPages: number;
-}
-
-async function extractTextFromFile(file: File): Promise<ExtractedText> {
-  await validateFile(file);
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".pdf") || file.type === "application/pdf") {
-    const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
-    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const pages: string[] = [];
-    let totalTextLength = 0;
-
-    // Not a real-world document-length limit — every page is processed. This
-    // only guards against a corrupt/malicious PDF lying about its page count
-    // (e.g. reporting millions) and hanging the browser tab indefinitely.
-    const MAX_PDF_PAGES = 20000;
-    const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
-    let failedPages = 0;
-    for (let i = 1; i <= pageCount; i++) {
-      try {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = content.items.map((item) => ("str" in item ? (item as { str: string }).str : "")).join(" ");
-        pages.push(pageText);
-        totalTextLength += pageText.trim().length;
-      } catch (pageErr) {
-        console.error(`Failed to extract page ${i}:`, pageErr);
-        failedPages++;
-      }
-    }
-
-    if (totalTextLength < 50 && pdf.numPages > 0) {
-      console.log("No embedded text found in PDF, falling back to OCR...");
-      const Tesseract = await import("tesseract.js");
-      const ocrPages: string[] = [];
-
-      const MAX_OCR_PAGES = 20000;
-      const ocrPageCount = Math.min(pdf.numPages, MAX_OCR_PAGES);
-      let ocrFailedPages = 0;
-      for (let i = 1; i <= ocrPageCount; i++) {
-        try {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            ocrFailedPages++;
-            continue;
-          }
-          await page.render({ canvasContext: ctx, viewport }).promise;
-
-          const dataUrl = canvas.toDataURL("image/png");
-          const recognize = Tesseract.recognize || (Tesseract as any).default?.recognize;
-          const { data: { text } } = await recognize(dataUrl, "eng");
-          ocrPages.push(text);
-        } catch (pageErr) {
-          console.error(`OCR failed for page ${i}:`, pageErr);
-          ocrFailedPages++;
-        }
-      }
-      return {
-        text: ocrPages.join("\n\n"),
-        truncated: pdf.numPages > ocrPageCount || ocrFailedPages > 0,
-        extractedPages: ocrPageCount - ocrFailedPages,
-        totalPages: pdf.numPages,
-      };
-    }
-
-    return {
-      text: pages.join("\n\n"),
-      truncated: pdf.numPages > pageCount || failedPages > 0,
-      extractedPages: pageCount - failedPages,
-      totalPages: pdf.numPages,
-    };
-  }
-  if (name.endsWith(".docx")) {
-    const mammoth = await import("mammoth");
-    const result = await mammoth.default.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    return { text: result.value, truncated: false, extractedPages: 1, totalPages: 1 };
-  }
-  const text = await file.text();
-  return { text, truncated: false, extractedPages: 1, totalPages: 1 };
-}
 
 type AnalysisTab = "overview" | "clauses" | "obligations" | "risks" | "missing" | "redlines" | "arbitration" | "ai_insights" | "questions";
 
@@ -857,7 +765,7 @@ export default function ContractReview() {
     setError("");
     setFileName(file.name);
     try {
-      const { text, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
+      const { text, truncated, extractedPages, totalPages } = await extractTextWithRetry(file);
       setContractText(text);
       if (truncated) {
         showToast(
@@ -899,7 +807,12 @@ export default function ContractReview() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to read file");
+      const { error_reason } = describeExtractionError(err);
+      setError(
+        error_reason === "empty_extraction"
+          ? "No text could be extracted from this file — it may be a blank, corrupted, or unsupported document."
+          : err instanceof Error ? err.message : "Failed to read file",
+      );
     }
   }
 
@@ -1964,11 +1877,22 @@ export default function ContractReview() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
-                              const { text: redlineExtracted } = await extractTextFromFile(file);
+                              const { text: redlineExtracted, truncated, extractedPages, totalPages } = await extractTextWithRetry(file);
                               setRedlineText(redlineExtracted);
+                              if (truncated) {
+                                showToast(
+                                  `${file.name} — extracted ${extractedPages} of ${totalPages} pages (some pages could not be processed)`,
+                                  "info",
+                                );
+                              }
                             } catch (err) {
                               console.error("Failed to extract text from file:", err);
-                              setError("Failed to read file. Please try again.");
+                              const { error_reason } = describeExtractionError(err);
+                              setError(
+                                error_reason === "empty_extraction"
+                                  ? "No text could be extracted from this file — it may be a blank, corrupted, or unsupported document."
+                                  : "Failed to read file. Please try again.",
+                              );
                             }
                             setRedlineResult(null);
                           }} className="hidden" />
