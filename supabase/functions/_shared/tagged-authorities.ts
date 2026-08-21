@@ -64,6 +64,16 @@ const FTS_STOPWORDS = new Set([
   "analyze", "analyse", "outline", "provide", "give", "list", "identify",
   "essay", "memo", "memorandum", "note", "notes", "opinion", "brief",
   "summary", "overview", "analysis", "please", "kindly", "legal",
+  // Question-framing words ("any information, definitions, or principles
+  // specifically addressing X") that carry no topical signal but, left in,
+  // dilute the OR-tier match set enough that boilerplate repeated across
+  // many chunks (e.g. a PDF's running title-page header) can outrank the
+  // chunk that actually answers the question — confirmed via a real
+  // tagged-document query that surfaced only front-matter until these were
+  // added.
+  "information", "definitions", "definition", "principles", "principle",
+  "specifically", "specific", "addressing", "address", "regarding",
+  "concerning", "under", "any", "does",
 ]);
 
 export function cleanFtsQuery(query: string): string {
