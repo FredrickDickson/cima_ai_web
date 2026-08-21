@@ -1,0 +1,4 @@
+E2E TEST DOCUMENT
+
+This is a small plain-text fixture file used by Playwright end-to-end tests to exercise
+the document upload flow. It contains no sensitive or real information.

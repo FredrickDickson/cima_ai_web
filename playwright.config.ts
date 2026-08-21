@@ -6,6 +6,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
+  // Vite's on-demand dependency pre-bundling (tiptap, pdfjs, tesseract, mammoth, etc.)
+  // makes the first navigation to each route slow in a cold dev server; the default
+  // 30s test timeout isn't enough for that first hit.
+  timeout: 90000,
   reporter: "html",
   use: {
     baseURL: process.env.E2E_BASE_URL || "http://localhost:5173",

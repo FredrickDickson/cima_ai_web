@@ -26,3 +26,9 @@ dist-ssr
 assests/Law Reports/
 assests
 assests/International
+
+# Playwright output (regenerated on every e2e run — was previously tracked by mistake)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

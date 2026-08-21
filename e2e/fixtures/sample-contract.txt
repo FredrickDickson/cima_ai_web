@@ -1,0 +1,13 @@
+SERVICES AGREEMENT
+
+This Services Agreement ("Agreement") is entered into between Acme Corp ("Party A") and
+Delta Industries ("Party B").
+
+1. Term. This Agreement shall commence on the Effective Date and continue for one (1) year.
+2. Governing Law. This Agreement shall be governed by the laws of Ghana.
+3. Dispute Resolution. Any dispute arising under this Agreement shall be resolved by
+   arbitration administered by the ICC, seated in Accra, Ghana.
+4. Payment. Party A shall pay Party B within thirty (30) days of invoice receipt.
+5. Termination. Either party may terminate this Agreement with sixty (60) days written notice.
+
+This is a fixture document used only for automated end-to-end testing.

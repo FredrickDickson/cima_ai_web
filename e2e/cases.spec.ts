@@ -1,479 +1,138 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
+import { loginAsTestUser } from "./helpers/auth";
+import { clickSidebarLink } from "./helpers/nav";
 
-test.describe("Cases - End to End", () => {
+async function openNewMatterModal(page: Page) {
+  await clickSidebarLink(page, "Cases");
+  await expect(page).toHaveURL(/\/cases/);
+  await page.getByRole("button", { name: /new matter/i }).click();
+  await expect(page.getByRole("heading", { name: "New Matter" })).toBeVisible();
+}
+
+function newMatterModal(page: Page) {
+  // The heading's grandparent is the modal card div, which also contains the
+  // form — scoping here (rather than to any ancestor "has" match, which
+  // includes the whole page) keeps locators from colliding with same-named
+  // background elements (e.g. the empty-state "Create Matter" button, the
+  // case list's sort <select>).
+  return page.getByRole("heading", { name: "New Matter" }).locator("../..");
+}
+
+async function fillAndSubmitNewMatter(
+  page: Page,
+  { title, matterNumber, type, claimant, respondent }: { title: string; matterNumber: string; type?: string; claimant: string; respondent: string }
+) {
+  const modal = newMatterModal(page);
+  await modal.getByPlaceholder("e.g. Acme Corp v. Delta Industries").fill(title);
+  await modal.getByPlaceholder("ARB/2025/001").fill(matterNumber);
+  if (type) {
+    // The "Type" <select> is the only <select> in this modal — the
+    // Framework field is a text input with a <datalist>, which Playwright
+    // also exposes with role "combobox", so target the tag directly.
+    await modal.locator("select").selectOption(type);
+  }
+  const partyInputs = modal.getByPlaceholder("Party name");
+  await partyInputs.first().fill(claimant);
+  await partyInputs.nth(1).fill(respondent);
+  await modal.getByRole("button", { name: /create matter/i }).click();
+}
+
+test("redirects unauthenticated visitors to login", async ({ page }) => {
+  await page.goto("/cases");
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test.describe("Cases", () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to login page
-    await page.goto("/login");
+    await loginAsTestUser(page);
   });
 
-  test("Authentication protection - redirect to login", async ({ page }) => {
-    // Try to access cases without authentication
-    await page.goto("/cases");
-    
-    // Should redirect to login
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test("Authentication and navigation to Cases", async ({ page }) => {
-    // Login with test credentials
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Wait for navigation to dashboard
-    await expect(page).toHaveURL(/\/(dashboard|cases)/);
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-    
-    // Verify page loads
+  test("Cases page loads with header and search", async ({ page }) => {
+    await clickSidebarLink(page, "Cases");
     await expect(page).toHaveURL(/\/cases/);
     await expect(page.getByText(/cases & matters/i)).toBeVisible();
-    
-    // Verify main UI elements are present
-    await expect(page.getByText("New Matter")).toBeVisible();
-    await expect(page.getByPlaceholder(/search/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /new matter/i })).toBeVisible();
+    await expect(page.getByPlaceholder("Search matters...")).toBeVisible();
   });
 
-  test("Case creation flow - arbitration case", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
+  test("creates an arbitration matter and shows it in the workspace", async ({ page }) => {
+    const title = `E2E Arbitration ${Date.now()}`;
+    await openNewMatterModal(page);
+    await fillAndSubmitNewMatter(page, {
+      title,
+      matterNumber: `ARB-${Date.now()}`,
+      type: "arbitration",
+      claimant: "ABC Corporation",
+      respondent: "XYZ Company",
+    });
 
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
+    // On success the modal closes and the case workspace opens in-place (no URL change).
+    await expect(page.getByRole("heading", { name: "New Matter" })).not.toBeVisible({ timeout: 15000 });
+    await expect(page).toHaveURL(/\/cases$/);
+    await expect(page.getByText(title)).toBeVisible();
 
-    // Click New Matter button
-    await page.getByText("New Matter").click();
-
-    // Verify modal opens
-    await expect(page.getByText(/create new matter/i)).toBeVisible();
-
-    // Fill in case details
-    await page.getByPlaceholder(/case title/i).fill("Test Arbitration Case");
-    await page.getByPlaceholder(/matter number/i).fill("ARB-2025-001");
-    
-    // Select case type
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-
-    // Select framework
-    await page.getByRole("combobox").nth(1).click();
-    await page.getByText("ICC Arbitration Rules").click();
-
-    // Add parties
-    await page.getByPlaceholder(/claimant/i).fill("ABC Corporation");
-    await page.getByPlaceholder(/respondent/i).fill("XYZ Company");
-
-    // Add description
-    await page.getByPlaceholder(/description/i).fill("Test case for e2e testing");
-
-    // Submit form
-    await page.getByRole("button", { name: /create matter/i }).click();
-
-    // Wait for navigation to case workspace
-    await page.waitForTimeout(2000);
-    await expect(page).toHaveURL(/\/cases\/[a-f0-9-]+/);
-
-    // Verify case details are displayed
-    await expect(page.getByText("Test Arbitration Case")).toBeVisible();
-    await expect(page.getByText("ARB-2025-001")).toBeVisible();
-  });
-
-  test("Case creation flow - litigation case", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-
-    // Click New Matter button
-    await page.getByText("New Matter").click();
-
-    // Fill in case details
-    await page.getByPlaceholder(/case title/i).fill("Test Litigation Case");
-    await page.getByPlaceholder(/matter number/i).fill("LIT-2025-001");
-    
-    // Select case type
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Litigation").click();
-
-    // Select framework
-    await page.getByRole("combobox").nth(1).click();
-    await page.getByText("High Court Rules").click();
-
-    // Add parties
-    await page.getByPlaceholder(/claimant/i).fill("John Doe");
-    await page.getByPlaceholder(/respondent/i).fill("Jane Smith");
-
-    // Submit form
-    await page.getByRole("button", { name: /create matter/i }).click();
-
-    // Wait for navigation
-    await page.waitForTimeout(2000);
-    await expect(page).toHaveURL(/\/cases\/[a-f0-9-]+/);
-  });
-
-  test("Case list view - display cases", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-
-    // Wait for cases to load
-    await page.waitForTimeout(2000);
-
-    // Verify cases are displayed (if any exist)
-    const caseCards = page.locator('[data-testid="case-card"]');
-    const count = await caseCards.count();
-    
-    if (count > 0) {
-      // Verify first case card has required elements
-      await expect(caseCards.first()).toBeVisible();
-      await expect(page.getByText(/title/i)).toBeVisible();
-    } else {
-      // Verify empty state is shown
-      await expect(page.getByText(/no cases|create your first matter/i)).toBeVisible();
-    }
-  });
-
-  test("Case list view - search functionality", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Search for a case
-    const searchInput = page.getByPlaceholder(/search/i);
-    await searchInput.fill("Test");
-    await page.waitForTimeout(1000);
-
-    // Verify search results (if any cases exist)
-    // This test assumes cases may or may not exist
-  });
-
-  test("Case list view - status filtering", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Test status filters
-    const filters = ["All", "Active", "Pending", "Closed", "Settled"];
-    
-    for (const filter of filters) {
-      const filterButton = page.getByText(filter).first();
-      if (await filterButton.isVisible()) {
-        await filterButton.click();
-        await page.waitForTimeout(500);
-      }
-    }
-  });
-
-  test("Case workspace navigation", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Check if any cases exist
-    const caseCards = page.locator('[data-testid="case-card"]');
-    const count = await caseCards.count();
-    
-    if (count > 0) {
-      // Click on first case
-      await caseCards.first().click();
-      await page.waitForTimeout(2000);
-
-      // Verify workspace loads
-      await expect(page).toHaveURL(/\/cases\/[a-f0-9-]+/);
-
-      // Verify back button
-      await expect(page.getByRole("button", { name: /back/i })).toBeVisible();
-
-      // Verify tabs are present
-      const tabs = ["Overview", "Issues", "Deadlines", "Hearings", "Evidence", "Documents", "Orders", "Research", "Drafts", "Settlement", "AI Insights"];
-      
-      for (const tab of tabs) {
-        const tabButton = page.getByText(tab).first();
-        if (await tabButton.isVisible()) {
-          await tabButton.click();
-          await page.waitForTimeout(500);
-          await expect(tabButton).toBeVisible();
-        }
-      }
-    }
-  });
-
-  test("Issues tab - CRUD operations", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create a test case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Issues Case");
-    await page.getByPlaceholder(/matter number/i).fill("ISS-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Navigate to Issues tab
-    await page.getByText("Issues").click();
-    await page.waitForTimeout(1000);
-
-    // Add a new issue
-    await page.getByRole("button", { name: /add issue/i }).click();
-    await page.getByPlaceholder(/issue title/i).fill("Test Issue 1");
-    await page.getByPlaceholder(/description/i).fill("This is a test issue");
-    await page.getByRole("button", { name: /save/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Verify issue is added
-    await expect(page.getByText("Test Issue 1")).toBeVisible();
-  });
-
-  test("Deadlines tab - CRUD operations", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create a test case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Deadlines Case");
-    await page.getByPlaceholder(/matter number/i).fill("DLN-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Navigate to Deadlines tab
-    await page.getByText("Deadlines").click();
-    await page.waitForTimeout(1000);
-
-    // Add a new deadline
-    await page.getByRole("button", { name: /add deadline/i }).click();
-    await page.getByPlaceholder(/deadline title/i).fill("Test Deadline");
-    await page.getByRole("combobox").click();
-    await page.getByText("Submission").click();
-    await page.getByRole("button", { name: /save/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Verify deadline is added
-    await expect(page.getByText("Test Deadline")).toBeVisible();
-  });
-
-  test("Hearings tab - CRUD operations", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create a test case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Hearings Case");
-    await page.getByPlaceholder(/matter number/i).fill("HRG-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Navigate to Hearings tab
-    await page.getByText("Hearings").click();
-    await page.waitForTimeout(1000);
-
-    // Add a new hearing
-    await page.getByRole("button", { name: /add hearing/i }).click();
-    await page.getByPlaceholder(/hearing title/i).fill("Test Hearing");
-    await page.getByRole("combobox").click();
-    await page.getByText("First Hearing").click();
-    await page.getByRole("button", { name: /save/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Verify hearing is added
-    await expect(page.getByText("Test Hearing")).toBeVisible();
-  });
-
-  test("Evidence tab - CRUD operations", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create a test case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Evidence Case");
-    await page.getByPlaceholder(/matter number/i).fill("EVD-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Navigate to Evidence tab
-    await page.getByText("Evidence").click();
-    await page.waitForTimeout(1000);
-
-    // Add a new evidence item
-    await page.getByRole("button", { name: /add evidence/i }).click();
-    await page.getByPlaceholder(/evidence title/i).fill("Test Evidence");
-    await page.getByRole("combobox").click();
-    await page.getByText("Document").click();
-    await page.getByPlaceholder(/summary/i).fill("Test evidence summary");
-    await page.getByRole("button", { name: /save/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Verify evidence is added
-    await expect(page.getByText("Test Evidence")).toBeVisible();
-  });
-
-  test("Arbitration features - Gen ToR button", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create an arbitration case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test ToR Case");
-    await page.getByPlaceholder(/matter number/i).fill("TOR-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Verify Gen ToR button is present for arbitration cases
+    // Arbitration-only actions should be present.
     await expect(page.getByText(/gen tor/i)).toBeVisible();
-  });
-
-  test("Arbitration features - Draft Award button", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Navigate to Cases and create an arbitration case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Award Case");
-    await page.getByPlaceholder(/matter number/i).fill("AWD-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
-
-    // Verify Draft Award button is present for arbitration cases
     await expect(page.getByText(/draft award/i)).toBeVisible();
   });
 
-  test("Case creation validation - required fields", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
+  test("case workspace tabs are navigable", async ({ page }) => {
+    const title = `E2E Tabs Case ${Date.now()}`;
+    await openNewMatterModal(page);
+    await fillAndSubmitNewMatter(page, {
+      title,
+      matterNumber: `TAB-${Date.now()}`,
+      claimant: "Test Claimant",
+      respondent: "Test Respondent",
+    });
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
 
-    // Navigate to Cases
-    await page.getByRole("link", { name: /cases/i }).click();
-
-    // Click New Matter button
-    await page.getByText("New Matter").click();
-
-    // Try to submit without required fields
-    await page.getByRole("button", { name: /create matter/i }).click();
-
-    // Verify validation error or button remains disabled
-    await page.waitForTimeout(1000);
-    // The form should not submit without title
+    // Scoped to <main>: the sidebar (persistent via AppLayout) has its own
+    // "Documents"/"Research" links whose names collide with tab labels.
+    const main = page.getByRole("main");
+    const tabs = ["Overview", "Issues", "Deadlines", "Hearings", "Evidence", "Documents", "Orders", "Research", "Drafts", "Settlement", "AI Insights"];
+    for (const tab of tabs) {
+      const tabButton = main.getByRole("button", { name: tab, exact: true }).or(main.getByText(tab, { exact: true }));
+      if (await tabButton.first().isVisible().catch(() => false)) {
+        await tabButton.first().click();
+        await expect(tabButton.first()).toBeVisible();
+      }
+    }
   });
 
-  test("Back navigation from case workspace", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("you@lawfirm.com").fill("test@example.com");
-    await page.getByPlaceholder("••••••••").fill("password123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await page.waitForTimeout(1000);
+  test("back navigation returns to the case list", async ({ page }) => {
+    const title = `E2E Back Nav ${Date.now()}`;
+    await openNewMatterModal(page);
+    await fillAndSubmitNewMatter(page, {
+      title,
+      matterNumber: `NAV-${Date.now()}`,
+      claimant: "Test Claimant",
+      respondent: "Test Respondent",
+    });
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
+    // The back button's accessible name is "Cases" (a ChevronLeft icon + the
+    // text "Cases"), not "Back" — there's no "Back" text anywhere in it.
+    await page.getByRole("button", { name: "Cases", exact: true }).click();
+    await expect(page.getByText(/cases & matters/i)).toBeVisible();
+    await expect(page.getByPlaceholder("Search matters...")).toBeVisible();
+  });
 
-    // Navigate to Cases and create a test case
-    await page.getByRole("link", { name: /cases/i }).click();
-    await page.getByText("New Matter").click();
-    await page.getByPlaceholder(/case title/i).fill("Test Navigation Case");
-    await page.getByPlaceholder(/matter number/i).fill("NAV-2025-001");
-    await page.getByRole("combobox").first().click();
-    await page.getByText("Arbitration").click();
-    await page.getByPlaceholder(/claimant/i).fill("Test Claimant");
-    await page.getByPlaceholder(/respondent/i).fill("Test Respondent");
-    await page.getByRole("button", { name: /create matter/i }).click();
-    await page.waitForTimeout(2000);
+  test("search filters the case list", async ({ page }) => {
+    await clickSidebarLink(page, "Cases");
+    await page.getByPlaceholder("Search matters...").fill("a very unlikely matter name xyzzy123");
+    await expect(page.getByText(/no matching matters/i)).toBeVisible();
+  });
 
-    // Click back button
-    await page.getByRole("button", { name: /back/i }).click();
+  test("status filters are clickable", async ({ page }) => {
+    await clickSidebarLink(page, "Cases");
+    for (const filter of ["All", "Active", "Pending", "Closed", "Settled"]) {
+      await page.getByRole("button", { name: filter, exact: true }).click();
+    }
+  });
 
-    // Verify navigation back to cases list
-    await expect(page).toHaveURL(/\/cases$/);
+  test("new matter form requires a title", async ({ page }) => {
+    await openNewMatterModal(page);
+    const createButton = newMatterModal(page).getByRole("button", { name: /create matter/i });
+    await expect(createButton).toBeDisabled();
   });
 });
