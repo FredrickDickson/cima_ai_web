@@ -29,53 +29,31 @@ export interface TavilyResult {
   score: number;
 }
 
-export async function getEmbedding(text: string, hfKey: string): Promise<number[] | null> {
-  try {
-    const res = await fetch(
-      "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: text, options: { wait_for_model: true } }),
-      },
-    );
-    if (!res.ok) {
-      console.error(`getEmbedding: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
-      return null;
-    }
-    const data = await res.json();
-    return Array.isArray(data[0]) ? data[0] : data;
-  } catch (err) {
-    console.error("getEmbedding: request threw", err);
-    return null;
-  }
+// Embeddings are intentionally disabled — the Hugging Face Inference API
+// token is invalid (401 on every call) and not something a code fix can
+// repair, and an in-process local-model replacement (running
+// @huggingface/transformers inside a Convex Node action) turned out to hit
+// a stack of real, unrelated incompatibilities between that library's
+// browser/Node build split and Convex's sandbox (env-detection assuming
+// the Node build's file-path semantics; onnxruntime-web's WASM loader using
+// a browser-only `blob:` dynamic-import scheme Node's ESM loader rejects) —
+// not a "few lines" fix, with no guarantee there wasn't a fourth issue
+// behind that one. Given every embedding-consuming RPC already has a
+// working, exercised full-text-search fallback (search_document_chunks_fts,
+// search_legal_library_fts, Convex's fullTextSearch — see the vector RPCs
+// below, all of which already degrade to FTS when the embedding is null),
+// returning null here immediately rather than attempting a doomed network
+// call is a correct, low-risk way to run FTS-only until this is revisited
+// (e.g. during the planned Convex database migration, or with a hosted
+// provider that has a valid token). Signatures kept intact so no caller
+// needs to change.
+export async function getEmbedding(_text: string, _hfKey: string): Promise<number[] | null> {
+  return null;
 }
 
-/** Batch variant of getEmbedding — one HuggingFace call for multiple chunks. */
-export async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
-  if (!hfKey) return texts.map(() => null);
-  try {
-    const res = await fetch(
-      "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
-      },
-    );
-    if (!res.ok) {
-      console.error(`getEmbeddings: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
-      return texts.map(() => null);
-    }
-    const data = await res.json();
-    if (!Array.isArray(data)) {
-      console.error("getEmbeddings: unexpected HuggingFace response shape", JSON.stringify(data).slice(0, 500));
-    }
-    return Array.isArray(data) ? data : texts.map(() => null);
-  } catch (err) {
-    console.error("getEmbeddings: request threw", err);
-    return texts.map(() => null);
-  }
+/** Batch variant of getEmbedding. See getEmbedding's comment — embeddings are disabled. */
+export async function getEmbeddings(texts: string[], _hfKey: string): Promise<(number[] | null)[]> {
+  return texts.map(() => null);
 }
 
 /**
