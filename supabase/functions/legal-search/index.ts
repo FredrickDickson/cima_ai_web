@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchLawsAfricaSources, COUNTRY_MAP, COUNTRY_NAMES } from "../_shared/laws-africa.ts";
 import { CIMA_SYSTEM_PROMPT } from "../_shared/cima-system-prompt.ts";
-import { fetchTaggedAuthorityContext } from "../_shared/tagged-authorities.ts";
+import { fetchTaggedAuthorityContext, cleanFtsQuery } from "../_shared/tagged-authorities.ts";
 import { buildStrictGroundingBlock } from "../_shared/strict-grounding.ts";
 import { getEmbedding, searchLegalLibrary, searchTavily } from "../_shared/legal-retrieval.ts";
 import { requireUser } from "../_shared/auth.ts";
@@ -181,13 +181,31 @@ Answer the query using only the tagged authority text provided below. Cite each 
         sourceType: source_types?.[0] || undefined,
         matchCount: 6,
       }),
-      (queryEmbedding && user_id)
-        ? supabase.rpc("match_document_chunks", {
+      (async (): Promise<{ data: { id: string; document_id: string; document_name: string | null; content: string; similarity?: number }[] | null }> => {
+        if (queryEmbedding) {
+          const { data } = await supabase.rpc("match_document_chunks", {
             query_embedding: queryEmbedding,
             match_count: 3,
             filter_user_id: user_id,
-          })
-        : Promise.resolve({ data: null }),
+          });
+          if (data && data.length > 0) return { data };
+        }
+        // Vector retrieval requires embeddings, which embed-document doesn't
+        // always manage to generate (e.g. the Hugging Face call failing) —
+        // full-text search needs no embedding and works off the same chunks.
+        // Mirrors the fallback tagged-authorities.ts uses for @-tagged docs.
+        try {
+          const { data } = await supabase.rpc("search_document_chunks_fts", {
+            search_query: cleanFtsQuery(query).slice(0, 300),
+            match_count: 3,
+            filter_user_id: user_id,
+          });
+          return { data: data ?? null };
+        } catch (err) {
+          console.error("search_document_chunks_fts fallback failed:", err);
+          return { data: null };
+        }
+      })(),
     ]);
 
     sources.push(...librarySources);

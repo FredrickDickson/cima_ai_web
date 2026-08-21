@@ -32,7 +32,7 @@ export interface TavilyResult {
 export async function getEmbedding(text: string, hfKey: string): Promise<number[] | null> {
   try {
     const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
+      "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction",
       {
         method: "POST",
         headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
@@ -48,6 +48,33 @@ export async function getEmbedding(text: string, hfKey: string): Promise<number[
   } catch (err) {
     console.error("getEmbedding: request threw", err);
     return null;
+  }
+}
+
+/** Batch variant of getEmbedding — one HuggingFace call for multiple chunks. */
+export async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
+  if (!hfKey) return texts.map(() => null);
+  try {
+    const res = await fetch(
+      "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
+      },
+    );
+    if (!res.ok) {
+      console.error(`getEmbeddings: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
+      return texts.map(() => null);
+    }
+    const data = await res.json();
+    if (!Array.isArray(data)) {
+      console.error("getEmbeddings: unexpected HuggingFace response shape", JSON.stringify(data).slice(0, 500));
+    }
+    return Array.isArray(data) ? data : texts.map(() => null);
+  } catch (err) {
+    console.error("getEmbeddings: request threw", err);
+    return texts.map(() => null);
   }
 }
 

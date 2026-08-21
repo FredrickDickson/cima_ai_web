@@ -50,6 +50,28 @@ interface RetrievedChunkRow {
   content: string;
 }
 
+// Generic instruction/task-framing words a user's request is often wrapped
+// in ("draft a legal essay on...", "explain..."). Left in, these dominate
+// the FTS fallback's OR-of-terms ranking (ts_rank has no notion of term
+// rarity, so ubiquitous words like "draft"/"legal"/"company" in a company-
+// law textbook can outrank chunks about the actual, rarer topic) — stripping
+// them before building the search query keeps the ranking on-topic. Not
+// applied to the embedding query: semantic search doesn't have this
+// bag-of-words weakness.
+const FTS_STOPWORDS = new Set([
+  "draft", "write", "prepare", "compose", "create", "generate",
+  "explain", "describe", "discuss", "summarize", "summarise",
+  "analyze", "analyse", "outline", "provide", "give", "list", "identify",
+  "essay", "memo", "memorandum", "note", "notes", "opinion", "brief",
+  "summary", "overview", "analysis", "please", "kindly", "legal",
+]);
+
+export function cleanFtsQuery(query: string): string {
+  const words = query.toLowerCase().split(/\W+/).filter(Boolean);
+  const kept = words.filter((w) => w.length > 2 && !FTS_STOPWORDS.has(w));
+  return kept.length > 0 ? kept.join(" ") : query;
+}
+
 /**
  * Fetches metadata + the text most relevant to `query` for @-tagged cases/
  * legislation (rows in `legal_library_documents`, via their chunks in
@@ -186,7 +208,7 @@ export async function fetchTaggedAuthorityContext(
       if (!retrieved && query) {
         try {
           const { data: relevant } = await supabase.rpc("search_document_chunks_fts", {
-            search_query: query.slice(0, 300),
+            search_query: cleanFtsQuery(query).slice(0, 300),
             match_count: RETRIEVAL_MATCH_COUNT,
             filter_user_id: userId,
             filter_document_id: doc.id,

@@ -6,28 +6,11 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
 import { requireUUID } from "../_shared/validate.ts";
+import { getEmbedding } from "../_shared/legal-retrieval.ts";
 
 const MAX_CANDIDATES = 15;
 const TREATMENTS = ["followed", "applied", "distinguished", "disapproved", "overruled", "mentioned"];
 const CONFIDENCES = ["low", "medium", "high"];
-
-async function getEmbedding(text: string, hfKey: string): Promise<number[] | null> {
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: text, options: { wait_for_model: true } }),
-      },
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data[0]) ? data[0] : data;
-  } catch {
-    return null;
-  }
-}
 
 interface MatchRow {
   id: string;

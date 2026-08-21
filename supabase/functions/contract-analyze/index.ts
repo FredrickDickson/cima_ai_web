@@ -114,7 +114,17 @@ Deno.serve(async (req: Request) => {
     const lawsAfricaKey = Deno.env.get("LAWS_AFRICA_API_KEY") ?? "";
     const hfKey = Deno.env.get("HUGGINGFACE_API_KEY") ?? "";
 
-    const excerpt = text.slice(0, 100000);
+    // Clause `char_start`/`char_end` must be offsets into the exact text the
+    // AI is shown, so this has to stay a single contiguous prefix (unlike
+    // embed-document's summary, which can safely sample non-contiguous
+    // windows) — raising the cap is the only way to cover more of a long
+    // document without breaking clause-position highlighting. 180K chars
+    // (~45K tokens) leaves headroom under deepseek-chat's context window for
+    // the system prompt, laws/case-law context, and the 8192-token response,
+    // while covering contracts far longer than the previous 100K-char cap
+    // silently allowed through.
+    const MAX_ANALYSIS_CHARS = 180000;
+    const excerpt = text.slice(0, MAX_ANALYSIS_CHARS);
     const docFocus = DOCUMENT_TYPE_FOCUS[effectiveDocType] ?? DOCUMENT_TYPE_FOCUS.general;
 
     const countryCode = COUNTRY_MAP[(jurisdiction ?? "ghana").toLowerCase()] ?? "gh";

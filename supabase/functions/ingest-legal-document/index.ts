@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString } from "../_shared/validate.ts";
+import { getEmbeddings } from "../_shared/legal-retrieval.ts";
+import { chunkBySentenceBoundary } from "../_shared/text-chunking.ts";
 
 /**
  * This is an internal pipeline endpoint (invoked by the legal-documents
@@ -118,62 +120,13 @@ function chunkByArticle(fullText: string, titlePrefix: string): Chunk[] {
 }
 
 function charChunk(text: string, titlePrefix: string, size = 1000, overlap = 150): Chunk[] {
-  const chunks: Chunk[] = [];
-  let start = 0;
-  let idx = 1;
-  while (start < text.length) {
-    const end = Math.min(start + size, text.length);
-    let slice = text.slice(start, end);
-
-    if (end < text.length) {
-      const lastStop = Math.max(
-        slice.lastIndexOf(". "),
-        slice.lastIndexOf(".\n"),
-        slice.lastIndexOf("\n\n")
-      );
-      if (lastStop > size * 0.5) slice = slice.slice(0, lastStop + 1);
-    }
-
-    const content = slice.trim();
-    if (content.length > 40) {
-      chunks.push({
-        title: `${titlePrefix} — Part ${idx}`,
-        citation: titlePrefix,
-        content,
-      });
-      idx++;
-    }
-    // Once we've reached the end of the text, stop — otherwise `end` stays
-    // pinned at text.length and `start = end - overlap` recomputes to the
-    // same value forever (infinite loop).
-    if (end >= text.length) break;
-    start = end - overlap;
-  }
-  return chunks;
-}
-
-// ─── EMBEDDINGS ──────────────────────────────────────────────────────────────
-
-async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
-  if (!hfKey) return texts.map(() => null);
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${hfKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
-      }
-    );
-    if (!res.ok) return texts.map(() => null);
-    const data = await res.json();
-    return Array.isArray(data) ? data : texts.map(() => null);
-  } catch {
-    return texts.map(() => null);
-  }
+  return chunkBySentenceBoundary(text, size, overlap)
+    .filter((content) => content.length > 40)
+    .map((content, i) => ({
+      title: `${titlePrefix} — Part ${i + 1}`,
+      citation: titlePrefix,
+      content,
+    }));
 }
 
 // ─── MAIN HANDLER ────────────────────────────────────────────────────────────

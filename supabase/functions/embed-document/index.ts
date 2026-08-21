@@ -5,40 +5,24 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, requireUUID } from "../_shared/validate.ts";
+import { getEmbeddings } from "../_shared/legal-retrieval.ts";
+import { chunkBySentenceBoundary } from "../_shared/text-chunking.ts";
 
-async function getEmbeddings(texts: string[], hfKey: string): Promise<(number[] | null)[]> {
-  try {
-    const res = await fetch(
-      "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5",
-      {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${hfKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
-      }
-    );
-    if (!res.ok) {
-      console.error(`getEmbeddings: HuggingFace request failed (${res.status})`, await res.text().catch(() => ""));
-      return texts.map(() => null);
-    }
-    const data = await res.json();
-    if (!Array.isArray(data)) {
-      console.error("getEmbeddings: unexpected HuggingFace response shape", JSON.stringify(data).slice(0, 500));
-    }
-    return Array.isArray(data) ? data : texts.map(() => null);
-  } catch (err) {
-    console.error("getEmbeddings: request threw", err);
-    return texts.map(() => null);
+// A flat text.slice(0, N) only ever sees a long document's opening pages, so
+// summary/risk_score/key_provisions for e.g. a 50-page contract used to
+// reflect nothing past the front matter. Sampling evenly spaced windows
+// across the whole document instead means the analysis sees content from
+// every part of it within the same character budget.
+function buildRepresentativeExcerpt(text: string, maxChars = 6000): string {
+  if (text.length <= maxChars) return text;
+  const sampleCount = 8;
+  const budgetPerSample = Math.floor(maxChars / sampleCount);
+  const parts: string[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const start = Math.floor((i / sampleCount) * text.length);
+    parts.push(text.slice(start, start + budgetPerSample));
   }
-}
-
-function chunkText(text: string, chunkSize = 800, overlap = 100): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + chunkSize));
-    start += chunkSize - overlap;
-  }
-  return chunks;
+  return parts.join("\n...\n");
 }
 
 Deno.serve(async (req: Request) => {
@@ -75,7 +59,7 @@ Deno.serve(async (req: Request) => {
 
     await supabase.from("documents").update({ status: "processing" }).eq("id", document_id);
 
-    const chunks = chunkText(text_content);
+    const chunks = chunkBySentenceBoundary(text_content);
     const allEmbeddings: (number[] | null)[] = [];
 
     if (hfKey) {
@@ -102,7 +86,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("document_chunks").insert(chunkRows.slice(i, i + 50));
     }
 
-    const excerpt = text_content.slice(0, 6000);
+    const excerpt = buildRepresentativeExcerpt(text_content);
     const analysisRes = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
