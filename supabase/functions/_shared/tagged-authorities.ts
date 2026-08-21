@@ -139,6 +139,8 @@ export async function fetchTaggedAuthorityContext(
       if (!combined) continue;
 
       let body = combined;
+      let retrieved = false;
+
       if (queryEmbedding) {
         try {
           const { data: relevant } = await supabase.rpc("match_legal_library", {
@@ -148,9 +150,31 @@ export async function fetchTaggedAuthorityContext(
           }) as unknown as { data: RetrievedChunkRow[] | null };
           if (relevant && relevant.length > 0) {
             body = relevant.map((c) => c.content).join("\n\n");
+            retrieved = true;
           }
         } catch (err) {
-          console.error(`match_legal_library retrieval failed for ${doc.id}, falling back to full text:`, err);
+          console.error(`match_legal_library retrieval failed for ${doc.id}, trying FTS fallback:`, err);
+        }
+      }
+
+      // Vector retrieval requires embeddings, which ingest-legal-document
+      // doesn't always manage to generate (e.g. the Hugging Face call
+      // failing) — full-text search needs no embedding and works off the
+      // same chunks. Mirrors the fallback the user-document branch below
+      // already has via search_document_chunks_fts.
+      if (!retrieved && query) {
+        try {
+          const { data: relevant } = await supabase.rpc("search_legal_library_fts", {
+            search_query: cleanFtsQuery(query).slice(0, 300),
+            match_count: RETRIEVAL_MATCH_COUNT,
+            filter_doc_id: doc.id,
+          }) as unknown as { data: RetrievedChunkRow[] | null };
+          if (relevant && relevant.length > 0) {
+            body = relevant.map((c) => c.content).join("\n\n");
+            retrieved = true;
+          }
+        } catch (err) {
+          console.error(`search_legal_library_fts retrieval failed for ${doc.id}, falling back to full text:`, err);
         }
       }
 
