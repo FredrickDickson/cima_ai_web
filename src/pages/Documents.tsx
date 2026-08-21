@@ -456,15 +456,26 @@ export default function Documents() {
       (async () => {
         try {
           const { extractTextFromFile } = await import("../lib/fileUtils");
-          const { text: textContent, truncated, extractedPages, totalPages } = await extractTextFromFile(file);
 
-          if (!textContent.trim()) {
-            await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
-            setDocuments((prev) =>
-              prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
-            );
-            return;
+          async function extractOnce() {
+            const result = await extractTextFromFile(file);
+            if (!result.text.trim()) throw new Error("EMPTY_EXTRACTION");
+            return result;
           }
+
+          let extracted;
+          try {
+            extracted = await extractOnce();
+          } catch {
+            // A transient browser hiccup (memory pressure, a backgrounded
+            // tab throttling the rAF-driven extraction loop, etc.) on a
+            // large document can succeed on a second attempt — retry once
+            // before giving up. A second failure propagates to the outer
+            // catch below as normal.
+            extracted = await extractOnce();
+          }
+
+          const { text: textContent, truncated, extractedPages, totalPages } = extracted;
 
           const { data: withText } = await supabase
             .from("documents")
@@ -534,9 +545,16 @@ export default function Documents() {
             });
         } catch (extractErr) {
           console.error("Text extraction failed:", extractErr);
-          await supabase.from("documents").update({ status: "error" }).eq("id", inserted.id);
+          const isEmptyResult = extractErr instanceof Error && extractErr.message === "EMPTY_EXTRACTION";
+          const metadata = isEmptyResult
+            ? { error_reason: "empty_extraction" }
+            : {
+                error_reason: "extraction_exception",
+                error_detail: (extractErr instanceof Error ? extractErr.message : String(extractErr)).slice(0, 300),
+              };
+          await supabase.from("documents").update({ status: "error", metadata }).eq("id", inserted.id);
           setDocuments((prev) =>
-            prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"] } : d))
+            prev.map((d) => (d.id === inserted.id ? { ...d, status: "error" as DocType["status"], metadata } : d))
           );
         }
       })();
@@ -1680,10 +1698,18 @@ Provide a structured comparison covering:
                       className="text-red-400 mb-3"
                     />
                     <p className="text-sm font-medium text-red-600">
-                      Processing failed
+                      {viewerDoc.metadata?.error_reason === "empty_extraction"
+                        ? "No readable text could be extracted"
+                        : viewerDoc.metadata?.error_reason === "extraction_exception"
+                        ? "Text extraction failed"
+                        : "Processing failed"}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Unable to process this document
+                    <p className="text-xs text-slate-400 mt-1 max-w-xs text-center">
+                      {viewerDoc.metadata?.error_reason === "empty_extraction"
+                        ? "This can happen with scanned documents or under heavy browser load — try uploading again."
+                        : viewerDoc.metadata?.error_reason === "extraction_exception"
+                        ? `${viewerDoc.metadata?.error_detail ?? "An unexpected error occurred"} — try uploading again.`
+                        : "Unable to process this document"}
                     </p>
                   </div>
                 ) : viewerDoc.extracted_text ? (
