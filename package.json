@@ -18,6 +18,7 @@
     "test:all": "vitest run && npx playwright test"
   },
   "dependencies": {
+    "@hyzyla/pdfium": "^2.1.13",
     "@supabase/supabase-js": "^2.57.4",
     "@tabler/icons-react": "^3.44.0",
     "@tiptap/extension-bubble-menu": "^3.26.0",

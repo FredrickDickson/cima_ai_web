@@ -134,7 +134,18 @@ export const getManyByIds = query({
   },
 });
 
-// Doc + all its ordered chunks in one call — mirrors get_legal_library_document.
+// Cap on getWithChunks's collect() — an unbounded collect() blows Convex's
+// per-query transaction limits (32,000 documents scanned) once a document
+// has more chunks than that, which a large document easily can. This is a
+// stopgap for the existing single-document viewer (LibraryDocument.tsx),
+// which reads and renders every chunk at once; a genuinely paginated viewer
+// (getChunksPage below) is what large documents need, not a bigger cap.
+const GET_WITH_CHUNKS_MAX = 2000;
+
+// Doc + its ordered chunks (up to GET_WITH_CHUNKS_MAX) in one call — mirrors
+// get_legal_library_document. `truncated` is true when the document has more
+// chunks than that; callers wanting the rest should page through
+// getChunksPage instead of raising this cap.
 export const getWithChunks = query({
   args: { docId: v.id("libraryDocuments") },
   returns: v.union(
@@ -149,20 +160,53 @@ export const getWithChunks = query({
           content: v.string(),
         }),
       ),
+      truncated: v.boolean(),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const document = await ctx.db.get(args.docId);
     if (!document) return null;
-    const chunks = await ctx.db
+    const page = await ctx.db
       .query("libraryChunks")
       .withIndex("by_docId", (q) => q.eq("docId", args.docId))
-      .collect();
-    chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+      .paginate({ cursor: null, numItems: GET_WITH_CHUNKS_MAX });
+    const chunks = [...page.page].sort((a, b) => a.chunkIndex - b.chunkIndex);
     return {
       document,
       chunks: chunks.map((c) => ({
+        _id: c._id,
+        chunkIndex: c.chunkIndex,
+        title: c.title,
+        citation: c.citation,
+        content: c.content,
+      })),
+      truncated: !page.isDone,
+    };
+  },
+});
+
+// Genuinely paginated chunk read for large documents — getWithChunks caps at
+// GET_WITH_CHUNKS_MAX; use this to page through the rest.
+export const getChunksPage = query({
+  args: { docId: v.id("libraryDocuments"), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      _id: v.id("libraryChunks"),
+      chunkIndex: v.number(),
+      title: v.string(),
+      citation: v.optional(v.string()),
+      content: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("libraryChunks")
+      .withIndex("by_docId", (q) => q.eq("docId", args.docId))
+      .paginate(args.paginationOpts);
+    return {
+      ...page,
+      page: page.page.map((c) => ({
         _id: c._id,
         chunkIndex: c.chunkIndex,
         title: c.title,

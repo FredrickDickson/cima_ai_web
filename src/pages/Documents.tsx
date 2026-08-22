@@ -35,6 +35,16 @@ import { logCaseEvent } from "../lib/caseEvents";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
+import { getPdfPageCount } from "../lib/fileUtils";
+import type { Id } from "../../convex/_generated/dataModel";
+import { LargeDocumentProgress } from "../components/documents/LargeDocumentProgress";
+
+// PDFs at or above this page count skip browser-based extraction entirely —
+// pdf.js was measured this session to degrade non-linearly (1000 pages:
+// 14.6s, 5000 pages: 23m35s) and never recovers, whereas the Convex
+// large-document pipeline extracted a full 20,000-page document in ~57s.
+// See the large-document ingestion plan.
+const LARGE_DOCUMENT_PAGE_THRESHOLD = 500;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,6 +174,13 @@ export default function Documents() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [folders, setFolders] = useState<DbDocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Large PDFs (routed away from browser-based extraction — see
+  // getPdfPageCount/LARGE_DOCUMENT_PAGE_THRESHOLD below) being processed by
+  // the Convex large-document pipeline. Tracked client-side per session so
+  // the progress UI (see the render section) can subscribe to each one's
+  // live status via Convex's useQuery.
+  const [largeDocIds, setLargeDocIds] = useState<Id<"largeDocuments">[]>([]);
 
   // ── Filter / Navigation ───────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<Section>("all");
@@ -387,6 +404,17 @@ export default function Documents() {
 
       const docName = uploadForm.name.trim() || file.name;
 
+      const pageCount = await getPdfPageCount(file).catch(() => null);
+      if (pageCount !== null && pageCount >= LARGE_DOCUMENT_PAGE_THRESHOLD) {
+        await handleLargeDocumentUpload(file, docName);
+        setShowUpload(false);
+        setUploadForm({ name: "", type: "document", caseId: "" });
+        setSelectedFileName("");
+        if (fileRef.current) fileRef.current.value = "";
+        setUploading(false);
+        return;
+      }
+
       let storagePath: string | null = null;
       const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
       const candidatePath = `${user!.id}/${crypto.randomUUID()}.${fileExt}`;
@@ -546,6 +574,52 @@ export default function Documents() {
     } finally {
       setUploading(false);
     }
+  }
+
+  // Large-PDF path (>= LARGE_DOCUMENT_PAGE_THRESHOLD pages): uploads
+  // directly to Convex storage (never proxied through a Supabase edge
+  // function — a 100MB+ file shouldn't have to fit through that twice),
+  // then hands off to the resumable sharding/extraction/chunking pipeline
+  // in convex/largeDocumentIngestion.ts. See get-large-document-upload-url
+  // and create-large-document (Supabase edge functions that verify auth
+  // before bridging to Convex).
+  async function handleLargeDocumentUpload(file: File, docName: string) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const authHeaders = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token}`,
+    };
+
+    showToast(`"${docName}" is a large document — processing it in the background, this can take a few minutes.`, "info");
+
+    const urlRes = await fetch(`${supabaseUrl}/functions/v1/get-large-document-upload-url`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({}),
+    });
+    if (!urlRes.ok) throw new Error(`Failed to start large-document upload (${urlRes.status})`);
+    const { uploadUrl } = await urlRes.json();
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/pdf" },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error(`File upload failed (${uploadRes.status})`);
+    const { storageId } = await uploadRes.json();
+
+    const createRes = await fetch(`${supabaseUrl}/functions/v1/create-large-document`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ name: docName, storageId }),
+    });
+    if (!createRes.ok) throw new Error(`Failed to create document (${createRes.status})`);
+    const { docId } = await createRes.json();
+
+    setLargeDocIds((prev) => [docId, ...prev]);
   }
 
   async function handleDelete(doc: DocType) {
@@ -1402,6 +1476,19 @@ Provide a structured comparison covering:
                 </p>
               </div>
             )}
+
+          {/* Large-document processing progress (Convex pipeline) */}
+          {largeDocIds.length > 0 && (
+            <div className="p-3 space-y-2 border-b border-slate-100">
+              {largeDocIds.map((docId) => (
+                <LargeDocumentProgress
+                  key={docId}
+                  docId={docId}
+                  onDismiss={() => setLargeDocIds((prev) => prev.filter((id) => id !== docId))}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Document list */}
           <div className="flex-1 overflow-y-auto">

@@ -99,6 +99,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
+/**
+ * Cheap metadata-only page count for routing — opens the PDF and reads
+ * `numPages` without calling `getTextContent()`/rendering anything, so it's
+ * fast even for a very large file. Used to decide whether a PDF should go
+ * through this module's browser-based extractTextFromFile (fine up to a
+ * few hundred/low-thousand pages) or the large-document pipeline
+ * (uploads to Convex storage, server-side extraction+chunking — see
+ * Documents.tsx's upload handler). Returns null for non-PDFs, which always
+ * stay on the existing path.
+ */
+export async function getPdfPageCount(file: File): Promise<number | null> {
+  const name = file.name.toLowerCase();
+  if (!name.endsWith(".pdf") && file.type !== "application/pdf") return null;
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  return pdf.numPages;
+}
+
 export async function extractTextFromFile(file: File, options: ExtractOptions = {}): Promise<ExtractedText> {
   await validateFile(file);
   const name = file.name.toLowerCase();

@@ -9,7 +9,7 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
-import { requireString, optionalString, optionalUUID, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
+import { requireString, optionalString, optionalUUID, optionalUUIDArray, optionalDocumentIdArray, requireArray } from "../_shared/validate.ts";
 
 interface CitedSource {
   marker: string;
@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
     const industry_type = optionalString(body.industry_type, "industry_type", 50);
     const jurisdiction = optionalString(body.jurisdiction, "jurisdiction", 100);
     const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
-    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const tagged_authorities = body.tagged_authorities === undefined
       ? undefined
       : requireArray(body.tagged_authorities, "tagged_authorities", { maxItems: 20, itemValidator: (v) => v });

@@ -119,9 +119,39 @@ export const vectorSearch = internalAction({
 
 // ─── Ingestion-only (public, secret-gated) ─────────────────────────────────
 
-// Replaces all chunks for one document — mirrors the delete-then-insert
-// pattern in ingest-law-reports.mjs (`legal_library.delete().eq('doc_id', ...)`
-// followed by a fresh batch insert).
+// Paginated delete of one document's existing chunks — call repeatedly
+// (feeding continueCursor back in) until isDone, before insertBatch. Split
+// out from insertBatch because collecting-then-deleting all existing chunks
+// in one mutation blows Convex's per-mutation transaction limits (16,000
+// documents written / 32,000 scanned) once a document has more chunks than
+// that — which a large re-ingested document easily can. Mirrors the same
+// cursor-driven pattern stripWatermarksBatch already uses below.
+export const deleteChunksBatch = mutation({
+  args: {
+    secret: v.string(),
+    docId: v.id("libraryDocuments"),
+    cursor: v.optional(v.string()),
+  },
+  returns: v.object({
+    deleted: v.number(),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    const page = await ctx.db
+      .query("libraryChunks")
+      .withIndex("by_docId", (q) => q.eq("docId", args.docId))
+      .paginate({ cursor: args.cursor ?? null, numItems: 500 });
+    for (const c of page.page) await ctx.db.delete(c._id);
+    return { deleted: page.page.length, isDone: page.isDone, continueCursor: page.continueCursor };
+  },
+});
+
+// Inserts a batch of chunks for a document. Insert-only — callers must clear
+// existing chunks first via deleteChunksBatch (see convexReplaceChunks in
+// scripts/lib/convex-ingest-target.mjs). Keep `chunks` well under the
+// 16,000-write mutation limit per call (the caller batches).
 export const insertBatch = mutation({
   args: {
     secret: v.string(),
@@ -141,13 +171,6 @@ export const insertBatch = mutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     requireIngestSecret(args.secret);
-
-    const existing = await ctx.db
-      .query("libraryChunks")
-      .withIndex("by_docId", (q) => q.eq("docId", args.docId))
-      .collect();
-    for (const c of existing) await ctx.db.delete(c._id);
-
     for (const chunk of args.chunks) {
       await ctx.db.insert("libraryChunks", { docId: args.docId, ...chunk });
     }

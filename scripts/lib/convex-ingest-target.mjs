@@ -46,5 +46,25 @@ export async function convexUpsertDocument({ client, secret }, fields) {
 }
 
 export async function convexReplaceChunks({ client, secret }, docId, chunks) {
-  return await client.mutation(api.libraryChunks.insertBatch, { secret, docId, chunks });
+  // Paginated delete first, then batched insert — both bounded well under
+  // Convex's per-mutation transaction limits regardless of document size
+  // (see convex/libraryChunks.ts for why this used to be a single collect()
+  // + insert-all-at-once).
+  let cursor;
+  for (;;) {
+    const res = await client.mutation(api.libraryChunks.deleteChunksBatch, { secret, docId, cursor });
+    if (res.isDone) break;
+    cursor = res.continueCursor;
+  }
+
+  const BATCH = 500;
+  let inserted = 0;
+  for (let i = 0; i < chunks.length; i += BATCH) {
+    inserted += await client.mutation(api.libraryChunks.insertBatch, {
+      secret,
+      docId,
+      chunks: chunks.slice(i, i + BATCH),
+    });
+  }
+  return inserted;
 }

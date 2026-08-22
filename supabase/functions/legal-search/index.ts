@@ -9,7 +9,7 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
-import { requireString, optionalString, optionalUUIDArray, requireArray } from "../_shared/validate.ts";
+import { requireString, optionalString, optionalUUIDArray, optionalDocumentIdArray, requireArray } from "../_shared/validate.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req);
@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
           },
         });
     const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
-    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const user_id = verifiedUser.id;
 
     // Strict grounding: when the user has @-tagged specific cases/legislation/

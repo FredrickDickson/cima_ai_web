@@ -15,7 +15,7 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
-import { optionalUUID, optionalUUIDArray, requireArray, optionalEnum } from "../_shared/validate.ts";
+import { optionalUUID, optionalUUIDArray, optionalDocumentIdArray, requireArray, optionalEnum } from "../_shared/validate.ts";
 
 interface CitedSource {
   marker: string;
@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
     const stream = body.stream === true;
     const library_doc_id = optionalUUID(body.library_doc_id, "library_doc_id");
     const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
-    const document_ids = optionalUUIDArray(body.document_ids, "document_ids");
+    const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const user_id = verifiedUser.id;
 
     const userQuery = extractLegalQuery(messages);
