@@ -55,7 +55,7 @@ export function TrustedBy() {
             background: "linear-gradient(135deg, rgba(139, 14, 30, 0.1), rgba(201, 169, 97, 0.1))",
             border: "1px solid rgba(139, 14, 30, 0.2)",
           }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Global Presence</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Worldwide Reach</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
@@ -65,10 +65,10 @@ export function TrustedBy() {
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
-            Trusted Across Three Continents
+            Trusted Globally
           </h2>
           <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
-            Serving legal professionals in leading international arbitration centers
+            Empowering legal professionals across leading international arbitration centers
           </p>
         </motion.div>
 
