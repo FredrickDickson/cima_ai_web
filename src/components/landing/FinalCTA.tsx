@@ -1,6 +1,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, Zap, Shield, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function FinalCTA() {
   return (
