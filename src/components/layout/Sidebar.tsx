@@ -32,7 +32,14 @@ export default function Sidebar() {
   const displayName = profile?.full_name || user?.email || "User";
 
   async function handleSignOut() {
-    await signOut();
+    try {
+      await signOut();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      navigate("/login", { replace: true });
+    }
+  }
     navigate("/login");
   }
 

@@ -20,8 +20,15 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
   async function handleSignOut() {
     setShowMobileProfileMenu(false);
-    await signOut();
-    navigate("/login");
+    try {
+      await signOut();
+      // Force navigate after sign out completes
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      // Navigate anyway even if there's an error
+      navigate("/login", { replace: true });
+    }
   }
 
   return (

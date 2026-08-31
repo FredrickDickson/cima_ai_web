@@ -203,8 +203,13 @@ export default function Profile() {
   }
 
   async function handleSignOut() {
-    await signOut();
-    navigate("/login");
+    try {
+      await signOut();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      navigate("/login", { replace: true });
+    }
   }
 
   async function handleChangePassword(e: React.FormEvent) {

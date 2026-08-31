@@ -155,6 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    // Clear state immediately to ensure RequireAuth redirects
+    setUser(null);
+    setSession(null);
+    setProfile(null);
   }
 
   async function refreshProfile() {
