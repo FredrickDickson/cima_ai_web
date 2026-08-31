@@ -15,7 +15,7 @@ export const TOUR_STEPS: TourStep[] = [
     description: "Let's take a quick look around — this will only take a minute. You can skip at any time.",
   },
   {
-    target: "sidebar-/",
+    target: "sidebar-/dashboard",
     title: "Dashboard",
     description: "Your home base — active matters, upcoming hearings, recent documents, and quick links to everything below.",
   },

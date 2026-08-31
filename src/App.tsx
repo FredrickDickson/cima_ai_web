@@ -131,7 +131,13 @@ function LoadingScreen() {
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    console.warn("[auth] RequireAuth redirecting to /login", {
+      path: window.location.pathname,
+      timestamp: new Date().toISOString(),
+    });
+    return <Navigate to="/login" replace />;
+  }
   return <>{children}</>;
 }
 

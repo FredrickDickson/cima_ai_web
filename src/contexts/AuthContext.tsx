@@ -60,11 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let hadUser = false;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
+      hadUser = Boolean(session?.user);
       if (session?.user) fetchProfile(session.user.id, session.user);
       setLoading(false);
     }).catch(() => {
@@ -76,11 +78,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // setLoading is never called here: if INITIAL_SESSION fires with null before getSession()
     // resolves it would set user=null and loading=false, causing a spurious redirect to /login.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!mounted) return;
         if (event === 'INITIAL_SESSION') return;
+
+        if (!session?.user && hadUser) {
+          // We previously had a confirmed session on this tab. Don't trust a
+          // single ambiguous null-session event enough to bounce an
+          // already-signed-in user back to /login — re-check directly first.
+          console.warn(`[auth] ${event} fired with no session while signed in — re-confirming`, {
+            event,
+            timestamp: new Date().toISOString(),
+          });
+          const { data: { session: confirmed } } = await supabase.auth.getSession();
+          if (!mounted) return;
+          if (confirmed?.user) {
+            console.warn(`[auth] re-confirm found a valid session — ignoring the ${event} event`, { event });
+            return;
+          }
+          console.warn(`[auth] re-confirm found no session — signing out`, { event });
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
+        hadUser = Boolean(session?.user);
         if (session?.user) {
           fetchProfile(session.user.id, session.user);
         } else {
