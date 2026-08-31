@@ -154,15 +154,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
-    // Clear state immediately to ensure RequireAuth redirects
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Supabase signOut error:", error);
+    }
+    // Clear state immediately
     setUser(null);
     setSession(null);
     setProfile(null);
-    // Force hard redirect as fallback to ensure navigation happens
-    setTimeout(() => {
-      window.location.href = "/login";
-    }, 100);
+    // Force immediate redirect - replace() prevents back button issues
+    window.location.replace("/login");
   }
 
   async function refreshProfile() {
