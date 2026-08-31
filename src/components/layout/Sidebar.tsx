@@ -40,8 +40,6 @@ export default function Sidebar() {
       navigate("/login", { replace: true });
     }
   }
-    navigate("/login");
-  }
 
   return (
     <aside
