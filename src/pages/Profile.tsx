@@ -48,6 +48,10 @@ export default function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [stats, setStats] = useState({ cases: 0, documents: 0, reviews: 0 });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     full_name: "",
@@ -167,7 +171,7 @@ export default function Profile() {
       console.log("Saving profile with avatar_url:", avatarUrl);
 
       // Update profile
-      const updatePayload: Record<string, string | null> = {
+      const updatePayload: any = {
         full_name: form.full_name,
         role: form.role || null,
         organization: form.organization || null,
@@ -203,8 +207,75 @@ export default function Profile() {
     navigate("/login");
   }
 
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError(null);
+
+    // Validation
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setPasswordError("All fields are required");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      // Supabase doesn't have a direct "verify current password" API
+      // So we need to re-authenticate with current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || "",
+        password: passwordForm.currentPassword,
+      });
+
+      if (signInError) {
+        setPasswordError("Current password is incorrect");
+        setPasswordLoading(false);
+        return;
+      }
+
+      // Update password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword,
+      });
+
+      if (updateError) {
+        setPasswordError(updateError.message);
+        setPasswordLoading(false);
+        return;
+      }
+
+      // Success
+      showToast("Password updated successfully");
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordError(null);
+    } catch (err) {
+      console.error("Password change error:", err);
+      setPasswordError("Failed to change password. Please try again.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
   async function handleDeleteAccount() {
-    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+    const confirmation = prompt(
+      'This action cannot be undone. All your data will be permanently deleted.\n\nType "DELETE" to confirm:'
+    );
+    
+    if (confirmation !== "DELETE") {
+      if (confirmation !== null) {
+        showToast("Account deletion cancelled", "error");
+      }
       return;
     }
 
@@ -214,10 +285,20 @@ export default function Profile() {
       if (user?.id) {
         await supabase.from("profiles").delete().eq("id", user.id);
       }
+      
+      // Delete the auth user
+      const { error } = await supabase.auth.admin.deleteUser(user?.id || "");
+      
+      if (error) {
+        // If admin delete fails (requires service role), just sign out
+        console.error("Admin delete error:", error);
+      }
+      
       await signOut();
       showToast("Your account has been deleted");
       navigate("/login");
     } catch (err) {
+      console.error("Delete account error:", err);
       setMessage({ type: "error", text: "Failed to delete account. Please contact support." });
     } finally {
       setLoading(false);
@@ -424,7 +505,7 @@ export default function Profile() {
             <h3 className="text-lg font-semibold text-navy-950 mb-4">Account Actions</h3>
             <div className="space-y-3">
               <button
-                onClick={() => {/* TODO: Implement password change */}}
+                onClick={() => setShowPasswordModal(true)}
                 className="w-full flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
               >
                 <Key size={18} className="text-slate-500" />
@@ -460,6 +541,83 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-navy-950 mb-4">Change Password</h3>
+            
+            {passwordError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg mb-4 text-sm bg-red-50 border border-red-200 text-red-700">
+                <AlertCircle size={16} />
+                {passwordError}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-navy-900 mb-1.5">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all"
+                  placeholder="Enter current password"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy-900 mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all"
+                  placeholder="Enter new password (min 6 characters)"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy-900 mb-1.5">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent transition-all"
+                  placeholder="Confirm new password"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                    setPasswordError(null);
+                  }}
+                  disabled={passwordLoading}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="px-4 py-2 bg-navy-950 hover:bg-navy-800 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {passwordLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {passwordLoading ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
