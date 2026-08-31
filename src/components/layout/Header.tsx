@@ -1,4 +1,4 @@
-import { Bell, HelpCircle, Settings, Menu, User, LogOut } from "lucide-react";
+import { Bell, HelpCircle, Settings, User, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTour } from "../../contexts/TourContext";
 import { useState } from "react";
@@ -84,13 +84,23 @@ export default function Header({ title, subtitle }: HeaderProps) {
           <Settings size={18} />
         </button>
 
-        {/* Mobile: Hamburger Menu */}
+        {/* Mobile: Profile Avatar (opens menu) */}
         <button
           onClick={() => setShowMobileProfileMenu(!showMobileProfileMenu)}
-          className="md:hidden flex items-center gap-2 ml-1 pl-2 border-l border-slate-200 p-2 hover:bg-slate-50 rounded-lg transition-colors"
+          className="md:hidden flex items-center ml-1 pl-2 border-l border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
           aria-label="Profile menu"
         >
-          <Menu size={20} className="text-[#5A2633]" />
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-[#B49A67]/30"
+            />
+          ) : (
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#5A2633] to-[#B49A67] text-white text-sm font-semibold shrink-0 ring-2 ring-[#B49A67]/30">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
         </button>
 
         {/* Desktop: Profile Button */}
