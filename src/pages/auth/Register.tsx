@@ -52,7 +52,7 @@ export default function Register() {
     <div style={{
       minHeight: "100vh",
       display: "flex",
-      background: "linear-gradient(135deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(135deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
       padding: "2rem 0",
@@ -69,7 +69,7 @@ export default function Register() {
           right: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(139, 14, 30, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(90, 38, 51, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -79,7 +79,7 @@ export default function Register() {
           left: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(201, 169, 97, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(180, 154, 103, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -105,7 +105,7 @@ export default function Register() {
               flexShrink: 0,
             }}>
               <img
-                src="/images/logo.jpeg"
+                src="/logo.png"
                 alt="CIMA AI Logo"
                 style={{ 
                   width: "100%",
@@ -119,13 +119,13 @@ export default function Register() {
                 fontFamily: "Playfair Display, Georgia, serif",
                 fontSize: "1.5rem",
                 fontWeight: 700,
-                color: "#2D2D2D",
+                color: "#252525",
               }}>
                 CIMA AI
               </div>
               <div style={{
                 fontSize: "0.875rem",
-                color: "#6d6d6d",
+                color: "#5f5f5f",
                 marginTop: "-0.125rem",
               }}>
                 Legal Intelligence Platform
@@ -139,14 +139,14 @@ export default function Register() {
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 4vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1.5rem",
             lineHeight: 1.2,
           }}>
             Join the Future of
             <br />
             <span style={{
-              background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+              background: "linear-gradient(135deg, #5A2633, #B49A67)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -154,7 +154,7 @@ export default function Register() {
           </h1>
           <p style={{
             fontSize: "1.125rem",
-            color: "#6d6d6d",
+            color: "#5f5f5f",
             lineHeight: 1.7,
             maxWidth: "28rem",
             marginBottom: "2rem",
@@ -187,7 +187,7 @@ export default function Register() {
                   width: "1.5rem",
                   height: "1.5rem",
                   borderRadius: "50%",
-                  background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+                  background: "linear-gradient(135deg, #5A2633, #B49A67)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -199,7 +199,7 @@ export default function Register() {
                 </div>
                 <span style={{
                   fontSize: "0.9375rem",
-                  color: "#2D2D2D",
+                  color: "#252525",
                   fontWeight: 500,
                 }}>
                   {benefit}
@@ -228,7 +228,7 @@ export default function Register() {
             display: "inline-flex",
             alignItems: "center",
             gap: "0.5rem",
-            color: "#8B0E1E",
+            color: "#5A2633",
             textDecoration: "none",
             fontSize: "0.9375rem",
             fontWeight: 600,
@@ -243,7 +243,7 @@ export default function Register() {
             background: "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(20px)",
             borderRadius: "1.5rem",
-            boxShadow: "0 20px 60px rgba(139, 14, 30, 0.12)",
+            boxShadow: "0 20px 60px rgba(90, 38, 51, 0.12)",
             border: "1px solid rgba(255, 255, 255, 0.3)",
             padding: "3rem 2.5rem",
           }}>
@@ -260,7 +260,7 @@ export default function Register() {
                     flexShrink: 0,
                   }}>
                     <img
-                      src="/images/logo.jpeg"
+                      src="/logo.png"
                       alt="CIMA AI Logo"
                       style={{ 
                         width: "100%",
@@ -274,7 +274,7 @@ export default function Register() {
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontSize: "1.25rem",
                       fontWeight: 700,
-                      color: "#2D2D2D",
+                      color: "#252525",
                     }}>
                       CIMA AI
                     </div>
@@ -287,14 +287,14 @@ export default function Register() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.875rem",
               fontWeight: 700,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "0.5rem",
             }}>
               Create Account
             </h2>
             <p style={{
               fontSize: "0.9375rem",
-              color: "#6d6d6d",
+              color: "#5f5f5f",
               marginBottom: "2rem",
             }}>
               Get started with CIMA AI in minutes
@@ -325,7 +325,7 @@ export default function Register() {
                   display: "block",
                   fontSize: "0.875rem",
                   fontWeight: 600,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   Full Name *
@@ -341,7 +341,7 @@ export default function Register() {
                     height: "3rem",
                     padding: "0 1rem",
                     fontSize: "0.9375rem",
-                    color: "#2D2D2D",
+                    color: "#252525",
                     background: "white",
                     border: "2px solid #e5e7eb",
                     borderRadius: "0.75rem",
@@ -349,8 +349,8 @@ export default function Register() {
                     transition: "all 0.3s",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#8B0E1E";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                    e.target.style.borderColor = "#5A2633";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "#e5e7eb";
@@ -365,7 +365,7 @@ export default function Register() {
                   display: "block",
                   fontSize: "0.875rem",
                   fontWeight: 600,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   Role *
@@ -378,7 +378,7 @@ export default function Register() {
                     height: "3rem",
                     padding: "0 1rem",
                     fontSize: "0.9375rem",
-                    color: "#2D2D2D",
+                    color: "#252525",
                     background: "white",
                     border: "2px solid #e5e7eb",
                     borderRadius: "0.75rem",
@@ -386,8 +386,8 @@ export default function Register() {
                     transition: "all 0.3s",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#8B0E1E";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                    e.target.style.borderColor = "#5A2633";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "#e5e7eb";
@@ -406,7 +406,7 @@ export default function Register() {
                   display: "block",
                   fontSize: "0.875rem",
                   fontWeight: 600,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   Work Email *
@@ -422,7 +422,7 @@ export default function Register() {
                     height: "3rem",
                     padding: "0 1rem",
                     fontSize: "0.9375rem",
-                    color: "#2D2D2D",
+                    color: "#252525",
                     background: "white",
                     border: "2px solid #e5e7eb",
                     borderRadius: "0.75rem",
@@ -430,8 +430,8 @@ export default function Register() {
                     transition: "all 0.3s",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#8B0E1E";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                    e.target.style.borderColor = "#5A2633";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "#e5e7eb";
@@ -446,7 +446,7 @@ export default function Register() {
                   display: "block",
                   fontSize: "0.875rem",
                   fontWeight: 600,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   Password *
@@ -463,7 +463,7 @@ export default function Register() {
                       height: "3rem",
                       padding: "0 3rem 0 1rem",
                       fontSize: "0.9375rem",
-                      color: "#2D2D2D",
+                      color: "#252525",
                       background: "white",
                       border: "2px solid #e5e7eb",
                       borderRadius: "0.75rem",
@@ -471,8 +471,8 @@ export default function Register() {
                       transition: "all 0.3s",
                     }}
                     onFocus={(e) => {
-                      e.target.style.borderColor = "#8B0E1E";
-                      e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                      e.target.style.borderColor = "#5A2633";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                     }}
                     onBlur={(e) => {
                       e.target.style.borderColor = "#e5e7eb";
@@ -491,7 +491,7 @@ export default function Register() {
                       border: "none",
                       cursor: "pointer",
                       padding: "0.25rem",
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                     }}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -516,21 +516,21 @@ export default function Register() {
                     height: "1.125rem",
                     marginTop: "0.125rem",
                     cursor: "pointer",
-                    accentColor: "#8B0E1E",
+                    accentColor: "#5A2633",
                     flexShrink: 0,
                   }}
                 />
                 <label htmlFor="acceptTerms" style={{
                   fontSize: "0.875rem",
-                  color: "#6d6d6d",
+                  color: "#5f5f5f",
                   lineHeight: 1.6,
                 }}>
                   I agree to the{" "}
-                  <Link to="/terms" style={{ color: "#8B0E1E", textDecoration: "none", fontWeight: 600 }}>
+                  <Link to="/terms" style={{ color: "#5A2633", textDecoration: "none", fontWeight: 600 }}>
                     Terms of Service
                   </Link>
                   {" "}and{" "}
-                  <Link to="/privacy" style={{ color: "#8B0E1E", textDecoration: "none", fontWeight: 600 }}>
+                  <Link to="/privacy" style={{ color: "#5A2633", textDecoration: "none", fontWeight: 600 }}>
                     Privacy Policy
                   </Link>
                 </label>
@@ -550,10 +550,10 @@ export default function Register() {
                   fontSize: "1rem",
                   fontWeight: 600,
                   color: "white",
-                  background: loading ? "#9d9d9d" : "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                  background: loading ? "#9d9d9d" : "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                   border: "none",
                   borderRadius: "0.75rem",
-                  boxShadow: "0 4px 16px rgba(139, 14, 30, 0.25)",
+                  boxShadow: "0 4px 16px rgba(90, 38, 51, 0.25)",
                   cursor: loading ? "not-allowed" : "pointer",
                   transition: "all 0.3s",
                   marginBottom: "1.5rem",
@@ -573,11 +573,11 @@ export default function Register() {
               <div style={{
                 textAlign: "center",
                 fontSize: "0.9375rem",
-                color: "#6d6d6d",
+                color: "#5f5f5f",
               }}>
                 Already have an account?{" "}
                 <Link to="/login" style={{
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   textDecoration: "none",
                   fontWeight: 600,
                 }}>

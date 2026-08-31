@@ -37,7 +37,7 @@ export default function TermsOfService() {
             background: "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
-            boxShadow: "0 8px 32px rgba(139, 14, 30, 0.08)",
+            boxShadow: "0 8px 32px rgba(90, 38, 51, 0.08)",
           }}>
             {/* Animated Border Shimmer */}
             <div style={{
@@ -45,7 +45,7 @@ export default function TermsOfService() {
               inset: 0,
               borderRadius: "9999px",
               padding: "2px",
-              background: "linear-gradient(90deg, transparent, rgba(139, 14, 30, 0.3), rgba(201, 169, 97, 0.4), rgba(139, 14, 30, 0.3), transparent)",
+              background: "linear-gradient(90deg, transparent, rgba(90, 38, 51, 0.3), rgba(180, 154, 103, 0.4), rgba(90, 38, 51, 0.3), transparent)",
               backgroundSize: "200% 100%",
               animation: "shimmer-border 3s linear infinite",
               WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
@@ -59,7 +59,7 @@ export default function TermsOfService() {
               position: "absolute",
               inset: 0,
               borderRadius: "9999px",
-              border: "2px solid rgba(139, 14, 30, 0.3)",
+              border: "2px solid rgba(90, 38, 51, 0.3)",
               pointerEvents: "none",
             }} />
 
@@ -86,7 +86,7 @@ export default function TermsOfService() {
                   flexShrink: 0,
                 }}>
                   <img
-                    src="/images/logo.jpeg"
+                    src="/logo.png"
                     alt="CIMA AI Logo"
                     style={{ 
                       width: "100%",
@@ -100,14 +100,14 @@ export default function TermsOfService() {
                     fontFamily: "Playfair Display, Georgia, serif",
                     fontSize: "1rem",
                     fontWeight: 700,
-                    color: "#2D2D2D",
+                    color: "#252525",
                     lineHeight: 1,
                   }}>
                     CIMA AI
                   </span>
                   <span style={{
                     fontSize: "0.625rem",
-                    color: "#6d6d6d",
+                    color: "#5f5f5f",
                     marginTop: "0.125rem",
                     letterSpacing: "0.02em",
                   }}>
@@ -124,14 +124,14 @@ export default function TermsOfService() {
                   padding: "0.625rem 1.125rem",
                   fontSize: "0.9375rem",
                   fontWeight: 500,
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   textDecoration: "none",
                   borderRadius: "9999px",
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   background: "transparent",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
@@ -156,7 +156,7 @@ export default function TermsOfService() {
           textAlign: "center", 
           marginBottom: "4rem",
           paddingBottom: "2rem",
-          borderBottom: "2px solid rgba(139, 14, 30, 0.1)",
+          borderBottom: "2px solid rgba(90, 38, 51, 0.1)",
         }}>
           <div style={{
             display: "inline-flex",
@@ -165,9 +165,9 @@ export default function TermsOfService() {
             width: "4rem",
             height: "4rem",
             borderRadius: "1rem",
-            background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+            background: "linear-gradient(135deg, #5A2633, #B49A67)",
             marginBottom: "1.5rem",
-            boxShadow: "0 8px 24px rgba(139, 14, 30, 0.2)",
+            boxShadow: "0 8px 24px rgba(90, 38, 51, 0.2)",
           }}>
             <Scale style={{ width: "2rem", height: "2rem", color: "white" }} />
           </div>
@@ -175,7 +175,7 @@ export default function TermsOfService() {
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "2.75rem",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "0.75rem",
             lineHeight: 1.2,
           }}>
@@ -183,7 +183,7 @@ export default function TermsOfService() {
           </h1>
           <p style={{
             fontSize: "1rem",
-            color: "#6d6d6d",
+            color: "#5f5f5f",
             fontWeight: 500,
           }}>
             Last updated: June 13, 2026
@@ -194,7 +194,7 @@ export default function TermsOfService() {
         <div style={{
           background: "white",
           borderRadius: "1.5rem",
-          border: "1px solid rgba(139, 14, 30, 0.08)",
+          border: "1px solid rgba(90, 38, 51, 0.08)",
           padding: "3rem",
           boxShadow: "0 4px 24px rgba(0, 0, 0, 0.04)",
         }}>
@@ -203,15 +203,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               1. Acceptance of Terms
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -225,15 +225,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               2. Description of Service
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -248,10 +248,10 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               3. User Responsibilities
             </h2>
@@ -259,7 +259,7 @@ export default function TermsOfService() {
               listStyle: "none",
               padding: 0,
               margin: 0,
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -271,7 +271,7 @@ export default function TermsOfService() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 You must be at least 18 years old to use this Service
@@ -284,7 +284,7 @@ export default function TermsOfService() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 You are responsible for maintaining the confidentiality of your account credentials
@@ -297,7 +297,7 @@ export default function TermsOfService() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 You agree to use the Service only for lawful purposes and in accordance with these Terms
@@ -310,7 +310,7 @@ export default function TermsOfService() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 You must not use the Service to provide legal advice unless you are a licensed legal professional
@@ -322,7 +322,7 @@ export default function TermsOfService() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 You are responsible for all activities that occur under your account
@@ -335,15 +335,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               4. Intellectual Property
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -358,15 +358,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               5. AI-Generated Content Disclaimer
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -382,20 +382,20 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               6. Privacy and Data Protection
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
               Your privacy is important to us. Please review our <Link to="/privacy" style={{ 
-                color: "#8B0E1E", 
+                color: "#5A2633", 
                 textDecoration: "underline",
                 fontWeight: 600,
               }}>Privacy Policy</Link> 
@@ -408,15 +408,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               7. Limitation of Liability
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -431,15 +431,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               8. Termination
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -453,15 +453,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               9. Governing Law
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -475,15 +475,15 @@ export default function TermsOfService() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               10. Contact Information
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -497,26 +497,26 @@ export default function TermsOfService() {
           marginTop: "3rem", 
           textAlign: "center",
           paddingTop: "2rem",
-          borderTop: "2px solid rgba(139, 14, 30, 0.1)",
+          borderTop: "2px solid rgba(90, 38, 51, 0.1)",
         }}>
           <Link to="/privacy" style={{
             display: "inline-block",
             padding: "0.875rem 2rem",
             fontSize: "1rem",
             fontWeight: 600,
-            color: "#8B0E1E",
+            color: "#5A2633",
             textDecoration: "none",
             borderRadius: "9999px",
-            background: "rgba(139, 14, 30, 0.06)",
+            background: "rgba(90, 38, 51, 0.06)",
             transition: "all 0.3s",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(139, 14, 30, 0.1)";
+            e.currentTarget.style.background = "rgba(90, 38, 51, 0.1)";
             e.currentTarget.style.transform = "translateY(-2px)";
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 14, 30, 0.15)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(90, 38, 51, 0.15)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+            e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}>

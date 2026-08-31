@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
             background: "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
-            boxShadow: "0 8px 32px rgba(139, 14, 30, 0.08)",
+            boxShadow: "0 8px 32px rgba(90, 38, 51, 0.08)",
           }}>
             {/* Animated Border Shimmer */}
             <div style={{
@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
               inset: 0,
               borderRadius: "9999px",
               padding: "2px",
-              background: "linear-gradient(90deg, transparent, rgba(139, 14, 30, 0.3), rgba(201, 169, 97, 0.4), rgba(139, 14, 30, 0.3), transparent)",
+              background: "linear-gradient(90deg, transparent, rgba(90, 38, 51, 0.3), rgba(180, 154, 103, 0.4), rgba(90, 38, 51, 0.3), transparent)",
               backgroundSize: "200% 100%",
               animation: "shimmer-border 3s linear infinite",
               WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
               position: "absolute",
               inset: 0,
               borderRadius: "9999px",
-              border: "2px solid rgba(139, 14, 30, 0.3)",
+              border: "2px solid rgba(90, 38, 51, 0.3)",
               pointerEvents: "none",
             }} />
 
@@ -86,7 +86,7 @@ export default function PrivacyPolicy() {
                   flexShrink: 0,
                 }}>
                   <img
-                    src="/images/logo.jpeg"
+                    src="/logo.png"
                     alt="CIMA AI Logo"
                     style={{ 
                       width: "100%",
@@ -100,14 +100,14 @@ export default function PrivacyPolicy() {
                     fontFamily: "Playfair Display, Georgia, serif",
                     fontSize: "1rem",
                     fontWeight: 700,
-                    color: "#2D2D2D",
+                    color: "#252525",
                     lineHeight: 1,
                   }}>
                     CIMA AI
                   </span>
                   <span style={{
                     fontSize: "0.625rem",
-                    color: "#6d6d6d",
+                    color: "#5f5f5f",
                     marginTop: "0.125rem",
                     letterSpacing: "0.02em",
                   }}>
@@ -124,14 +124,14 @@ export default function PrivacyPolicy() {
                   padding: "0.625rem 1.125rem",
                   fontSize: "0.9375rem",
                   fontWeight: 500,
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   textDecoration: "none",
                   borderRadius: "9999px",
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   background: "transparent",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
@@ -156,7 +156,7 @@ export default function PrivacyPolicy() {
           textAlign: "center", 
           marginBottom: "4rem",
           paddingBottom: "2rem",
-          borderBottom: "2px solid rgba(139, 14, 30, 0.1)",
+          borderBottom: "2px solid rgba(90, 38, 51, 0.1)",
         }}>
           <div style={{
             display: "inline-flex",
@@ -165,9 +165,9 @@ export default function PrivacyPolicy() {
             width: "4rem",
             height: "4rem",
             borderRadius: "1rem",
-            background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+            background: "linear-gradient(135deg, #5A2633, #B49A67)",
             marginBottom: "1.5rem",
-            boxShadow: "0 8px 24px rgba(139, 14, 30, 0.2)",
+            boxShadow: "0 8px 24px rgba(90, 38, 51, 0.2)",
           }}>
             <Shield style={{ width: "2rem", height: "2rem", color: "white" }} />
           </div>
@@ -175,7 +175,7 @@ export default function PrivacyPolicy() {
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "2.75rem",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "0.75rem",
             lineHeight: 1.2,
           }}>
@@ -183,7 +183,7 @@ export default function PrivacyPolicy() {
           </h1>
           <p style={{
             fontSize: "1rem",
-            color: "#6d6d6d",
+            color: "#5f5f5f",
             fontWeight: 500,
           }}>
             Last updated: June 13, 2026
@@ -194,7 +194,7 @@ export default function PrivacyPolicy() {
         <div style={{
           background: "white",
           borderRadius: "1.5rem",
-          border: "1px solid rgba(139, 14, 30, 0.08)",
+          border: "1px solid rgba(90, 38, 51, 0.08)",
           padding: "3rem",
           boxShadow: "0 4px 24px rgba(0, 0, 0, 0.04)",
         }}>
@@ -203,15 +203,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               1. Introduction
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -226,17 +226,17 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               2. Information We Collect
             </h2>
             <h3 style={{
               fontSize: "1.125rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "0.75rem",
               marginTop: "1rem",
             }}>
@@ -246,7 +246,7 @@ export default function PrivacyPolicy() {
               listStyle: "none",
               padding: 0,
               margin: "0 0 1.5rem 0",
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -258,7 +258,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Name and contact information (email, phone)
@@ -271,7 +271,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Professional information (role, organization)
@@ -284,7 +284,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Account credentials (encrypted passwords)
@@ -296,7 +296,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Payment information (processed securely via third-party providers)
@@ -305,7 +305,7 @@ export default function PrivacyPolicy() {
             <h3 style={{
               fontSize: "1.125rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "0.75rem",
             }}>
               Usage Information
@@ -314,7 +314,7 @@ export default function PrivacyPolicy() {
               listStyle: "none",
               padding: 0,
               margin: 0,
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -326,7 +326,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Documents you upload for analysis and review
@@ -339,7 +339,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Search queries and research activities
@@ -352,7 +352,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Drafts and documents you create using our tools
@@ -365,7 +365,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 AI interactions and generated content
@@ -377,7 +377,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Device information and IP address
@@ -390,15 +390,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               3. How We Use Your Information
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
               marginBottom: "1rem",
@@ -409,7 +409,7 @@ export default function PrivacyPolicy() {
               listStyle: "none",
               padding: 0,
               margin: 0,
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -421,7 +421,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Provide and improve our AI-powered legal services
@@ -434,7 +434,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Process and analyze legal documents you submit
@@ -447,7 +447,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Generate insights, summaries, and recommendations
@@ -460,7 +460,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Authenticate users and secure accounts
@@ -473,7 +473,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Send important updates and service communications
@@ -486,7 +486,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Comply with legal obligations
@@ -498,7 +498,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Prevent fraud and ensure platform security
@@ -511,15 +511,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               4. Data Security
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
               marginBottom: "1rem",
@@ -530,7 +530,7 @@ export default function PrivacyPolicy() {
               listStyle: "none",
               padding: 0,
               margin: 0,
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -542,7 +542,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 End-to-end encryption for data in transit
@@ -555,7 +555,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Secure storage with access controls
@@ -568,7 +568,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Regular security audits and penetration testing
@@ -580,7 +580,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Compliance with Ghana Data Protection Act 2012
@@ -593,15 +593,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               5. AI and Machine Learning
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -616,15 +616,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               6. Data Retention
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -639,15 +639,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               7. Third-Party Services
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -662,15 +662,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               8. Your Rights
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
               marginBottom: "1rem",
@@ -681,7 +681,7 @@ export default function PrivacyPolicy() {
               listStyle: "none",
               padding: 0,
               margin: 0,
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -693,7 +693,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Access your personal data
@@ -706,7 +706,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Request correction of inaccurate data
@@ -719,7 +719,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Request deletion of your data
@@ -732,7 +732,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Object to processing of your data
@@ -744,7 +744,7 @@ export default function PrivacyPolicy() {
                 <span style={{
                   position: "absolute",
                   left: "0",
-                  color: "#C9A961",
+                  color: "#B49A67",
                   fontWeight: "bold",
                 }}>•</span>
                 Withdraw consent at any time
@@ -757,15 +757,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               9. Legal Documents and Confidentiality
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -780,15 +780,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               10. Children's Privacy
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -803,15 +803,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               11. International Data Transfers
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -826,15 +826,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               12. Changes to This Policy
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
             }}>
@@ -849,15 +849,15 @@ export default function PrivacyPolicy() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.5rem",
               fontWeight: 600,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
-              borderBottom: "2px solid rgba(201, 169, 97, 0.3)",
+              borderBottom: "2px solid rgba(180, 154, 103, 0.3)",
             }}>
               13. Contact Information
             </h2>
             <p style={{
-              color: "#4f4f4f",
+              color: "#4a4a4a",
               lineHeight: 1.8,
               fontSize: "1rem",
               marginBottom: "1rem",
@@ -865,19 +865,19 @@ export default function PrivacyPolicy() {
               For questions about this Privacy Policy or to exercise your data rights, please contact us at:
             </p>
             <div style={{
-              background: "rgba(139, 14, 30, 0.03)",
+              background: "rgba(90, 38, 51, 0.03)",
               padding: "1.25rem",
               borderRadius: "0.75rem",
-              border: "1px solid rgba(139, 14, 30, 0.1)",
+              border: "1px solid rgba(90, 38, 51, 0.1)",
             }}>
               <p style={{
-                color: "#4f4f4f",
+                color: "#4a4a4a",
                 lineHeight: 1.8,
                 fontSize: "1rem",
                 margin: 0,
               }}>
-                <strong style={{ color: "#2D2D2D" }}>Email:</strong> privacy@cimaafrica.com<br />
-                <strong style={{ color: "#2D2D2D" }}>Address:</strong> Accra, Ghana
+                <strong style={{ color: "#252525" }}>Email:</strong> privacy@cimaafrica.com<br />
+                <strong style={{ color: "#252525" }}>Address:</strong> Accra, Ghana
               </p>
             </div>
           </section>
@@ -888,26 +888,26 @@ export default function PrivacyPolicy() {
           marginTop: "3rem", 
           textAlign: "center",
           paddingTop: "2rem",
-          borderTop: "2px solid rgba(139, 14, 30, 0.1)",
+          borderTop: "2px solid rgba(90, 38, 51, 0.1)",
         }}>
           <Link to="/terms" style={{
             display: "inline-block",
             padding: "0.875rem 2rem",
             fontSize: "1rem",
             fontWeight: 600,
-            color: "#8B0E1E",
+            color: "#5A2633",
             textDecoration: "none",
             borderRadius: "9999px",
-            background: "rgba(139, 14, 30, 0.06)",
+            background: "rgba(90, 38, 51, 0.06)",
             transition: "all 0.3s",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(139, 14, 30, 0.1)";
+            e.currentTarget.style.background = "rgba(90, 38, 51, 0.1)";
             e.currentTarget.style.transform = "translateY(-2px)";
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 14, 30, 0.15)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(90, 38, 51, 0.15)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+            e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}>

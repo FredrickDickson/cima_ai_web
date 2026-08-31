@@ -82,7 +82,7 @@ export function Features() {
   return (
     <section id="features" style={{
       padding: "5rem 0",
-      background: "linear-gradient(180deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(180deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -93,7 +93,7 @@ export function Features() {
         right: "-20%",
         width: "800px",
         height: "800px",
-        background: "radial-gradient(circle, rgba(139, 14, 30, 0.03) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(90, 38, 51, 0.03) 0%, transparent 70%)",
         borderRadius: "50%",
         pointerEvents: "none",
       }} />
@@ -113,16 +113,16 @@ export function Features() {
             marginBottom: "1rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(201, 169, 97, 0.15), rgba(139, 14, 30, 0.1))",
-            border: "1px solid rgba(201, 169, 97, 0.3)",
+            background: "linear-gradient(135deg, rgba(180, 154, 103, 0.15), rgba(90, 38, 51, 0.1))",
+            border: "1px solid rgba(180, 154, 103, 0.3)",
           }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Comprehensive Platform</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5A2633" }}>Comprehensive Platform</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 5vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
@@ -130,7 +130,7 @@ export function Features() {
             <br />
             <span className="gradient-text">Modern Legal Practice</span>
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
+          <p style={{ fontSize: "1.125rem", color: "#5f5f5f", maxWidth: "42rem", margin: "0 auto" }}>
             A complete suite of AI-powered tools designed specifically for international arbitration and dispute resolution.
           </p>
         </motion.div>
@@ -152,11 +152,11 @@ export function Features() {
                 whileHover={{ y: -12, scale: 1.02 }}
               >
                 <div style={{
-                  background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(253, 251, 247, 0.9) 100%)",
+                  background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 241, 232, 0.9) 100%)",
                   backdropFilter: "blur(20px)",
                   borderRadius: "1.5rem",
                   border: "1px solid rgba(255, 255, 255, 0.3)",
-                  boxShadow: "0 8px 32px rgba(139, 14, 30, 0.08)",
+                  boxShadow: "0 8px 32px rgba(90, 38, 51, 0.08)",
                   height: "100%",
                   transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   position: "relative",
@@ -170,7 +170,7 @@ export function Features() {
                     left: 0,
                     right: 0,
                     height: "4px",
-                    background: "linear-gradient(90deg, #8B0E1E, #C9A961)",
+                    background: "linear-gradient(90deg, #5A2633, #B49A67)",
                     opacity: 0,
                     transition: "opacity 0.4s",
                   }} />
@@ -213,7 +213,7 @@ export function Features() {
                       justifyContent: "center",
                       boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
                     }}>
-                      <Icon style={{ width: "1.5rem", height: "1.5rem", color: "#8B0E1E" }} />
+                      <Icon style={{ width: "1.5rem", height: "1.5rem", color: "#5A2633" }} />
                     </div>
                   </div>
 
@@ -223,14 +223,14 @@ export function Features() {
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontSize: "1.25rem",
                       fontWeight: 700,
-                      color: "#2D2D2D",
+                      color: "#252525",
                       marginBottom: "0.75rem",
                       transition: "color 0.3s",
                     }}>
                       {feature.title}
                     </h3>
                     <p style={{
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                       lineHeight: 1.7,
                       fontSize: "0.9375rem",
                     }}>
@@ -245,7 +245,7 @@ export function Features() {
                     right: "-50%",
                     width: "200px",
                     height: "200px",
-                    background: "radial-gradient(circle, rgba(201, 169, 97, 0.1) 0%, transparent 70%)",
+                    background: "radial-gradient(circle, rgba(180, 154, 103, 0.08) 0%, transparent 70%)",
                     borderRadius: "50%",
                     opacity: 0,
                     transition: "opacity 0.4s",

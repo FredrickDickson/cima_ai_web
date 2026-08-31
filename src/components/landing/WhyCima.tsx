@@ -15,58 +15,30 @@ const benefits = [
   {
     icon: Clock,
     title: "Save Time",
-    description: "Reduce research time by up to 70% with AI-powered legal intelligence.",
+    description: "Reduce research time by up to 70% with AI-powered legal intelligence and smart automation.",
     stat: "70%",
     label: "Time Saved",
   },
   {
     icon: TrendingDown,
     title: "Reduce Costs",
-    description: "Lower operational costs through automation and efficient workflows.",
+    description: "Lower operational costs through automation, efficient workflows, and reduced manual work.",
     stat: "45%",
     label: "Cost Reduction",
   },
   {
     icon: Zap,
     title: "Boost Productivity",
-    description: "Handle more cases with intelligent automation and smart workflows.",
+    description: "Handle more cases with intelligent automation, AI assistance, and streamlined processes.",
     stat: "3x",
     label: "Faster Drafting",
   },
   {
     icon: ShieldCheck,
     title: "Enterprise Security",
-    description: "Bank-grade encryption, SOC 2 compliance, and data privacy protection.",
+    description: "Bank-grade encryption, SOC 2 compliance, and comprehensive data privacy protection.",
     stat: "100%",
     label: "Secure",
-  },
-  {
-    icon: Globe,
-    title: "International Expertise",
-    description: "Specialized in international arbitration and cross-border disputes.",
-    stat: "50+",
-    label: "Jurisdictions",
-  },
-  {
-    icon: Brain,
-    title: "AI-Powered",
-    description: "Cutting-edge AI trained on millions of arbitration cases and decisions.",
-    stat: "1M+",
-    label: "Cases Analyzed",
-  },
-  {
-    icon: Users,
-    title: "Collaborative",
-    description: "Built for teams with real-time collaboration and shared workspaces.",
-    stat: "24/7",
-    label: "Collaboration",
-  },
-  {
-    icon: Award,
-    title: "Trusted Workflow",
-    description: "Designed with arbitrators and legal professionals for real-world use.",
-    stat: "500+",
-    label: "Professionals",
   },
 ];
 
@@ -74,7 +46,7 @@ export function WhyCima() {
   return (
     <section id="why-cima" style={{
       padding: "5rem 0",
-      background: "linear-gradient(180deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(180deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -84,7 +56,7 @@ export function WhyCima() {
         left: "10%",
         width: "500px",
         height: "500px",
-        background: "radial-gradient(circle, rgba(201, 169, 97, 0.08) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(180, 154, 103, 0.08) 0%, transparent 70%)",
         borderRadius: "50%",
         filter: "blur(60px)",
         animation: "pulse-slow 4s ease-in-out infinite",
@@ -95,7 +67,7 @@ export function WhyCima() {
         right: "10%",
         width: "600px",
         height: "600px",
-        background: "radial-gradient(circle, rgba(139, 14, 30, 0.08) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(90, 38, 51, 0.08) 0%, transparent 70%)",
         borderRadius: "50%",
         filter: "blur(80px)",
         animation: "pulse-slow 5s ease-in-out infinite",
@@ -116,22 +88,22 @@ export function WhyCima() {
             marginBottom: "1rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(201, 169, 97, 0.15), rgba(139, 14, 30, 0.1))",
-            border: "1px solid rgba(201, 169, 97, 0.3)",
+            background: "linear-gradient(135deg, rgba(180, 154, 103, 0.15), rgba(90, 38, 51, 0.1))",
+            border: "1px solid rgba(180, 154, 103, 0.3)",
           }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Why Choose CIMA AI</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5A2633" }}>Why Choose CIMA AI</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 5vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
             Built for Legal Excellence
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
+          <p style={{ fontSize: "1.125rem", color: "#5f5f5f", maxWidth: "42rem", margin: "0 auto" }}>
             Trusted by international law firms, arbitrators, and legal professionals worldwide
           </p>
         </motion.div>
@@ -139,7 +111,9 @@ export function WhyCima() {
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "1.5rem",
+          gap: "2rem",
+          maxWidth: "72rem",
+          margin: "0 auto",
         }}>
           {benefits.map((benefit, index) => {
             const Icon = benefit.icon;
@@ -157,7 +131,7 @@ export function WhyCima() {
                   backdropFilter: "blur(20px)",
                   borderRadius: "1.5rem",
                   border: "1px solid rgba(229, 231, 235, 0.5)",
-                  boxShadow: "0 4px 24px rgba(139, 14, 30, 0.08)",
+                  boxShadow: "0 4px 24px rgba(90, 38, 51, 0.08)",
                   padding: "2rem",
                   height: "100%",
                   transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -168,7 +142,7 @@ export function WhyCima() {
                   <div style={{
                     position: "absolute",
                     inset: 0,
-                    background: "linear-gradient(135deg, rgba(201, 169, 97, 0.1), rgba(139, 14, 30, 0.1))",
+                    background: "linear-gradient(135deg, rgba(180, 154, 103, 0.1), rgba(90, 38, 51, 0.1))",
                     opacity: 0,
                     transition: "opacity 0.4s",
                     pointerEvents: "none",
@@ -182,10 +156,10 @@ export function WhyCima() {
                       width: "3.5rem",
                       height: "3.5rem",
                       borderRadius: "1rem",
-                      background: "linear-gradient(135deg, #8B0E1E, #751222)",
+                      background: "linear-gradient(135deg, #5A2633, #4a1f2a)",
                       color: "white",
                       marginBottom: "1rem",
-                      boxShadow: "0 8px 24px rgba(201, 169, 97, 0.3)",
+                      boxShadow: "0 8px 24px rgba(180, 154, 103, 0.3)",
                       transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                     }}>
                       <Icon style={{ width: "1.75rem", height: "1.75rem" }} />
@@ -196,7 +170,7 @@ export function WhyCima() {
                         fontSize: "2.5rem",
                         fontFamily: "Playfair Display, Georgia, serif",
                         fontWeight: 700,
-                        color: "#8B0E1E",
+                        color: "#5A2633",
                         marginBottom: "0.25rem",
                         lineHeight: 1,
                       }}>
@@ -205,7 +179,7 @@ export function WhyCima() {
                       <div style={{
                         fontSize: "0.75rem",
                         fontWeight: 600,
-                        color: "#6d6d6d",
+                        color: "#5f5f5f",
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                       }}>
@@ -217,14 +191,14 @@ export function WhyCima() {
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontSize: "1.25rem",
                       fontWeight: 700,
-                      color: "#2D2D2D",
+                      color: "#252525",
                       marginBottom: "0.75rem",
                       transition: "color 0.3s",
                     }}>
                       {benefit.title}
                     </h3>
                     <p style={{
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                       lineHeight: 1.7,
                       fontSize: "0.875rem",
                     }}>
@@ -238,7 +212,7 @@ export function WhyCima() {
                     left: 0,
                     right: 0,
                     height: "3px",
-                    background: "linear-gradient(90deg, #C9A961, #8B0E1E)",
+                    background: "linear-gradient(90deg, #B49A67, #5A2633)",
                     opacity: 0,
                     transition: "opacity 0.4s",
                   }} />

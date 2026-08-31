@@ -6,7 +6,7 @@ export function FinalCTA() {
   return (
     <section style={{
       padding: "6rem 0",
-      background: "linear-gradient(180deg, #F8F6F0 0%, #ffffff 50%, #FDFBF7 100%)",
+      background: "linear-gradient(180deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -16,7 +16,7 @@ export function FinalCTA() {
         left: "5%",
         width: "600px",
         height: "600px",
-        background: "radial-gradient(circle, rgba(201, 169, 97, 0.1) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(180, 154, 103, 0.1) 0%, transparent 70%)",
         borderRadius: "50%",
         filter: "blur(80px)",
         animation: "pulse-slow 6s ease-in-out infinite",
@@ -27,7 +27,7 @@ export function FinalCTA() {
         right: "5%",
         width: "700px",
         height: "700px",
-        background: "radial-gradient(circle, rgba(139, 14, 30, 0.08) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(90, 38, 51, 0.08) 0%, transparent 70%)",
         borderRadius: "50%",
         filter: "blur(100px)",
         animation: "pulse-slow 8s ease-in-out infinite",
@@ -93,12 +93,12 @@ export function FinalCTA() {
               marginBottom: "2rem",
               padding: "0.75rem 1.5rem",
               borderRadius: "9999px",
-              background: "linear-gradient(135deg, rgba(201, 169, 97, 0.15), rgba(139, 14, 30, 0.1))",
-              border: "1px solid rgba(201, 169, 97, 0.3)",
+              background: "linear-gradient(135deg, rgba(180, 154, 103, 0.15), rgba(90, 38, 51, 0.1))",
+              border: "1px solid rgba(180, 154, 103, 0.3)",
             }}
           >
-            <Zap style={{ width: "1.25rem", height: "1.25rem", color: "#8B0E1E", fill: "#8B0E1E" }} />
-            <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#8B0E1E" }}>
+            <Zap style={{ width: "1.25rem", height: "1.25rem", color: "#5A2633", fill: "#5A2633" }} />
+            <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#5A2633" }}>
               Ready to Transform Your Legal Practice?
             </span>
           </motion.div>
@@ -112,7 +112,7 @@ export function FinalCTA() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "clamp(2.5rem, 6vw, 4rem)",
               fontWeight: 700,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "1.5rem",
               lineHeight: 1.15,
               letterSpacing: "-0.02em",
@@ -132,7 +132,7 @@ export function FinalCTA() {
             transition={{ duration: 0.6, delay: 0.2 }}
             style={{
               fontSize: "clamp(1.125rem, 2vw, 1.375rem)",
-              color: "#6d6d6d",
+              color: "#5f5f5f",
               marginBottom: "3rem",
               lineHeight: 1.6,
             }}
@@ -165,20 +165,20 @@ export function FinalCTA() {
                 fontSize: "1.125rem",
                 fontWeight: 600,
                 color: "white",
-                background: "linear-gradient(135deg, #8B0E1E, #751222)",
+                background: "linear-gradient(135deg, #5A2633, #4a1f2a)",
                 border: "none",
                 borderRadius: "0.75rem",
-                boxShadow: "0 8px 32px rgba(201, 169, 97, 0.4)",
+                boxShadow: "0 8px 32px rgba(180, 154, 103, 0.4)",
                 cursor: "pointer",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-4px) scale(1.02)";
-                e.currentTarget.style.boxShadow = "0 16px 48px rgba(201, 169, 97, 0.5)";
+                e.currentTarget.style.boxShadow = "0 16px 48px rgba(180, 154, 103, 0.5)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0) scale(1)";
-                e.currentTarget.style.boxShadow = "0 8px 32px rgba(201, 169, 97, 0.4)";
+                e.currentTarget.style.boxShadow = "0 8px 32px rgba(180, 154, 103, 0.4)";
               }}>
                 Start Now
                 <ArrowRight style={{ width: "1.25rem", height: "1.25rem" }} />
@@ -190,16 +190,16 @@ export function FinalCTA() {
                 padding: "0 2.5rem",
                 fontSize: "1.125rem",
                 fontWeight: 600,
-                color: "#8B0E1E",
+                color: "#5A2633",
                 background: "rgba(255, 255, 255, 0.9)",
                 backdropFilter: "blur(20px)",
-                border: "2px solid #8B0E1E",
+                border: "2px solid #5A2633",
                 borderRadius: "0.75rem",
                 cursor: "pointer",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(139, 14, 30, 0.05)";
+                e.currentTarget.style.background = "rgba(90, 38, 51, 0.05)";
                 e.currentTarget.style.transform = "translateY(-4px)";
               }}
               onMouseLeave={(e) => {
@@ -246,13 +246,13 @@ export function FinalCTA() {
                       borderRadius: "1rem",
                       padding: "1.5rem 1rem",
                       border: "1px solid rgba(229, 231, 235, 0.5)",
-                      boxShadow: "0 4px 24px rgba(139, 14, 30, 0.08)",
+                      boxShadow: "0 4px 24px rgba(90, 38, 51, 0.08)",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       cursor: "pointer",
                     }}
                     whileHover={{
                       y: -4,
-                      boxShadow: "0 8px 32px rgba(139, 14, 30, 0.12)",
+                      boxShadow: "0 8px 32px rgba(90, 38, 51, 0.12)",
                     }}
                   >
                     <div style={{
@@ -265,7 +265,7 @@ export function FinalCTA() {
                         width: "2.5rem",
                         height: "2.5rem",
                         borderRadius: "0.5rem",
-                        background: "linear-gradient(135deg, #8B0E1E, #751222)",
+                        background: "linear-gradient(135deg, #5A2633, #4a1f2a)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -277,7 +277,7 @@ export function FinalCTA() {
                       fontSize: "clamp(2rem, 4vw, 2.5rem)",
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontWeight: 700,
-                      color: "#8B0E1E",
+                      color: "#5A2633",
                       marginBottom: "0.5rem",
                       lineHeight: 1,
                     }}>
@@ -285,7 +285,7 @@ export function FinalCTA() {
                     </div>
                     <div style={{
                       fontSize: "0.8125rem",
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                       fontWeight: 500,
                     }}>
                       {stat.label}
