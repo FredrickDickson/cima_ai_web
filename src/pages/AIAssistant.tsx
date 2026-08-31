@@ -786,36 +786,36 @@ export default function AIAssistant() {
                 <span className="text-[11px] text-gold-400/80 font-medium">Answering only from tagged sources</span>
               </div>
             )}
-            <div className="flex items-end gap-2 bg-navy-800 border border-navy-700 rounded-2xl px-3 py-2.5 focus-within:border-gold-500/40 transition-all">
+            <div className="flex items-end gap-2 md:gap-3 bg-navy-800 border border-navy-700 rounded-2xl px-3 md:px-4 py-3 md:py-2.5 focus-within:border-gold-500/50 focus-within:ring-2 focus-within:ring-gold-500/20 transition-all shadow-lg">
               <button onClick={() => setShowAttach(p => !p)}
-                className={`p-1.5 rounded-lg transition-colors shrink-0 ${showAttach || attachedCase || attachedDoc ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"}`}
+                className={`p-2 md:p-1.5 rounded-lg transition-colors shrink-0 ${showAttach || attachedCase || attachedDoc ? "text-gold-400 bg-gold-500/10" : "text-slate-400 hover:text-slate-200 hover:bg-navy-700"}`}
                 title="Attach case or document">
-                <Paperclip size={15} />
+                <Paperclip size={18} className="md:w-[15px] md:h-[15px]" />
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={extractingFile}
-                className={`p-1.5 rounded-lg transition-colors shrink-0 ${uploadedDocName ? "text-gold-400 bg-gold-500/10" : "text-slate-500 hover:text-slate-300 hover:bg-navy-700"} disabled:opacity-40`}
+                className={`p-2 md:p-1.5 rounded-lg transition-colors shrink-0 ${uploadedDocName ? "text-gold-400 bg-gold-500/10" : "text-slate-400 hover:text-slate-200 hover:bg-navy-700"} disabled:opacity-40`}
                 title="Upload document for AI context">
-                {extractingFile ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {extractingFile ? <Loader2 size={18} className="md:w-[15px] md:h-[15px] animate-spin" /> : <Upload size={18} className="md:w-[15px] md:h-[15px]" />}
               </button>
               <VoiceInputButton
                 onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
-                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                className="text-slate-400 hover:text-slate-200 hover:bg-navy-700 p-2 md:p-1.5"
                 title="Dictate your message"
               />
               <SharpenButton
                 text={input}
                 onSharpened={setInput}
                 kind="chat message"
-                className="text-slate-500 hover:text-slate-300 hover:bg-navy-700"
+                className="text-slate-400 hover:text-slate-200 hover:bg-navy-700 p-2 md:p-1.5"
                 title="Sharpen your message"
               />
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <textarea ref={textareaRef} value={input} onChange={mentions.handleTextareaChange} onKeyDown={handleKeyDown}
                   rows={1} placeholder={`Ask CIMA AI${contextInfo ? ` — ${contextInfo.label}` : ""}... (type @ to tag a source)`}
-                  className="w-full text-sm text-slate-200 placeholder-white/70 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-0.5"
-                  style={{ minHeight: "24px" }} />
+                  className="w-full text-sm md:text-sm text-slate-200 placeholder-slate-400 bg-transparent focus:outline-none resize-none max-h-36 leading-relaxed py-1 md:py-0.5"
+                  style={{ minHeight: "28px" }} />
                 {mentions.popupOpen && (
                   <MentionPopup
                     results={mentions.popupResults}
@@ -829,11 +829,11 @@ export default function AIAssistant() {
                 )}
               </div>
               <button onClick={handleSend} disabled={(!input.trim() && !uploadedDocText) || streaming || extractingFile}
-                className="flex items-center justify-center w-8 h-8 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
-                {streaming ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                className="flex items-center justify-center w-10 h-10 md:w-9 md:h-9 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 shadow-md hover:shadow-lg active:scale-95">
+                {streaming ? <Loader2 size={18} className="md:w-4 md:h-4 animate-spin" /> : <Send size={18} className="md:w-4 md:h-4" />}
               </button>
             </div>
-            <p className="text-xs text-slate-600 text-center mt-2">AI responses are for legal assistance only. Verify all citations independently.</p>
+            <p className="text-xs text-slate-600 text-center mt-2 px-2">AI responses are for legal assistance only. Verify all citations independently.</p>
           </div>
         </div>
       </div>
