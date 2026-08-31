@@ -1,6 +1,8 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import Sidebar from "./Sidebar";
-import { SidebarProvider, useSidebar } from "../../contexts/SidebarContext";
+import MobileBottomNav from "./MobileBottomNav";
+import MobileMenuDrawer from "./MobileMenuDrawer";
+import { SidebarProvider } from "../../contexts/SidebarContext";
 import TourOverlay from "../onboarding/TourOverlay";
 
 interface AppLayoutProps {
@@ -8,24 +10,26 @@ interface AppLayoutProps {
 }
 
 function AppLayoutInner({ children }: AppLayoutProps) {
-  const { isOpen, close } = useSidebar();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-slate-50">
-      {/* Mobile overlay backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={close}
-          aria-hidden="true"
-        />
-      )}
-
+      {/* Desktop Sidebar */}
       <Sidebar />
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0 pb-16 md:pb-0">
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav onMenuClick={() => setMobileMenuOpen(true)} />
+
+      {/* Mobile Menu Drawer */}
+      <MobileMenuDrawer 
+        isOpen={mobileMenuOpen} 
+        onClose={() => setMobileMenuOpen(false)} 
+      />
 
       <TourOverlay />
     </div>

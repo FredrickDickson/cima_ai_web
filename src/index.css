@@ -12,6 +12,15 @@
     letter-spacing: 0.01em;
     line-height: 1.7;
   }
+
+  /* Safe area utilities for mobile notches/home indicators */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 @tailwind base;

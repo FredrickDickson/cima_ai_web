@@ -12,10 +12,8 @@ import {
   Gavel,
   PenTool,
   ClipboardCheck,
-  X,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { useSidebar } from "../../contexts/SidebarContext";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -30,9 +28,8 @@ const navItems = [
 
 export default function Sidebar() {
   const { user, profile, signOut } = useAuth();
-  const { isOpen, close } = useSidebar();
-  const displayName = profile?.full_name || user?.email || "User";
   const navigate = useNavigate();
+  const displayName = profile?.full_name || user?.email || "User";
 
   async function handleSignOut() {
     await signOut();
@@ -42,12 +39,8 @@ export default function Sidebar() {
   return (
     <aside
       className={[
-        "flex flex-col w-64 bg-gradient-to-b from-[#2a1419] to-[#1a0c0f] border-r border-[#5A2633]/20",
-        // Mobile: fixed drawer sliding in from left
-        "fixed inset-y-0 left-0 z-50 transition-transform duration-300",
-        // Desktop: static in normal flow
-        "md:static md:z-auto md:translate-x-0 md:min-h-screen",
-        isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none md:pointer-events-auto",
+        "hidden md:flex flex-col w-64 bg-gradient-to-b from-[#2a1419] to-[#1a0c0f] border-r border-[#5A2633]/20",
+        "md:static md:z-auto md:min-h-screen",
       ].join(" ")}
     >
       {/* Logo row */}
@@ -70,14 +63,6 @@ export default function Sidebar() {
           </div>
           <span className="text-[#B49A67]/50 text-xs font-medium tracking-wide">Legal Intelligence</span>
         </div>
-        {/* Close button — mobile only */}
-        <button
-          onClick={close}
-          className="md:hidden p-1.5 text-[#F5F1E8]/40 hover:text-white rounded-md transition-colors shrink-0 hover:bg-[#5A2633]/20"
-          aria-label="Close navigation"
-        >
-          <X size={18} />
-        </button>
       </div>
 
       {/* Nav */}
@@ -88,7 +73,6 @@ export default function Sidebar() {
             to={to}
             end={to === "/dashboard"}
             data-tour={`sidebar-${to}`}
-            onClick={close}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group relative overflow-hidden ${
                 isActive
