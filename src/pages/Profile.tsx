@@ -202,15 +202,8 @@ export default function Profile() {
     }
   }
 
-  async function handleSignOut() {
-    try {
-      await signOut();
-      // signOut() in AuthContext now handles navigation with hard redirect
-    } catch (error) {
-      console.error("Sign out error:", error);
-      // Force redirect on error
-      window.location.href = "/login";
-    }
+  function handleSignOut() {
+    signOut(); // Don't await - let signOut handle the redirect immediately
   }
 
   async function handleChangePassword(e: React.FormEvent) {

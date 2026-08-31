@@ -18,16 +18,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
   const [showMobileProfileMenu, setShowMobileProfileMenu] = useState(false);
 
-  async function handleSignOut() {
+  function handleSignOut() {
     setShowMobileProfileMenu(false);
-    try {
-      await signOut();
-      // signOut() in AuthContext now handles navigation with hard redirect
-    } catch (error) {
-      console.error("Sign out error:", error);
-      // Force redirect on error
-      window.location.href = "/login";
-    }
+    signOut(); // Don't await - let signOut handle the redirect immediately
   }
 
   return (
