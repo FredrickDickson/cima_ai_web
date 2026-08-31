@@ -159,6 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    // Force hard redirect as fallback to ensure navigation happens
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 100);
   }
 
   async function refreshProfile() {

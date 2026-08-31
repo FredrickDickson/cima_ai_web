@@ -146,7 +146,7 @@ export function Hero() {
             Trusted by international law firms and ADR organizations.
           </motion.p>
 
-          {/* CTA Buttons */}
+          {/* CTA Button */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -173,8 +173,8 @@ export function Hero() {
                 gap: "0.5rem",
                 width: "100%",
                 height: "3.5rem",
-                padding: "0 2rem",
-                fontSize: "1rem",
+                padding: "0 2.5rem",
+                fontSize: "1.0625rem",
                 fontWeight: 600,
                 color: "white",
                 background: "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
@@ -193,36 +193,10 @@ export function Hero() {
                 e.currentTarget.style.boxShadow = "0 8px 24px rgba(90, 38, 51, 0.25)";
               }}
               className="sm:w-auto">
-                Get Started
+                Get Started Now
                 <ArrowRight style={{ width: "1.125rem", height: "1.125rem" }} />
               </button>
             </Link>
-            <a href="#features" style={{ textDecoration: "none", width: "100%" }} className="sm:w-auto">
-              <button style={{
-                width: "100%",
-                height: "3.5rem",
-                padding: "0 2rem",
-                fontSize: "1rem",
-                fontWeight: 600,
-                color: "#5A2633",
-                background: "transparent",
-                border: "2px solid #5A2633",
-                borderRadius: "0.75rem",
-                cursor: "pointer",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(90, 38, 51, 0.05)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-              className="sm:w-auto">
-                Book a Demo
-              </button>
-            </a>
           </motion.div>
 
           {/* Dashboard Preview */}

@@ -41,7 +41,7 @@ const faqs = [
   },
   {
     question: "Can I try CIMA AI before committing?",
-    answer: "Yes! We offer a free demo and trial period for qualified legal professionals and organizations. Request a demo to see the platform in action and experience how CIMA AI can transform your legal practice.",
+    answer: "Yes! We offer a trial period for qualified legal professionals and organizations. Sign up to experience how CIMA AI can transform your legal practice.",
   },
 ];
 

@@ -147,21 +147,18 @@ export function FinalCTA() {
             transition={{ duration: 0.6, delay: 0.3 }}
             style={{
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: "1rem",
               marginBottom: "4rem",
             }}
-            className="sm:flex-row"
           >
-            <a href="#demo" style={{ textDecoration: "none" }}>
+            <Link to="/register" style={{ textDecoration: "none" }}>
               <button style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.5rem",
                 height: "4rem",
-                padding: "0 2.5rem",
+                padding: "0 3rem",
                 fontSize: "1.125rem",
                 fontWeight: 600,
                 color: "white",
@@ -180,35 +177,10 @@ export function FinalCTA() {
                 e.currentTarget.style.transform = "translateY(0) scale(1)";
                 e.currentTarget.style.boxShadow = "0 8px 32px rgba(180, 154, 103, 0.4)";
               }}>
-                Start Now
+                Get Started Now
                 <ArrowRight style={{ width: "1.25rem", height: "1.25rem" }} />
               </button>
-            </a>
-            <a href="#contact" style={{ textDecoration: "none" }}>
-              <button style={{
-                height: "4rem",
-                padding: "0 2.5rem",
-                fontSize: "1.125rem",
-                fontWeight: 600,
-                color: "#5A2633",
-                background: "rgba(255, 255, 255, 0.9)",
-                backdropFilter: "blur(20px)",
-                border: "2px solid #5A2633",
-                borderRadius: "0.75rem",
-                cursor: "pointer",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(90, 38, 51, 0.05)";
-                e.currentTarget.style.transform = "translateY(-4px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}>
-                Book Demo
-              </button>
-            </a>
+            </Link>
           </motion.div>
 
           <motion.div

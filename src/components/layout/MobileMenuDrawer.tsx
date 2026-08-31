@@ -22,10 +22,11 @@ export default function MobileMenuDrawer({ isOpen, onClose }: MobileMenuDrawerPr
   async function handleSignOut() {
     try {
       await signOut();
-      navigate("/login", { replace: true });
+      // signOut() in AuthContext now handles navigation with hard redirect
     } catch (error) {
       console.error("Sign out error:", error);
-      navigate("/login", { replace: true });
+      // Force redirect on error
+      window.location.href = "/login";
     }
   }
 

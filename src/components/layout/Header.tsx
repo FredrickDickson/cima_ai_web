@@ -22,12 +22,11 @@ export default function Header({ title, subtitle }: HeaderProps) {
     setShowMobileProfileMenu(false);
     try {
       await signOut();
-      // Force navigate after sign out completes
-      navigate("/login", { replace: true });
+      // signOut() in AuthContext now handles navigation with hard redirect
     } catch (error) {
       console.error("Sign out error:", error);
-      // Navigate anyway even if there's an error
-      navigate("/login", { replace: true });
+      // Force redirect on error
+      window.location.href = "/login";
     }
   }
 
