@@ -25,7 +25,7 @@ export function Navigation() {
   const boxShadow = useTransform(
     scrollY,
     [0, 100],
-    ["0 0 0 rgba(0, 0, 0, 0)", "0 8px 32px rgba(139, 14, 30, 0.08)"]
+    ["0 0 0 rgba(0, 0, 0, 0)", "0 8px 32px rgba(90, 38, 51, 0.08)"]
   );
 
   // Close menu when clicking outside
@@ -77,7 +77,7 @@ export function Navigation() {
             inset: 0,
             borderRadius: "9999px",
             padding: "2px",
-            background: "linear-gradient(90deg, transparent, rgba(139, 14, 30, 0.3), rgba(201, 169, 97, 0.4), rgba(139, 14, 30, 0.3), transparent)",
+            background: "linear-gradient(90deg, transparent, rgba(90, 38, 51, 0.3), rgba(180, 154, 103, 0.4), rgba(90, 38, 51, 0.3), transparent)",
             backgroundSize: "200% 100%",
             animation: "shimmer-border 3s linear infinite",
             WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
@@ -91,7 +91,7 @@ export function Navigation() {
             position: "absolute",
             inset: 0,
             borderRadius: "9999px",
-            border: "2px solid rgba(139, 14, 30, 0.3)",
+            border: "2px solid rgba(90, 38, 51, 0.3)",
             pointerEvents: "none",
           }} />
           
@@ -106,20 +106,20 @@ export function Navigation() {
             <Link to="/" style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.5rem",
+              gap: "0.75rem",
               textDecoration: "none",
               zIndex: 60,
             }}>
               <div style={{
                 position: "relative",
-                width: "2.25rem",
-                height: "2.25rem",
-                borderRadius: "0.625rem",
+                width: "2.5rem",
+                height: "2.5rem",
+                borderRadius: "0",
                 overflow: "hidden",
                 flexShrink: 0,
               }}>
                 <img
-                  src="/images/logo.jpeg"
+                  src="/logo.png"
                   alt="CIMA AI Logo"
                   style={{ 
                     width: "100%",
@@ -128,25 +128,22 @@ export function Navigation() {
                   }}
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
                 <span style={{
-                  fontFamily: "Playfair Display, Georgia, serif",
-                  fontSize: "1rem",
+                  fontSize: "0.9375rem",
                   fontWeight: 700,
-                  color: "#2D2D2D",
-                  lineHeight: 1,
+                  color: "#252525",
+                  letterSpacing: "-0.01em",
                 }}>
-                  CIMA AI
+                  Center for International
                 </span>
                 <span style={{
-                  fontSize: "0.625rem",
-                  color: "#6d6d6d",
-                  marginTop: "0.125rem",
-                  letterSpacing: "0.02em",
-                  display: "none",
-                }}
-                className="sm:inline">
-                  Legal Intelligence
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "#5f5f5f",
+                  letterSpacing: "-0.01em",
+                }}>
+                  Mediators & Arbitrators
                 </span>
               </div>
             </Link>
@@ -166,17 +163,17 @@ export function Navigation() {
                     padding: "0.625rem 1.125rem",
                     fontSize: "0.9375rem",
                     fontWeight: 500,
-                    color: "#4f4f4f",
+                    color: "#4a4a4a",
                     borderRadius: "9999px",
                     textDecoration: "none",
                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#8B0E1E";
-                    e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+                    e.currentTarget.style.color = "#5A2633";
+                    e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "#4f4f4f";
+                    e.currentTarget.style.color = "#4a4a4a";
                     e.currentTarget.style.background = "transparent";
                   }}
                 >
@@ -198,7 +195,7 @@ export function Navigation() {
                   padding: "0 1.5rem",
                   fontSize: "0.9375rem",
                   fontWeight: 600,
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   background: "transparent",
                   border: "none",
                   borderRadius: "9999px",
@@ -206,7 +203,7 @@ export function Navigation() {
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.06)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.06)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
@@ -221,20 +218,20 @@ export function Navigation() {
                   fontSize: "0.9375rem",
                   fontWeight: 600,
                   color: "white",
-                  background: "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                  background: "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                   border: "none",
                   borderRadius: "9999px",
-                  boxShadow: "0 4px 12px rgba(139, 14, 30, 0.2)",
+                  boxShadow: "0 4px 12px rgba(90, 38, 51, 0.2)",
                   cursor: "pointer",
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(139, 14, 30, 0.3)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(90, 38, 51, 0.3)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 14, 30, 0.2)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(90, 38, 51, 0.2)";
                 }}>
                   Get Started
                 </button>
@@ -251,10 +248,10 @@ export function Navigation() {
                 width: "2.5rem",
                 height: "2.5rem",
                 padding: 0,
-                color: isOpen ? "white" : "#8B0E1E",
+                color: isOpen ? "white" : "#5A2633",
                 borderRadius: "0.625rem",
                 border: "none",
-                background: isOpen ? "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)" : "rgba(139, 14, 30, 0.08)",
+                background: isOpen ? "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)" : "rgba(90, 38, 51, 0.08)",
                 cursor: "pointer",
                 transition: "all 0.3s",
                 zIndex: 60,
@@ -303,8 +300,8 @@ export function Navigation() {
                 background: "rgba(255, 255, 255, 0.98)",
                 backdropFilter: "blur(20px)",
                 borderRadius: "1.5rem",
-                boxShadow: "0 20px 60px rgba(139, 14, 30, 0.2)",
-                border: "1px solid rgba(139, 14, 30, 0.1)",
+                boxShadow: "0 20px 60px rgba(90, 38, 51, 0.2)",
+                border: "1px solid rgba(90, 38, 51, 0.1)",
                 padding: "1.5rem",
                 maxHeight: "calc(100vh - 6rem)",
                 overflowY: "auto",
@@ -334,19 +331,19 @@ export function Navigation() {
                         padding: "1rem 1.25rem",
                         fontSize: "1.0625rem",
                         fontWeight: 600,
-                        color: "#2D2D2D",
+                        color: "#252525",
                         borderRadius: "0.75rem",
                         textDecoration: "none",
                         transition: "all 0.3s",
                         background: "transparent",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(139, 14, 30, 0.05)";
-                        e.currentTarget.style.color = "#8B0E1E";
+                        e.currentTarget.style.background = "rgba(90, 38, 51, 0.05)";
+                        e.currentTarget.style.color = "#5A2633";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "#2D2D2D";
+                        e.currentTarget.style.color = "#252525";
                       }}
                     >
                       {item.name}
@@ -358,7 +355,7 @@ export function Navigation() {
               {/* Divider */}
               <div style={{
                 height: "1px",
-                background: "linear-gradient(90deg, transparent, rgba(139, 14, 30, 0.2), transparent)",
+                background: "linear-gradient(90deg, transparent, rgba(90, 38, 51, 0.2), transparent)",
                 marginBottom: "1.5rem",
               }} />
 
@@ -379,9 +376,9 @@ export function Navigation() {
                       height: "3.25rem",
                       fontSize: "1rem",
                       fontWeight: 600,
-                      color: "#8B0E1E",
-                      background: "rgba(139, 14, 30, 0.05)",
-                      border: "2px solid rgba(139, 14, 30, 0.2)",
+                      color: "#5A2633",
+                      background: "rgba(90, 38, 51, 0.05)",
+                      border: "2px solid rgba(90, 38, 51, 0.2)",
                       borderRadius: "0.75rem",
                       cursor: "pointer",
                       transition: "all 0.3s",
@@ -402,10 +399,10 @@ export function Navigation() {
                       fontSize: "1rem",
                       fontWeight: 600,
                       color: "white",
-                      background: "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                      background: "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                       border: "none",
                       borderRadius: "0.75rem",
-                      boxShadow: "0 4px 16px rgba(139, 14, 30, 0.25)",
+                      boxShadow: "0 4px 16px rgba(90, 38, 51, 0.25)",
                       cursor: "pointer",
                       transition: "all 0.3s",
                     }}>

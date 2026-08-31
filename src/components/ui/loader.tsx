@@ -6,7 +6,7 @@ export default function ClassicLoader({ size = 40 }: { size?: number }) {
         width: size, 
         height: size,
         borderColor: '#ffffff',
-        borderTopColor: '#8B0E1E'
+        borderTopColor: '#5A2633'
       }}
     />
   );

@@ -36,7 +36,7 @@ export default function Login() {
     <div style={{
       minHeight: "100vh",
       display: "flex",
-      background: "linear-gradient(135deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(135deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -52,7 +52,7 @@ export default function Login() {
           right: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(139, 14, 30, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(90, 38, 51, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -62,7 +62,7 @@ export default function Login() {
           left: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(201, 169, 97, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(180, 154, 103, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -87,7 +87,7 @@ export default function Login() {
               flexShrink: 0,
             }}>
               <img
-                src="/images/logo.jpeg"
+                src="/logo.png"
                 alt="CIMA AI Logo"
                 style={{ 
                   width: "100%",
@@ -101,13 +101,13 @@ export default function Login() {
                 fontFamily: "Playfair Display, Georgia, serif",
                 fontSize: "1.5rem",
                 fontWeight: 700,
-                color: "#2D2D2D",
+                color: "#252525",
               }}>
                 CIMA AI
               </div>
               <div style={{
                 fontSize: "0.875rem",
-                color: "#6d6d6d",
+                color: "#5f5f5f",
                 marginTop: "-0.125rem",
               }}>
                 Legal Intelligence Platform
@@ -121,14 +121,14 @@ export default function Login() {
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 4vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1.5rem",
             lineHeight: 1.2,
           }}>
             Welcome Back to
             <br />
             <span style={{
-              background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+              background: "linear-gradient(135deg, #5A2633, #B49A67)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -136,7 +136,7 @@ export default function Login() {
           </h1>
           <p style={{
             fontSize: "1.125rem",
-            color: "#6d6d6d",
+            color: "#5f5f5f",
             lineHeight: 1.7,
             maxWidth: "28rem",
           }}>
@@ -162,20 +162,20 @@ export default function Login() {
                 borderRadius: "0.75rem",
                 background: "rgba(255, 255, 255, 0.5)",
                 backdropFilter: "blur(20px)",
-                border: "1px solid rgba(139, 14, 30, 0.1)",
+                border: "1px solid rgba(90, 38, 51, 0.1)",
               }}>
                 <div style={{
                   fontSize: "1.5rem",
                   fontFamily: "Playfair Display, Georgia, serif",
                   fontWeight: 700,
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   marginBottom: "0.25rem",
                 }}>
                   {stat.value}
                 </div>
                 <div style={{
                   fontSize: "0.8125rem",
-                  color: "#6d6d6d",
+                  color: "#5f5f5f",
                   fontWeight: 500,
                 }}>
                   {stat.label}
@@ -204,7 +204,7 @@ export default function Login() {
             display: "inline-flex",
             alignItems: "center",
             gap: "0.5rem",
-            color: "#8B0E1E",
+            color: "#5A2633",
             textDecoration: "none",
             fontSize: "0.9375rem",
             fontWeight: 600,
@@ -219,7 +219,7 @@ export default function Login() {
             background: "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(20px)",
             borderRadius: "1.5rem",
-            boxShadow: "0 20px 60px rgba(139, 14, 30, 0.12)",
+            boxShadow: "0 20px 60px rgba(90, 38, 51, 0.12)",
             border: "1px solid rgba(255, 255, 255, 0.3)",
             padding: "3rem 2.5rem",
           }}>
@@ -236,7 +236,7 @@ export default function Login() {
                     flexShrink: 0,
                   }}>
                     <img
-                      src="/images/logo.jpeg"
+                      src="/logo.png"
                       alt="CIMA AI Logo"
                       style={{ 
                         width: "100%",
@@ -250,7 +250,7 @@ export default function Login() {
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontSize: "1.25rem",
                       fontWeight: 700,
-                      color: "#2D2D2D",
+                      color: "#252525",
                     }}>
                       CIMA AI
                     </div>
@@ -263,14 +263,14 @@ export default function Login() {
               fontFamily: "Playfair Display, Georgia, serif",
               fontSize: "1.875rem",
               fontWeight: 700,
-              color: "#2D2D2D",
+              color: "#252525",
               marginBottom: "0.5rem",
             }}>
               Sign In
             </h2>
             <p style={{
               fontSize: "0.9375rem",
-              color: "#6d6d6d",
+              color: "#5f5f5f",
               marginBottom: "2rem",
             }}>
               Enter your credentials to access your account
@@ -319,7 +319,7 @@ export default function Login() {
                   display: "block",
                   fontSize: "0.875rem",
                   fontWeight: 600,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   Email Address
@@ -335,7 +335,7 @@ export default function Login() {
                     height: "3.5rem",
                     padding: "0 1rem",
                     fontSize: "0.9375rem",
-                    color: "#2D2D2D",
+                    color: "#252525",
                     background: "white",
                     border: "2px solid #e5e7eb",
                     borderRadius: "0.75rem",
@@ -343,8 +343,8 @@ export default function Login() {
                     transition: "all 0.3s",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#8B0E1E";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                    e.target.style.borderColor = "#5A2633";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "#e5e7eb";
@@ -359,13 +359,13 @@ export default function Login() {
                   <label style={{
                     fontSize: "0.875rem",
                     fontWeight: 600,
-                    color: "#2D2D2D",
+                    color: "#252525",
                   }}>
                     Password
                   </label>
                   <Link to="/forgot-password" style={{
                     fontSize: "0.875rem",
-                    color: "#8B0E1E",
+                    color: "#5A2633",
                     textDecoration: "none",
                     fontWeight: 600,
                   }}>
@@ -384,7 +384,7 @@ export default function Login() {
                       height: "3.5rem",
                       padding: "0 3rem 0 1rem",
                       fontSize: "0.9375rem",
-                      color: "#2D2D2D",
+                      color: "#252525",
                       background: "white",
                       border: "2px solid #e5e7eb",
                       borderRadius: "0.75rem",
@@ -392,8 +392,8 @@ export default function Login() {
                       transition: "all 0.3s",
                     }}
                     onFocus={(e) => {
-                      e.target.style.borderColor = "#8B0E1E";
-                      e.target.style.boxShadow = "0 0 0 3px rgba(139, 14, 30, 0.1)";
+                      e.target.style.borderColor = "#5A2633";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(90, 38, 51, 0.1)";
                     }}
                     onBlur={(e) => {
                       e.target.style.borderColor = "#e5e7eb";
@@ -412,7 +412,7 @@ export default function Login() {
                       border: "none",
                       cursor: "pointer",
                       padding: "0.25rem",
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                     }}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -437,20 +437,20 @@ export default function Login() {
                     height: "1.125rem",
                     marginTop: "0.125rem",
                     cursor: "pointer",
-                    accentColor: "#8B0E1E",
+                    accentColor: "#5A2633",
                   }}
                 />
                 <label htmlFor="acceptTerms" style={{
                   fontSize: "0.875rem",
-                  color: "#6d6d6d",
+                  color: "#5f5f5f",
                   lineHeight: 1.5,
                 }}>
                   I agree to the{" "}
-                  <Link to="/terms" style={{ color: "#8B0E1E", textDecoration: "none", fontWeight: 600 }}>
+                  <Link to="/terms" style={{ color: "#5A2633", textDecoration: "none", fontWeight: 600 }}>
                     Terms of Service
                   </Link>
                   {" "}and{" "}
-                  <Link to="/privacy" style={{ color: "#8B0E1E", textDecoration: "none", fontWeight: 600 }}>
+                  <Link to="/privacy" style={{ color: "#5A2633", textDecoration: "none", fontWeight: 600 }}>
                     Privacy Policy
                   </Link>
                 </label>
@@ -470,10 +470,10 @@ export default function Login() {
                   fontSize: "1rem",
                   fontWeight: 600,
                   color: "white",
-                  background: loading ? "#9d9d9d" : "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                  background: loading ? "#9d9d9d" : "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                   border: "none",
                   borderRadius: "0.75rem",
-                  boxShadow: "0 4px 16px rgba(139, 14, 30, 0.25)",
+                  boxShadow: "0 4px 16px rgba(90, 38, 51, 0.25)",
                   cursor: loading ? "not-allowed" : "pointer",
                   transition: "all 0.3s",
                   marginBottom: "1.5rem",
@@ -493,11 +493,11 @@ export default function Login() {
               <div style={{
                 textAlign: "center",
                 fontSize: "0.9375rem",
-                color: "#6d6d6d",
+                color: "#5f5f5f",
               }}>
                 Don't have an account?{" "}
                 <Link to="/register" style={{
-                  color: "#8B0E1E",
+                  color: "#5A2633",
                   textDecoration: "none",
                   fontWeight: 600,
                 }}>

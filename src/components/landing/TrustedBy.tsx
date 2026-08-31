@@ -33,7 +33,7 @@ export function TrustedBy() {
   return (
     <section id="trusted-by" style={{
       padding: "5rem 0",
-      background: "linear-gradient(180deg, #ffffff 0%, #FDFBF7 100%)",
+      background: "linear-gradient(180deg, #ffffff 0%, #F5F1E8 100%)",
       borderTop: "1px solid rgba(229, 231, 235, 0.5)",
       borderBottom: "1px solid rgba(229, 231, 235, 0.5)",
     }}>
@@ -52,22 +52,22 @@ export function TrustedBy() {
             marginBottom: "1rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(139, 14, 30, 0.1), rgba(201, 169, 97, 0.1))",
-            border: "1px solid rgba(139, 14, 30, 0.2)",
+            background: "linear-gradient(135deg, rgba(90, 38, 51, 0.1), rgba(180, 154, 103, 0.1))",
+            border: "1px solid rgba(90, 38, 51, 0.2)",
           }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Worldwide Reach</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5A2633" }}>Worldwide Reach</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 5vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
             Trusted Globally
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
+          <p style={{ fontSize: "1.125rem", color: "#5f5f5f", maxWidth: "42rem", margin: "0 auto" }}>
             Empowering legal professionals across leading international arbitration centers
           </p>
         </motion.div>
@@ -92,7 +92,7 @@ export function TrustedBy() {
                 background: "linear-gradient(135deg, #ffffff 0%, #fefdfb 100%)",
                 borderRadius: "1.5rem",
                 border: "1px solid rgba(229, 231, 235, 0.5)",
-                boxShadow: "0 4px 24px rgba(139, 14, 30, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset",
+                boxShadow: "0 4px 24px rgba(90, 38, 51, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset",
                 padding: "2rem",
                 textAlign: "center",
                 transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -106,7 +106,7 @@ export function TrustedBy() {
                   left: 0,
                   right: 0,
                   height: "3px",
-                  background: "linear-gradient(90deg, transparent, #C9A961, transparent)",
+                  background: "linear-gradient(90deg, transparent, #B49A67, transparent)",
                   opacity: 0,
                   transition: "opacity 0.4s",
                 }} />
@@ -118,10 +118,10 @@ export function TrustedBy() {
                   width: "4rem",
                   height: "4rem",
                   borderRadius: "1rem",
-                  background: "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                  background: "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                   color: "white",
                   marginBottom: "1.5rem",
-                  boxShadow: "0 8px 24px rgba(139, 14, 30, 0.2)",
+                  boxShadow: "0 8px 24px rgba(90, 38, 51, 0.2)",
                 }}>
                   <MapPin style={{ width: "2rem", height: "2rem" }} />
                 </div>
@@ -129,12 +129,12 @@ export function TrustedBy() {
                   fontFamily: "Playfair Display, Georgia, serif",
                   fontSize: "1.5rem",
                   fontWeight: 700,
-                  color: "#2D2D2D",
+                  color: "#252525",
                   marginBottom: "0.5rem",
                 }}>
                   {location.city}
                 </h3>
-                <p style={{ color: "#6d6d6d", fontWeight: 500, fontSize: "0.9375rem" }}>
+                <p style={{ color: "#5f5f5f", fontWeight: 500, fontSize: "0.9375rem" }}>
                   {location.country}
                 </p>
               </div>
@@ -163,7 +163,7 @@ export function TrustedBy() {
                   background: "linear-gradient(135deg, #ffffff 0%, #fefdfb 100%)",
                   border: "1px solid rgba(229, 231, 235, 0.5)",
                   overflow: "hidden",
-                  boxShadow: "0 4px 24px rgba(139, 14, 30, 0.06)",
+                  boxShadow: "0 4px 24px rgba(90, 38, 51, 0.06)",
                   transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}>
                   <div style={{
@@ -197,7 +197,7 @@ export function TrustedBy() {
                       justifyContent: "center",
                       boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
                     }}>
-                      <Icon style={{ width: "1.5rem", height: "1.5rem", color: "#8B0E1E" }} />
+                      <Icon style={{ width: "1.5rem", height: "1.5rem", color: "#5A2633" }} />
                     </div>
                   </div>
                   
@@ -206,7 +206,7 @@ export function TrustedBy() {
                       fontSize: "2.5rem",
                       fontFamily: "Playfair Display, Georgia, serif",
                       fontWeight: 700,
-                      color: "#8B0E1E",
+                      color: "#5A2633",
                       marginBottom: "0.5rem",
                       lineHeight: 1,
                     }}>
@@ -215,7 +215,7 @@ export function TrustedBy() {
                     <div style={{ 
                       fontSize: "1rem", 
                       fontWeight: 600, 
-                      color: "#2D2D2D",
+                      color: "#252525",
                       lineHeight: 1.4,
                     }}>
                       {item.name}

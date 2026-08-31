@@ -71,7 +71,7 @@ const offices = [
 export function Footer() {
   return (
     <footer id="footer" style={{
-      background: "linear-gradient(180deg, #2D2D2D 0%, #1a1a1a 100%)",
+      background: "linear-gradient(180deg, #252525 0%, #1a1a1a 100%)",
       color: "rgba(255, 255, 255, 0.8)",
       borderTop: "1px solid rgba(255, 255, 255, 0.1)",
       position: "relative",
@@ -96,7 +96,7 @@ export function Footer() {
                 flexShrink: 0,
               }}>
                 <img
-                  src="/images/logo.jpeg"
+                  src="/logo.png"
                   alt="CIMA AI Logo"
                   style={{ 
                     width: "100%",
@@ -150,8 +150,8 @@ export function Footer() {
                   textDecoration: "none",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.2)";
-                  e.currentTarget.style.borderColor = "rgba(139, 14, 30, 0.4)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(90, 38, 51, 0.4)";
                   e.currentTarget.style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
@@ -181,8 +181,8 @@ export function Footer() {
                   textDecoration: "none",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.2)";
-                  e.currentTarget.style.borderColor = "rgba(139, 14, 30, 0.4)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(90, 38, 51, 0.4)";
                   e.currentTarget.style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
@@ -210,8 +210,8 @@ export function Footer() {
                   textDecoration: "none",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(139, 14, 30, 0.2)";
-                  e.currentTarget.style.borderColor = "rgba(139, 14, 30, 0.4)";
+                  e.currentTarget.style.background = "rgba(90, 38, 51, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(90, 38, 51, 0.4)";
                   e.currentTarget.style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
@@ -253,7 +253,7 @@ export function Footer() {
                       gap: "0.5rem",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "#C9A961";
+                      e.currentTarget.style.color = "#B49A67";
                       e.currentTarget.style.transform = "translateX(4px)";
                     }}
                     onMouseLeave={(e) => {
@@ -293,7 +293,7 @@ export function Footer() {
                       display: "inline-block",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "#C9A961";
+                      e.currentTarget.style.color = "#B49A67";
                       e.currentTarget.style.transform = "translateX(4px)";
                     }}
                     onMouseLeave={(e) => {
@@ -332,7 +332,7 @@ export function Footer() {
                       display: "inline-block",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "#C9A961";
+                      e.currentTarget.style.color = "#B49A67";
                       e.currentTarget.style.transform = "translateX(4px)";
                     }}
                     onMouseLeave={(e) => {
@@ -379,7 +379,7 @@ export function Footer() {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-                e.currentTarget.style.borderColor = "rgba(201, 169, 97, 0.3)";
+                e.currentTarget.style.borderColor = "rgba(180, 154, 103, 0.3)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
@@ -390,7 +390,7 @@ export function Footer() {
                     width: "2.5rem",
                     height: "2.5rem",
                     borderRadius: "0.5rem",
-                    background: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+                    background: "linear-gradient(135deg, #5A2633, #B49A67)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -421,7 +421,7 @@ export function Footer() {
                       gap: "0.5rem",
                       marginBottom: "0.5rem",
                     }}>
-                      <Phone style={{ width: "0.875rem", height: "0.875rem", color: "#C9A961" }} />
+                      <Phone style={{ width: "0.875rem", height: "0.875rem", color: "#B49A67" }} />
                       <a href={`tel:${office.phone}`} style={{
                         fontSize: "0.8125rem",
                         color: "rgba(255, 255, 255, 0.5)",
@@ -435,7 +435,7 @@ export function Footer() {
                       alignItems: "center",
                       gap: "0.5rem",
                     }}>
-                      <Mail style={{ width: "0.875rem", height: "0.875rem", color: "#C9A961" }} />
+                      <Mail style={{ width: "0.875rem", height: "0.875rem", color: "#B49A67" }} />
                       <a href={`mailto:${office.email}`} style={{
                         fontSize: "0.8125rem",
                         color: "rgba(255, 255, 255, 0.5)",
@@ -487,7 +487,7 @@ export function Footer() {
                   transition: "color 0.3s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#C9A961";
+                  e.currentTarget.style.color = "#B49A67";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)";

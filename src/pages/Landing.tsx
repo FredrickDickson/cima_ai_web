@@ -1,6 +1,5 @@
 import { Navigation } from '../components/landing/Navigation';
 import { Hero } from '../components/landing/Hero';
-import { TrustedBy } from '../components/landing/TrustedBy';
 import { Features } from '../components/landing/Features';
 import { HowItWorks } from '../components/landing/HowItWorks';
 import { WhyCima } from '../components/landing/WhyCima';
@@ -14,7 +13,6 @@ export default function Landing() {
     <main className="min-h-screen bg-white">
       <Navigation />
       <Hero />
-      <TrustedBy />
       <Features />
       <HowItWorks />
       <WhyCima />

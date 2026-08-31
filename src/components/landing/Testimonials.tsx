@@ -11,7 +11,7 @@ const testimonials = [
     location: "London",
     rating: 5,
     avatar: "SC",
-    color: "linear-gradient(135deg, #8B0E1E, #C9A961)",
+    color: "linear-gradient(135deg, #5A2633, #B49A67)",
     image: "https://i.pravatar.cc/150?img=5",
   },
   {
@@ -75,7 +75,7 @@ export function Testimonials() {
   return (
     <section id="testimonials" style={{
       padding: "5rem 0",
-      background: "linear-gradient(180deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(180deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -86,7 +86,7 @@ export function Testimonials() {
         left: "-10%",
         width: "600px",
         height: "600px",
-        background: "radial-gradient(circle, rgba(139, 14, 30, 0.04) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(90, 38, 51, 0.04) 0%, transparent 70%)",
         borderRadius: "50%",
         filter: "blur(60px)",
         pointerEvents: "none",
@@ -107,17 +107,17 @@ export function Testimonials() {
             marginBottom: "1rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(201, 169, 97, 0.15), rgba(139, 14, 30, 0.1))",
-            border: "1px solid rgba(201, 169, 97, 0.3)",
+            background: "linear-gradient(135deg, rgba(180, 154, 103, 0.15), rgba(90, 38, 51, 0.1))",
+            border: "1px solid rgba(180, 154, 103, 0.3)",
           }}>
-            <Star style={{ width: "1rem", height: "1rem", color: "#C9A961", fill: "#C9A961" }} />
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Testimonials</span>
+            <Star style={{ width: "1rem", height: "1rem", color: "#B49A67", fill: "#B49A67" }} />
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5A2633" }}>Testimonials</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 5vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
@@ -125,7 +125,7 @@ export function Testimonials() {
             <br />
             <span className="gradient-text">Worldwide</span>
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
+          <p style={{ fontSize: "1.125rem", color: "#5f5f5f", maxWidth: "42rem", margin: "0 auto" }}>
             See how CIMA AI is transforming legal practice for arbitrators, lawyers, and judges globally
           </p>
         </motion.div>
@@ -149,7 +149,7 @@ export function Testimonials() {
                 backdropFilter: "blur(20px)",
                 borderRadius: "1.5rem",
                 border: "1px solid rgba(255, 255, 255, 0.3)",
-                boxShadow: "0 8px 32px rgba(139, 14, 30, 0.08)",
+                boxShadow: "0 8px 32px rgba(90, 38, 51, 0.08)",
                 padding: "2rem",
                 height: "100%",
                 transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -167,7 +167,7 @@ export function Testimonials() {
                   opacity: 0.08,
                   pointerEvents: "none",
                 }}>
-                  <Quote style={{ width: "4rem", height: "4rem", color: "#8B0E1E" }} />
+                  <Quote style={{ width: "4rem", height: "4rem", color: "#5A2633" }} />
                 </div>
 
                 {/* Top Accent Bar */}
@@ -177,7 +177,7 @@ export function Testimonials() {
                   left: 0,
                   right: 0,
                   height: "4px",
-                  background: "linear-gradient(90deg, #8B0E1E, #C9A961)",
+                  background: "linear-gradient(90deg, #5A2633, #B49A67)",
                   opacity: 0,
                   transition: "opacity 0.4s",
                 }} />
@@ -185,14 +185,14 @@ export function Testimonials() {
                 {/* Rating Stars */}
                 <div style={{ display: "flex", gap: "0.25rem", marginBottom: "1.5rem", position: "relative", zIndex: 1 }}>
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} style={{ width: "1.125rem", height: "1.125rem", color: "#C9A961", fill: "#C9A961" }} />
+                    <Star key={i} style={{ width: "1.125rem", height: "1.125rem", color: "#B49A67", fill: "#B49A67" }} />
                   ))}
                 </div>
 
                 {/* Quote */}
                 <blockquote style={{
                   fontSize: "1rem",
-                  color: "#2D2D2D",
+                  color: "#252525",
                   lineHeight: 1.7,
                   marginBottom: "1.5rem",
                   position: "relative",
@@ -220,7 +220,7 @@ export function Testimonials() {
                     borderRadius: "50%",
                     flexShrink: 0,
                     overflow: "hidden",
-                    boxShadow: "0 4px 12px rgba(139, 14, 30, 0.2)",
+                    boxShadow: "0 4px 12px rgba(90, 38, 51, 0.2)",
                     border: "2px solid rgba(255, 255, 255, 0.3)",
                     position: "relative",
                   }}>
@@ -240,7 +240,7 @@ export function Testimonials() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontWeight: 700,
-                      color: "#2D2D2D",
+                      color: "#252525",
                       fontSize: "1rem",
                       marginBottom: "0.25rem",
                       whiteSpace: "nowrap",
@@ -251,14 +251,14 @@ export function Testimonials() {
                     </div>
                     <div style={{
                       fontSize: "0.875rem",
-                      color: "#6d6d6d",
+                      color: "#5f5f5f",
                       marginBottom: "0.125rem",
                     }}>
                       {testimonial.role}
                     </div>
                     <div style={{
                       fontSize: "0.875rem",
-                      color: "#8B0E1E",
+                      color: "#5A2633",
                       fontWeight: 600,
                       marginBottom: "0.25rem",
                     }}>
@@ -276,7 +276,7 @@ export function Testimonials() {
                         width: "0.25rem",
                         height: "0.25rem",
                         borderRadius: "50%",
-                        background: "#C9A961",
+                        background: "#B49A67",
                       }}></span>
                       {testimonial.location}
                     </div>
@@ -290,7 +290,7 @@ export function Testimonials() {
                   left: "-50%",
                   width: "200px",
                   height: "200px",
-                  background: "radial-gradient(circle, rgba(201, 169, 97, 0.15) 0%, transparent 70%)",
+                  background: "radial-gradient(circle, rgba(180, 154, 103, 0.15) 0%, transparent 70%)",
                   borderRadius: "50%",
                   opacity: 0,
                   transition: "opacity 0.4s",
@@ -318,8 +318,8 @@ export function Testimonials() {
             gap: "0.75rem",
             padding: "1rem 2rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(139, 14, 30, 0.05), rgba(201, 169, 97, 0.05))",
-            border: "1px solid rgba(139, 14, 30, 0.15)",
+            background: "linear-gradient(135deg, rgba(90, 38, 51, 0.05), rgba(180, 154, 103, 0.05))",
+            border: "1px solid rgba(90, 38, 51, 0.15)",
           }}>
             <div style={{
               display: "flex",
@@ -349,7 +349,7 @@ export function Testimonials() {
                 </div>
               ))}
             </div>
-            <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#2D2D2D" }}>
+            <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#252525" }}>
               Join 500+ legal professionals using CIMA AI
             </span>
           </div>

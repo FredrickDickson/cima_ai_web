@@ -73,7 +73,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-6" style={{ 
-      background: "linear-gradient(135deg, #FDFBF7 0%, #ffffff 50%, #F8F6F0 100%)",
+      background: "linear-gradient(135deg, #F5F1E8 0%, #ffffff 50%, #F5F1E8 100%)",
       position: "relative",
       overflow: "hidden"
     }}>
@@ -89,7 +89,7 @@ function LoadingScreen() {
           right: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(139, 14, 30, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(90, 38, 51, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -99,7 +99,7 @@ function LoadingScreen() {
           left: "-10%",
           width: "600px",
           height: "600px",
-          background: "radial-gradient(circle, rgba(201, 169, 97, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(180, 154, 103, 0.15) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(80px)",
         }}></div>
@@ -110,7 +110,7 @@ function LoadingScreen() {
         {/* Logo mark */}
         <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg">
           <img 
-            src="/images/logo.jpeg" 
+            src="/logo.png" 
             alt="CIMA AI Logo" 
             style={{ 
               width: '100%', 
@@ -122,7 +122,7 @@ function LoadingScreen() {
         {/* Spinner */}
         <ClassicLoader size={36} />
         {/* Label */}
-        <p style={{ color: "#6d6d6d", fontSize: "0.875rem", fontWeight: 500, letterSpacing: "0.025em" }}>Loading CIMA AI...</p>
+        <p style={{ color: "#5f5f5f", fontSize: "0.875rem", fontWeight: 500, letterSpacing: "0.025em" }}>Loading CIMA AI...</p>
       </div>
     </div>
   );

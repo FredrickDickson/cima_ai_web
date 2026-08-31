@@ -54,7 +54,7 @@ export default function Sidebar() {
       <div className="flex items-center gap-3 px-4 py-4 border-b border-navy-800 shrink-0">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg overflow-hidden shrink-0">
           <img 
-            src="/images/logo.jpeg" 
+            src="/logo.png" 
             alt="CIMA AI Logo" 
             style={{ 
               width: '100%', 

@@ -10,7 +10,7 @@ const themes: { id: Theme; name: string; description: string; colors: string[] }
     id: 'white-burgundy',
     name: 'White & Burgundy',
     description: 'Clean white surfaces with a refined burgundy accent',
-    colors: ['#ffffff', '#f9e4e7', '#8b0e1e', '#3d0b15'],
+    colors: ['#ffffff', '#f9e4e7', '#5A2633', '#3d0b15'],
   },
   {
     id: 'professional-serenity',

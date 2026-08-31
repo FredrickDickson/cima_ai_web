@@ -36,7 +36,7 @@ const steps = [
     icon: TrendingUp,
     title: "Better Decisions",
     description: "Make informed legal decisions faster with AI-augmented research and analysis.",
-    color: "#8B0E1E",
+    color: "#5A2633",
   },
 ];
 
@@ -62,22 +62,22 @@ export function HowItWorks() {
             marginBottom: "1rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "linear-gradient(135deg, rgba(139, 14, 30, 0.1), rgba(201, 169, 97, 0.1))",
-            border: "1px solid rgba(139, 14, 30, 0.2)",
+            background: "linear-gradient(135deg, rgba(90, 38, 51, 0.1), rgba(180, 154, 103, 0.1))",
+            border: "1px solid rgba(90, 38, 51, 0.2)",
           }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#8B0E1E" }}>Simple Process</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5A2633" }}>Simple Process</span>
           </div>
           <h2 style={{
             fontFamily: "Playfair Display, Georgia, serif",
             fontSize: "clamp(2rem, 5vw, 3rem)",
             fontWeight: 700,
-            color: "#2D2D2D",
+            color: "#252525",
             marginBottom: "1rem",
             lineHeight: 1.2,
           }}>
             How CIMA AI Works
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#6d6d6d", maxWidth: "42rem", margin: "0 auto" }}>
+          <p style={{ fontSize: "1.125rem", color: "#5f5f5f", maxWidth: "42rem", margin: "0 auto" }}>
             A streamlined workflow that combines AI efficiency with human expertise
           </p>
         </motion.div>
@@ -116,7 +116,7 @@ export function HowItWorks() {
                     }}
                     className="lg:block"
                   >
-                    <ArrowRight style={{ width: "1.5rem", height: "1.5rem", color: "#C9A961" }} />
+                    <ArrowRight style={{ width: "1.5rem", height: "1.5rem", color: "#B49A67" }} />
                   </motion.div>
                 )}
 
@@ -125,7 +125,7 @@ export function HowItWorks() {
                   backdropFilter: "blur(20px)",
                   borderRadius: "1.5rem",
                   border: "1px solid rgba(255, 255, 255, 0.3)",
-                  boxShadow: "0 8px 32px rgba(139, 14, 30, 0.08)",
+                  boxShadow: "0 8px 32px rgba(90, 38, 51, 0.08)",
                   padding: "2rem",
                   textAlign: "center",
                   transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -139,14 +139,14 @@ export function HowItWorks() {
                     width: "2.5rem",
                     height: "2.5rem",
                     borderRadius: "50%",
-                    background: "linear-gradient(135deg, #C9A961, #a98543)",
+                    background: "linear-gradient(135deg, #B49A67, #a98543)",
                     color: "white",
                     fontWeight: 700,
                     fontSize: "0.875rem",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    boxShadow: "0 4px 12px rgba(201, 169, 97, 0.3)",
+                    boxShadow: "0 4px 12px rgba(180, 154, 103, 0.3)",
                   }}>
                     {index + 1}
                   </div>
@@ -158,10 +158,10 @@ export function HowItWorks() {
                     width: "4rem",
                     height: "4rem",
                     borderRadius: "1.25rem",
-                    background: "linear-gradient(135deg, #8B0E1E 0%, #751222 100%)",
+                    background: "linear-gradient(135deg, #5A2633 0%, #4a1f2a 100%)",
                     color: "white",
                     marginBottom: "1.5rem",
-                    boxShadow: "0 8px 24px rgba(139, 14, 30, 0.25)",
+                    boxShadow: "0 8px 24px rgba(90, 38, 51, 0.25)",
                     position: "relative",
                   }}>
                     <Icon style={{ width: "2rem", height: "2rem" }} />
@@ -171,13 +171,13 @@ export function HowItWorks() {
                     fontFamily: "Playfair Display, Georgia, serif",
                     fontSize: "1.25rem",
                     fontWeight: 700,
-                    color: "#2D2D2D",
+                    color: "#252525",
                     marginBottom: "0.75rem",
                   }}>
                     {step.title}
                   </h3>
                   <p style={{
-                    color: "#6d6d6d",
+                    color: "#5f5f5f",
                     lineHeight: 1.7,
                     fontSize: "0.875rem",
                   }}>
@@ -212,8 +212,8 @@ export function HowItWorks() {
             gap: "0.5rem",
             padding: "0.5rem 1rem",
             borderRadius: "9999px",
-            background: "rgba(139, 14, 30, 0.05)",
-            color: "#8B0E1E",
+            background: "rgba(90, 38, 51, 0.05)",
+            color: "#5A2633",
             fontSize: "0.875rem",
             fontWeight: 600,
           }}>
