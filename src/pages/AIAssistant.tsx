@@ -554,7 +554,7 @@ export default function AIAssistant() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-hidden flex h-full bg-navy-950 relative">
+      <div className="flex-1 flex overflow-hidden bg-navy-950 relative max-h-screen">
         {/* Mobile sidebar overlay */}
         {mobileSidebarOpen && (
           <div
@@ -633,9 +633,9 @@ export default function AIAssistant() {
         </div>
 
         {/* ── Chat Area ── */}
-        <div className="flex-1 flex flex-col min-w-0 relative z-10 h-full">
+        <div className="flex-1 flex flex-col min-w-0 relative z-10 overflow-hidden max-h-full">
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-navy-800 bg-navy-900/60 relative z-20 shrink-0">
+          <div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-navy-800 bg-navy-900/60 relative z-20 shrink-0 flex-none">
             <AppMenuButton />
             
             <button
@@ -674,7 +674,7 @@ export default function AIAssistant() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-5 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-5 overscroll-contain" style={{ minHeight: 0 }}>
             {!activeConv && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center pb-10">
                 <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gold-500/10 mb-4 border border-gold-500/20">
@@ -705,7 +705,7 @@ export default function AIAssistant() {
 
           {/* Attachment panel */}
           {showAttach && (
-            <div className="mx-4 md:mx-6 mb-2 p-4 bg-navy-900 border border-navy-700 rounded-xl shrink-0">
+            <div className="mx-4 md:mx-6 mb-2 p-4 bg-navy-900 border border-navy-700 rounded-xl shrink-0 flex-none">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-white">Attach Context</span>
                 <button onClick={() => setShowAttach(false)} className="text-slate-500 hover:text-white"><X size={14} /></button>
@@ -741,7 +741,7 @@ export default function AIAssistant() {
           )}
 
           {/* Input */}
-          <div className="px-4 md:px-6 py-3 md:py-4 border-t border-navy-800 bg-navy-900/40 shrink-0">
+          <div className="px-4 md:px-6 py-3 md:py-4 border-t border-navy-800 bg-navy-900/40 shrink-0 flex-none">
             <input ref={fileInputRef} type="file" accept=".txt,.pdf,.docx" className="hidden" onChange={handleFileUpload} />
             {(uploadedDocName || attachedDoc || attachedCase) && (
               <div className="flex flex-wrap items-center gap-2 mb-3">
