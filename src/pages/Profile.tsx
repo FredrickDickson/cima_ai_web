@@ -204,6 +204,7 @@ export default function Profile() {
 
   async function handleSignOut() {
     await signOut();
+    navigate("/login", { replace: true });
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -295,7 +296,7 @@ export default function Profile() {
       
       await signOut();
       showToast("Your account has been deleted");
-      navigate("/login");
+      navigate("/login", { replace: true });
     } catch (err) {
       console.error("Delete account error:", err);
       setMessage({ type: "error", text: "Failed to delete account. Please contact support." });

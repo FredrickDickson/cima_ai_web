@@ -33,6 +33,7 @@ export default function Sidebar() {
 
   async function handleSignOut() {
     await signOut();
+    navigate("/login", { replace: true });
   }
 
   return (

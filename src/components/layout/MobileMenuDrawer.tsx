@@ -21,6 +21,7 @@ export default function MobileMenuDrawer({ isOpen, onClose }: MobileMenuDrawerPr
 
   async function handleSignOut() {
     await signOut();
+    navigate("/login", { replace: true });
   }
 
   return (

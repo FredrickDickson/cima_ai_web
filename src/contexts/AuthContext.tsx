@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     try {
-      // Clear Supabase session FIRST (before redirect)
+      // Clear Supabase session FIRST (before clearing state)
       await supabase.auth.signOut();
     } catch (error) {
       console.error("Supabase signOut error:", error);
@@ -165,9 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
-    
-    // Redirect to login page
-    window.location.replace("/login");
   }
 
   async function refreshProfile() {

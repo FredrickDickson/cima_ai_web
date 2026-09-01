@@ -21,6 +21,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
   async function handleSignOut() {
     setShowMobileProfileMenu(false);
     await signOut();
+    navigate("/login", { replace: true });
   }
 
   return (
