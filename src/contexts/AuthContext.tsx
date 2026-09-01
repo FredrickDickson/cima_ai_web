@@ -165,6 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    
+    // Perform a hard redirect to login page
+    // Using window.location.href ensures the page reloads and all state is cleared
+    window.location.href = "/login";
   }
 
   async function refreshProfile() {
