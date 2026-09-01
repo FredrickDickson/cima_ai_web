@@ -31,8 +31,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const displayName = profile?.full_name || user?.email || "User";
 
-  function handleSignOut() {
-    signOut(); // Don't await - let signOut handle the redirect immediately
+  async function handleSignOut() {
+    await signOut();
   }
 
   return (

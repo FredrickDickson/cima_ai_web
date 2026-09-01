@@ -18,9 +18,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
   const [showMobileProfileMenu, setShowMobileProfileMenu] = useState(false);
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setShowMobileProfileMenu(false);
-    signOut(); // Don't await - let signOut handle the redirect immediately
+    await signOut();
   }
 
   return (

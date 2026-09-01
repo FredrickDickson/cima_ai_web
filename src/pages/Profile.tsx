@@ -202,8 +202,8 @@ export default function Profile() {
     }
   }
 
-  function handleSignOut() {
-    signOut(); // Don't await - let signOut handle the redirect immediately
+  async function handleSignOut() {
+    await signOut();
   }
 
   async function handleChangePassword(e: React.FormEvent) {

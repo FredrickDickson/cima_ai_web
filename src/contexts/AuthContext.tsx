@@ -21,7 +21,7 @@ interface AuthContextValue {
     fullName: string,
     role: string
   ) => Promise<{ error: string | null }>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
@@ -153,19 +153,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }
 
-  function signOut() {
-    // Clear state first
+  async function signOut() {
+    try {
+      // Clear Supabase session FIRST (before redirect)
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Supabase signOut error:", error);
+    }
+    
+    // Clear local state
     setUser(null);
     setSession(null);
     setProfile(null);
     
-    // Redirect immediately (synchronous)
+    // Redirect to login page
     window.location.replace("/login");
-    
-    // Clean up Supabase session in background (this won't block the redirect)
-    supabase.auth.signOut().catch((error) => {
-      console.error("Supabase signOut error:", error);
-    });
   }
 
   async function refreshProfile() {
