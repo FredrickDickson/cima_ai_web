@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const isSigningOutRef = useRef(false);
 
   async function fetchProfile(userId: string, userObj?: { email?: string }) {
     const { data } = await supabase
@@ -82,10 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         if (event === 'INITIAL_SESSION') return;
 
-        if (!session?.user && hadUser) {
+        if (!session?.user && hadUser && !isSigningOutRef.current) {
           // We previously had a confirmed session on this tab. Don't trust a
           // single ambiguous null-session event enough to bounce an
           // already-signed-in user back to /login — re-check directly first.
+          // UNLESS we're intentionally signing out (isSigningOutRef.current is true).
           console.warn(`[auth] ${event} fired with no session while signed in — re-confirming`, {
             event,
             timestamp: new Date().toISOString(),
@@ -154,8 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // Set flag to prevent re-confirm logic from interfering
+    isSigningOutRef.current = true;
+    
     try {
-      // Clear Supabase session FIRST (before clearing state)
+      // Clear Supabase session
       await supabase.auth.signOut();
     } catch (error) {
       console.error("Supabase signOut error:", error);
