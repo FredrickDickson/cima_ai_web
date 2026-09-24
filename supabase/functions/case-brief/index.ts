@@ -5,7 +5,8 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
-import { requireUUID } from "../_shared/validate.ts";
+import { requireLibraryDocId } from "../_shared/validate.ts";
+import { getLibraryDocument } from "../_shared/convex-library.ts";
 
 const MAX_CHARS = 45000;
 
@@ -35,8 +36,15 @@ Deno.serve(async (req: Request) => {
     await enforceRateLimit(supabase, verifiedUser.id, "case-brief", 10, 60);
 
     const body = await req.json();
-    const doc_id = requireUUID(body.doc_id, "doc_id");
+    const requestedId = requireLibraryDocId(body.doc_id, "doc_id");
     const force_regenerate = body.force_regenerate === true;
+
+    // Resolve first so the cache is keyed by the canonical Convex id even when
+    // an old Supabase UUID link was used.
+    const found = await getLibraryDocument(requestedId);
+    if (!found) throw new Error("Document not found");
+    const doc = found.document;
+    const doc_id = doc.id;
 
     if (!force_regenerate) {
       const { data: existing } = await supabase
@@ -51,12 +59,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { data: docRow, error: docError } = await supabase.rpc("get_legal_library_document", { doc_id });
-    const doc = Array.isArray(docRow) ? docRow[0] : docRow;
-    if (docError || !doc) throw new Error("Document not found");
     if (doc.source_type !== "case") throw new Error("Case briefs are only available for case documents");
 
-    const chunks = (doc.chunks ?? []) as { chunk_index: number | null; content: string }[];
+    const chunks = found.chunks;
     if (chunks.length === 0) throw new Error("Document has no extracted text to brief");
 
     let fullText = chunks

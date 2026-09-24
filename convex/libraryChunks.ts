@@ -162,7 +162,7 @@ export const insertBatch = mutation({
         title: v.string(),
         citation: v.optional(v.string()),
         content: v.string(),
-        embedding: v.array(v.float64()),
+        embedding: v.optional(v.array(v.float64())),
         sourceType: v.string(),
         jurisdiction: v.string(),
       }),

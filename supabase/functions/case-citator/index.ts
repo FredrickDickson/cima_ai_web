@@ -5,8 +5,9 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
-import { requireUUID } from "../_shared/validate.ts";
+import { requireLibraryDocId } from "../_shared/validate.ts";
 import { getEmbedding } from "../_shared/legal-retrieval.ts";
+import { countLibraryDocuments, getLibraryDocuments, searchLibraryChunks } from "../_shared/convex-library.ts";
 
 const MAX_CANDIDATES = 15;
 const TREATMENTS = ["followed", "applied", "distinguished", "disapproved", "overruled", "mentioned"];
@@ -128,15 +129,14 @@ Deno.serve(async (req: Request) => {
     await enforceRateLimit(supabase, verifiedUser.id, "case-citator", 3, 60);
 
     const body = await req.json();
-    const doc_id = requireUUID(body.doc_id, "doc_id");
+    const requestedId = requireLibraryDocId(body.doc_id, "doc_id");
     const force_refresh = body.force_refresh === true;
 
-    const { data: cited, error: citedError } = await supabase
-      .from("legal_library_documents")
-      .select("id, title, citation, parties, decided_year, source_type")
-      .eq("id", doc_id)
-      .maybeSingle();
-    if (citedError || !cited) throw new Error("Document not found");
+    const [cited] = await getLibraryDocuments([requestedId]);
+    if (!cited) throw new Error("Document not found");
+    // Canonical Convex id — runs/citations are keyed by it even when an old
+    // Supabase UUID link was used.
+    const doc_id = cited.id;
     if (cited.source_type !== "case") throw new Error("Smart Citator is only available for case documents");
 
     // Return the most recent cached run unless a fresh analysis was explicitly requested.
@@ -160,33 +160,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { count: corpusDocCount } = await supabase
-      .from("legal_library_documents")
-      .select("id", { count: "exact", head: true })
-      .eq("source_type", "case");
+    const corpusDocCount = await countLibraryDocuments("case").catch(() => 0);
 
     const parties = (cited.parties ?? []) as { role: string; name: string }[];
     const identity = `${cited.citation ?? ""} ${parties.map((p) => p.name).join(" ")}`.trim() || cited.title;
 
     const matchRows: MatchRow[] = [];
-    const { data: ftsResults } = await supabase.rpc("search_legal_library_fts", {
-      search_query: identity,
-      match_count: 40,
-    });
-    for (const r of ftsResults ?? []) {
+    for (const r of await searchLibraryChunks(identity, { matchCount: 40 })) {
       matchRows.push({ id: r.id, content: r.content, doc_id: r.doc_id ?? null });
     }
 
     const embedding = hfKey ? await getEmbedding(identity, hfKey) : null;
     if (embedding) {
-      const { data: vectorResults } = await supabase.rpc("match_legal_library", {
-        query_embedding: embedding,
-        match_count: 40,
-        filter_jurisdiction: null,
-        filter_source_type: "case",
-        filter_doc_id: null,
-      });
-      for (const r of vectorResults ?? []) {
+      for (const r of await searchLibraryChunks(identity, { embedding, sourceType: "case", matchCount: 40 })) {
         matchRows.push({ id: r.id, content: r.content, doc_id: r.doc_id ?? null });
       }
     }
@@ -207,12 +193,9 @@ Deno.serve(async (req: Request) => {
 
     let candidateDocs: Candidate[] = [];
     if (byDoc.size > 0) {
-      const { data: citingDocs } = await supabase
-        .from("legal_library_documents")
-        .select("id, title, citation, decided_year, source_type")
-        .in("id", Array.from(byDoc.keys()));
+      const citingDocs = await getLibraryDocuments(Array.from(byDoc.keys()));
 
-      for (const d of citingDocs ?? []) {
+      for (const d of citingDocs) {
         if (d.source_type !== "case") continue;
         // A case cannot meaningfully "treat" a case decided after it.
         if (cited.decided_year && d.decided_year && d.decided_year < cited.decided_year) continue;

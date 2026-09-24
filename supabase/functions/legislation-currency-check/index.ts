@@ -6,7 +6,8 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
-import { requireUUID } from "../_shared/validate.ts";
+import { requireLibraryDocId } from "../_shared/validate.ts";
+import { getLibraryDocuments } from "../_shared/convex-library.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req);
@@ -25,14 +26,10 @@ Deno.serve(async (req: Request) => {
     await enforceRateLimit(supabase, verifiedUser.id, "legislation-currency-check", 20, 60);
 
     const body = await req.json();
-    const doc_id = requireUUID(body.doc_id, "doc_id");
+    const doc_id = requireLibraryDocId(body.doc_id, "doc_id");
 
-    const { data: doc, error: docError } = await supabase
-      .from("legal_library_documents")
-      .select("title, legislation_number, citation, jurisdiction, source_type")
-      .eq("id", doc_id)
-      .maybeSingle();
-    if (docError || !doc) throw new Error("Document not found");
+    const [doc] = await getLibraryDocuments([doc_id]);
+    if (!doc) throw new Error("Document not found");
     if (doc.source_type !== "statute") throw new Error("Currency check is only available for legislation documents");
 
     if (!lawsAfricaKey) throw new Error("Laws.Africa API key not configured");

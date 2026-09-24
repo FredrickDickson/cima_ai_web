@@ -78,6 +78,9 @@ function convexDocWithChunksToUnified(result: {
   };
 }
 
+// Supabase legal_library_documents ids — resolved via libraryDocuments.getByLegacyId.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface LawsAfricaMatch {
   id: string;
   source_name: string;
@@ -825,11 +828,10 @@ function CurrencyCheckPanel({ docId }: { docId: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────
 
 export default function LibraryDocument() {
-  const { docId, source: sourceParam } = useParams<{ docId: string; source?: string }>();
-  // The single-param route (/library/:docId) predates the Convex migration
-  // and always pointed at Supabase — default there when no source segment is
-  // present, rather than force-migrating every existing link site.
-  const source: "supabase" | "convex" = sourceParam === "convex" ? "convex" : "supabase";
+  // The :source segment is legacy (the library used to be split across
+  // Supabase and Convex) — every doc now lives in Convex, and docId is either
+  // a Convex id or an old Supabase UUID (pre-migration links, stored citations).
+  const { docId } = useParams<{ docId: string; source?: string }>();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<LegalLibraryDocumentWithChunks | null>(null);
   const [loading, setLoading] = useState(true);
@@ -843,45 +845,32 @@ export default function LibraryDocument() {
     setError("");
     setActivePanel(null);
     (async () => {
-      if (source === "convex") {
-        const result = await convex.query(api.libraryDocuments.getWithChunks, {
-          docId: docId as Id<"libraryDocuments">,
-        });
+      try {
+        const convexId = UUID_RE.test(docId)
+          ? (await convex.query(api.libraryDocuments.getByLegacyId, { legacyId: docId }))?._id
+          : (docId as Id<"libraryDocuments">);
+        const result = convexId
+          ? await convex.query(api.libraryDocuments.getWithChunks, { docId: convexId })
+          : null;
         if (!result) {
           setError("Document not found.");
-          setLoading(false);
           return;
         }
-        const row = convexDocWithChunksToUnified(result);
-        setDoc(row);
+        setDoc(convexDocWithChunksToUnified(result));
         if (result.document.storageId) {
           const url = await convex.query(api.libraryDocuments.getFileUrl, {
             storageId: result.document.storageId,
           });
           setFileUrl(url);
         }
-        setLoading(false);
-        return;
-      }
-
-      const { data, error: rpcError } = await (supabase.rpc as any)("get_legal_library_document", { doc_id: docId });
-      const row = (Array.isArray(data) ? data[0] : data) as unknown as LegalLibraryDocumentWithChunks | undefined;
-      if (rpcError || !row) {
+      } catch {
+        // A malformed id makes Convex's validator throw — treat it as not found.
         setError("Document not found.");
+      } finally {
         setLoading(false);
-        return;
       }
-      setDoc(row);
-
-      if (row.storage_path) {
-        const { data: signed } = await supabase.storage
-          .from("legal-documents")
-          .createSignedUrl(row.storage_path, 3600);
-        setFileUrl(signed?.signedUrl ?? null);
-      }
-      setLoading(false);
     })();
-  }, [docId, source]);
+  }, [docId]);
 
   const title =
     doc?.parties?.length === 2 ? `${doc.parties[0].name} v. ${doc.parties[1].name}` : doc?.title ?? "";
@@ -911,69 +900,53 @@ export default function LibraryDocument() {
             )} */}
             {doc?.source_type === "case" && (
               <button
-                onClick={() => source === "supabase" && setActivePanel((p) => (p === "brief" ? null : "brief"))}
-                disabled={source === "convex"}
-                title={source === "convex" ? "AI case tools are only available for documents in the main library today" : undefined}
+                onClick={() => setActivePanel((p) => (p === "brief" ? null : "brief"))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  source === "convex"
-                    ? "text-slate-400 border border-slate-200 bg-slate-50 cursor-not-allowed"
-                    : activePanel === "brief"
+                  activePanel === "brief"
                       ? "bg-navy-950 text-white"
                       : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
                 }`}
               >
-                {activePanel === "brief" && source === "supabase" ? <X size={13} /> : <FileText size={13} />}
-                {activePanel === "brief" && source === "supabase" ? "Close" : "Case Brief"}
+                {activePanel === "brief" ? <X size={13} /> : <FileText size={13} />}
+                {activePanel === "brief" ? "Close" : "Case Brief"}
               </button>
             )}
             {doc?.source_type === "case" && (
               <button
-                onClick={() => source === "supabase" && setActivePanel((p) => (p === "citator" ? null : "citator"))}
-                disabled={source === "convex"}
-                title={source === "convex" ? "AI case tools are only available for documents in the main library today" : undefined}
+                onClick={() => setActivePanel((p) => (p === "citator" ? null : "citator"))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  source === "convex"
-                    ? "text-slate-400 border border-slate-200 bg-slate-50 cursor-not-allowed"
-                    : activePanel === "citator"
+                  activePanel === "citator"
                       ? "bg-navy-950 text-white"
                       : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
                 }`}
               >
-                {activePanel === "citator" && source === "supabase" ? <X size={13} /> : <GitBranch size={13} />}
-                {activePanel === "citator" && source === "supabase" ? "Close" : "Citator"}
+                {activePanel === "citator" ? <X size={13} /> : <GitBranch size={13} />}
+                {activePanel === "citator" ? "Close" : "Citator"}
               </button>
             )}
             {doc?.source_type === "statute" && (
               <button
-                onClick={() => source === "supabase" && setActivePanel((p) => (p === "currency" ? null : "currency"))}
-                disabled={source === "convex"}
-                title={source === "convex" ? "AI case tools are only available for documents in the main library today" : undefined}
+                onClick={() => setActivePanel((p) => (p === "currency" ? null : "currency"))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  source === "convex"
-                    ? "text-slate-400 border border-slate-200 bg-slate-50 cursor-not-allowed"
-                    : activePanel === "currency"
+                  activePanel === "currency"
                       ? "bg-navy-950 text-white"
                       : "text-navy-700 border border-navy-200 bg-navy-50 hover:bg-navy-100"
                 }`}
               >
-                {activePanel === "currency" && source === "supabase" ? <X size={13} /> : <RefreshCw size={13} />}
-                {activePanel === "currency" && source === "supabase" ? "Close" : "Check Currency"}
+                {activePanel === "currency" ? <X size={13} /> : <RefreshCw size={13} />}
+                {activePanel === "currency" ? "Close" : "Check Currency"}
               </button>
             )}
             <button
-              onClick={() => source === "supabase" && setActivePanel((p) => (p === "chat" ? null : "chat"))}
-              disabled={source === "convex"}
-              title={source === "convex" ? "AI case tools are only available for documents in the main library today" : undefined}
+              onClick={() => setActivePanel((p) => (p === "chat" ? null : "chat"))}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                source === "convex"
-                  ? "text-slate-400 border border-slate-200 bg-slate-50 cursor-not-allowed"
-                  : activePanel === "chat"
+                activePanel === "chat"
                     ? "bg-navy-950 text-white"
                     : "text-gold-700 border border-gold-300 bg-gold-50 hover:bg-gold-100"
               }`}
             >
-              {activePanel === "chat" && source === "supabase" ? <X size={13} /> : <Bot size={13} />}
-              {activePanel === "chat" && source === "supabase" ? "Close chat" : "Ask CIMA AI"}
+              {activePanel === "chat" ? <X size={13} /> : <Bot size={13} />}
+              {activePanel === "chat" ? "Close chat" : "Ask CIMA AI"}
             </button>
           </div>
         </div>

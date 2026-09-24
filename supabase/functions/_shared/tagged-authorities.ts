@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmbedding } from "./legal-retrieval.ts";
+import { getLibraryDocument, rankChunksByQuery } from "./convex-library.ts";
 
 export interface TaggedCitedSource {
   marker: string;
@@ -25,20 +26,6 @@ const MAX_CHARS_TOTAL = 24000;
 // How many of the most relevant chunks to pull per tagged item when a query
 // embedding is available.
 const RETRIEVAL_MATCH_COUNT = 6;
-
-interface LibraryDocRow {
-  id: string;
-  title: string;
-  citation: string | null;
-  source_type: string;
-  jurisdiction: string | null;
-}
-
-interface LibraryChunkRow {
-  doc_id: string;
-  content: string;
-  chunk_index: number | null;
-}
 
 interface UserDocRow {
   id: string;
@@ -84,13 +71,13 @@ export function cleanFtsQuery(query: string): string {
 
 /**
  * Fetches metadata + the text most relevant to `query` for @-tagged cases/
- * legislation (rows in `legal_library_documents`, via their chunks in
- * `legal_library`) and the user's own tagged documents (`documents`, via
- * their chunks in `document_chunks`).
+ * legislation (Convex library docs — see convex-library.ts) and the user's
+ * own tagged documents (`documents`, via their chunks in `document_chunks`).
  *
- * When `query`/`hfKey` are supplied, each tagged item's most relevant chunks
- * are retrieved by embedding similarity (via `match_legal_library` /
- * `match_document_chunks`, scoped to that one document) instead of using the
+ * When `query` is supplied, each tagged item's most relevant chunks are
+ * retrieved (library docs by term overlap via rankChunksByQuery; user docs by
+ * embedding similarity via `match_document_chunks`, scoped to that one
+ * document, with an FTS fallback) instead of using the
  * item's raw text — a long document previously always contributed its first
  * ~8000 characters (title page/preface for a book), regardless of what was
  * asked. Falls back to that from-the-start behavior when no query/HF key is
@@ -131,61 +118,28 @@ export async function fetchTaggedAuthorityContext(
   }
 
   if (hasLibraryDocs) {
-    const [{ data: docs }, { data: chunks }] = await Promise.all([
-      supabase
-        .from("legal_library_documents")
-        .select("id, title, citation, source_type, jurisdiction")
-        .in("id", libraryDocIds!) as unknown as Promise<{ data: LibraryDocRow[] | null }>,
-      supabase
-        .from("legal_library")
-        .select("doc_id, content, chunk_index")
-        .in("doc_id", libraryDocIds!)
-        .order("chunk_index") as unknown as Promise<{ data: LibraryChunkRow[] | null }>,
-    ]);
+    // Library docs live in Convex (see convex-library.ts). Each tagged doc's
+    // chunks come back in one call; with a query, keep the chunks that
+    // mention its terms, else fall back to the doc from the start.
+    const found = await Promise.all(
+      libraryDocIds!.map((id) =>
+        getLibraryDocument(id).catch((err) => {
+          console.error(`getLibraryDocument failed for ${id}:`, err);
+          return null;
+        })
+      ),
+    );
 
-    for (const doc of docs ?? []) {
-      const docChunks = (chunks ?? []).filter((c) => c.doc_id === doc.id);
-      const combined = docChunks.map((c) => c.content).join("\n\n");
+    for (const entry of found) {
+      if (!entry) continue;
+      const doc = entry.document;
+      const combined = entry.chunks.map((c) => c.content).join("\n\n");
       if (!combined) continue;
 
       let body = combined;
-      let retrieved = false;
-
-      if (queryEmbedding) {
-        try {
-          const { data: relevant } = await supabase.rpc("match_legal_library", {
-            query_embedding: queryEmbedding,
-            match_count: RETRIEVAL_MATCH_COUNT,
-            filter_doc_id: doc.id,
-          }) as unknown as { data: RetrievedChunkRow[] | null };
-          if (relevant && relevant.length > 0) {
-            body = relevant.map((c) => c.content).join("\n\n");
-            retrieved = true;
-          }
-        } catch (err) {
-          console.error(`match_legal_library retrieval failed for ${doc.id}, trying FTS fallback:`, err);
-        }
-      }
-
-      // Vector retrieval requires embeddings, which ingest-legal-document
-      // doesn't always manage to generate (e.g. the Hugging Face call
-      // failing) — full-text search needs no embedding and works off the
-      // same chunks. Mirrors the fallback the user-document branch below
-      // already has via search_document_chunks_fts.
-      if (!retrieved && query) {
-        try {
-          const { data: relevant } = await supabase.rpc("search_legal_library_fts", {
-            search_query: cleanFtsQuery(query).slice(0, 300),
-            match_count: RETRIEVAL_MATCH_COUNT,
-            filter_doc_id: doc.id,
-          }) as unknown as { data: RetrievedChunkRow[] | null };
-          if (relevant && relevant.length > 0) {
-            body = relevant.map((c) => c.content).join("\n\n");
-            retrieved = true;
-          }
-        } catch (err) {
-          console.error(`search_legal_library_fts retrieval failed for ${doc.id}, falling back to full text:`, err);
-        }
+      if (query) {
+        const relevant = rankChunksByQuery(entry.chunks, cleanFtsQuery(query), RETRIEVAL_MATCH_COUNT);
+        if (relevant.length > 0) body = relevant.map((c) => c.content).join("\n\n");
       }
 
       const label = doc.citation ? `${doc.title} (${doc.citation})` : doc.title;

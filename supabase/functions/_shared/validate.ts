@@ -46,6 +46,18 @@ export function optionalUUID(value: unknown, field: string): string | undefined 
   return requireUUID(value, field);
 }
 
+/** A legal-library doc id: a Convex id, or a pre-migration Supabase UUID
+ * (old links / stored citations — resolved on the Convex side). */
+export function requireLibraryDocId(value: unknown, field: string): string {
+  if (typeof value === "string" && (UUID_RE.test(value) || CONVEX_ID_RE.test(value))) return value;
+  throw new HttpError(400, `${field} must be a valid library document id`);
+}
+
+export function optionalLibraryDocId(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  return requireLibraryDocId(value, field);
+}
+
 export function requireEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
     throw new HttpError(400, `${field} must be one of: ${allowed.join(", ")}`);

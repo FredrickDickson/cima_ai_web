@@ -36,6 +36,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
 import { getPdfPageCount } from "../lib/fileUtils";
+import { deleteUserFile, getUserFileUrl, isConvexFileRef, uploadUserFile } from "../lib/userFiles";
 import type { Id } from "../../convex/_generated/dataModel";
 import { LargeDocumentProgress } from "../components/documents/LargeDocumentProgress";
 
@@ -415,16 +416,13 @@ export default function Documents() {
         return;
       }
 
+      // Original file goes to Convex storage; storage_path holds its
+      // "convex:<storageId>.<ext>" reference (see lib/userFiles.ts).
       let storagePath: string | null = null;
-      const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
-      const candidatePath = `${user!.id}/${crypto.randomUUID()}.${fileExt}`;
-      const { error: storageErr } = await supabase.storage
-        .from("documents")
-        .upload(candidatePath, file, { contentType: file.type || undefined });
-      if (storageErr) {
-        console.error("Failed to store original file:", storageErr.message);
-      } else {
-        storagePath = candidatePath;
+      try {
+        storagePath = (await uploadUserFile(file, "document")).ref;
+      } catch (storageErr) {
+        console.error("Failed to store original file:", storageErr);
       }
 
       // Row is created before text is extracted (below) — extraction can
@@ -629,7 +627,12 @@ export default function Documents() {
       showToast(`Failed to delete "${doc.name}": ${error.message}`, "error");
       return;
     }
-    if (doc.storage_path) {
+    if (isConvexFileRef(doc.storage_path)) {
+      await deleteUserFile(doc.storage_path).catch((storageError) =>
+        console.error("Failed to remove stored file:", storageError),
+      );
+    } else if (doc.storage_path) {
+      // Pre-migration file still in the Supabase bucket (see scripts/migrate-storage-to-convex.mjs).
       const { error: storageError } = await supabase.storage.from("documents").remove([doc.storage_path]);
       if (storageError) console.error("Failed to remove stored file:", storageError);
     }
@@ -2551,21 +2554,26 @@ function OriginalDocumentModal({
         return;
       }
 
-      const { data, error: signErr } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(doc.storage_path, 3600);
+      let fileUrl: string | null = null;
+      if (isConvexFileRef(doc.storage_path)) {
+        fileUrl = await getUserFileUrl(doc.storage_path).catch(() => null);
+      } else {
+        // Pre-migration file still in the Supabase bucket (see scripts/migrate-storage-to-convex.mjs).
+        const { data } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
+        fileUrl = data?.signedUrl ?? null;
+      }
 
       if (cancelled) return;
-      if (signErr || !data?.signedUrl) {
+      if (!fileUrl) {
         setError("Could not load the original file.");
         setLoading(false);
         return;
       }
-      setSignedUrl(data.signedUrl);
+      setSignedUrl(fileUrl);
 
       if (isDocx) {
         try {
-          const res = await fetch(data.signedUrl);
+          const res = await fetch(fileUrl);
           const buffer = await res.arrayBuffer();
           const { renderAsync } = await import("docx-preview");
           if (cancelled || !docxContainerRef.current) return;

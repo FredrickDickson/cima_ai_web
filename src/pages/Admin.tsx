@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { deleteUserFile, isConvexFileRef, uploadUserFile } from "../lib/userFiles";
 
 export default function Admin() {
   const { user } = useAuth();
@@ -67,18 +68,8 @@ export default function Admin() {
     setUploading(true);
 
     try {
-      // Upload file to Supabase Storage
-      const fileName = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('legal-documents')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('legal-documents')
-        .getPublicUrl(fileName);
+      // Upload file to Convex storage (lib/userFiles.ts)
+      const { ref } = await uploadUserFile(file, 'admin');
 
       // Create document record using existing ghana_laws table
       const { error: dbError } = await supabase
@@ -86,7 +77,7 @@ export default function Admin() {
         .insert({
           title,
           description,
-          file_path: urlData.publicUrl,
+          file_path: ref,
           file_size: file.size,
           source_type: documentType === 'rules' ? 'regulation' : documentType,
           jurisdiction: 'ghana',
@@ -123,12 +114,16 @@ export default function Admin() {
 
       if (dbError) throw dbError;
 
-      // Delete from storage (extract filename from path)
-      const fileName = filePath.split('/').pop();
-      if (fileName) {
-        await supabase.storage
-          .from('legal-documents')
-          .remove([fileName]);
+      if (isConvexFileRef(filePath)) {
+        await deleteUserFile(filePath).catch((err) => console.error("Failed to remove stored file:", err));
+      } else {
+        // Pre-migration upload still in the Supabase bucket (extract filename from its URL)
+        const fileName = filePath.split('/').pop();
+        if (fileName) {
+          await supabase.storage
+            .from('legal-documents')
+            .remove([fileName]);
+        }
       }
 
       // Reload documents

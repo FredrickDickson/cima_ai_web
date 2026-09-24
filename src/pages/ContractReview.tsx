@@ -50,6 +50,7 @@ import { useChatAutoScroll } from "../hooks/useChatAutoScroll";
 import { MentionPopup } from "../components/ui/MentionPopup";
 import { TaggedAuthorityChip } from "../components/ui/TaggedAuthorityChip";
 import { splitTaggedAuthorityIds, type TaggedAuthority } from "../lib/mentions";
+import { uploadUserFile } from "../lib/userFiles";
 
 interface AnalysisResult {
   id?: string;
@@ -777,11 +778,12 @@ export default function ContractReview() {
       }
 
       if (user) {
-        const fileExt = file.name.split('.').pop() || 'pdf';
-        const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
-        if (uploadError) {
+        // Original goes to Convex storage (lib/userFiles.ts); file_path holds
+        // its "convex:<storageId>.<ext>" reference (the file name if the upload failed).
+        let filePath = file.name;
+        try {
+          filePath = (await uploadUserFile(file, "contract")).ref;
+        } catch (uploadError) {
           console.error("File upload failed:", uploadError);
           // Continue anyway - document analysis can still work without file storage
         }

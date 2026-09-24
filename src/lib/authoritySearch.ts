@@ -1,4 +1,6 @@
 import { supabase } from "./supabase";
+import { convex } from "./convexClient";
+import { api } from "../../convex/_generated/api";
 import type { AuthorityType } from "./mentions";
 
 export interface AuthoritySearchResult {
@@ -11,9 +13,8 @@ export interface AuthoritySearchResult {
 /**
  * Search for taggable authorities (published cases/legislation in the Legal
  * Library, plus the current user's own uploaded documents) as the user types
- * after "@". Runs directly against Supabase from the browser — RLS already
- * scopes `documents` to its owner and `legal_library_documents` is readable
- * by any authenticated user, so no dedicated edge function is needed here.
+ * after "@". Library docs come from Convex (public reads); the user's own
+ * documents from Supabase, where RLS scopes `documents` to its owner.
  */
 export async function searchAuthorities(
   query: string,
@@ -23,24 +24,18 @@ export async function searchAuthorities(
   const q = query.trim();
   if (!q) return [];
 
-  const [libRes, docIdsRes] = await Promise.all([
-    supabase.rpc("search_legal_library_documents" as any, {
-      search_query: q,
-      match_count: limit,
-    }),
+  const [libDocs, docIdsRes] = await Promise.all([
+    convex
+      .query(api.libraryDocuments.searchByTitle, { searchQuery: q, matchCount: limit })
+      .catch(() => []),
     userId
       ? supabase.rpc("search_documents" as any, { search_query: q, match_count: limit })
       : Promise.resolve({ data: [] as { id: string }[] }),
   ]);
 
-  const libResults: AuthoritySearchResult[] = ((libRes.data ?? []) as {
-    id: string;
-    title: string;
-    source_type: string;
-    citation?: string;
-  }[]).map((d) => ({
-    id: d.id,
-    type: (d.source_type === "statute" ? "statute" : "case") as AuthorityType,
+  const libResults: AuthoritySearchResult[] = libDocs.map((d) => ({
+    id: d._id,
+    type: (d.sourceType === "statute" ? "statute" : "case") as AuthorityType,
     label: d.title,
     citation: d.citation || undefined,
   }));

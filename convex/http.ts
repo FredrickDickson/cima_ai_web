@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { requireIngestSecret } from "./lib/ingestAuth";
 
 const http = httpRouter();
@@ -172,6 +173,86 @@ http.route({
         doc_id: h.docId,
       })),
     );
+  }),
+});
+
+// ─── Legal-library reads for Supabase edge functions ───────────────────────
+// (case-brief, case-citator, legislation-currency-check, tagged-authorities —
+// see supabase/functions/_shared/convex-library.ts). Public like /searchLibrary:
+// library reads are effectively public. Ids may be Convex ids or pre-migration
+// Supabase UUIDs; responses use the snake_case shape the edge functions used
+// to get from legal_library_documents.
+
+function toSnakeDoc(d: Doc<"libraryDocuments">) {
+  return {
+    id: d._id,
+    title: d.title,
+    source_type: d.sourceType,
+    jurisdiction: d.jurisdiction,
+    citation: d.citation ?? "",
+    court: d.court ?? "",
+    decided_year: d.decidedYear ?? null,
+    parties: d.parties,
+    legislation_number: d.legislationNumber ?? "",
+  };
+}
+
+async function readJsonObject(req: Request): Promise<Record<string, unknown> | Response> {
+  const body: unknown = await req.json().catch(() => null);
+  if (typeof body !== "object" || body === null) {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  return body as Record<string, unknown>;
+}
+
+// One doc + its ordered chunks (capped by getWithChunks — `truncated` says so).
+http.route({
+  path: "/getLibraryDocument",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const b = await readJsonObject(req);
+    if (b instanceof Response) return b;
+    if (typeof b.id !== "string") {
+      return Response.json({ error: "`id` (string) is required" }, { status: 400 });
+    }
+    const [doc] = await ctx.runQuery(internal.libraryDocuments.resolveMany, { ids: [b.id] });
+    if (!doc) return Response.json({ found: false });
+    const result = await ctx.runQuery(api.libraryDocuments.getWithChunks, { docId: doc._id });
+    if (!result) return Response.json({ found: false });
+    return Response.json({
+      found: true,
+      document: toSnakeDoc(result.document),
+      chunks: result.chunks.map((c) => ({ id: c._id, chunk_index: c.chunkIndex, content: c.content })),
+      truncated: result.truncated,
+    });
+  }),
+});
+
+// Metadata for several docs (input order preserved, unknown ids dropped).
+http.route({
+  path: "/getLibraryDocuments",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const b = await readJsonObject(req);
+    if (b instanceof Response) return b;
+    if (!Array.isArray(b.ids) || !b.ids.every((id) => typeof id === "string")) {
+      return Response.json({ error: "`ids` (string[]) is required" }, { status: 400 });
+    }
+    const docs = await ctx.runQuery(internal.libraryDocuments.resolveMany, { ids: b.ids as string[] });
+    return Response.json(docs.map(toSnakeDoc));
+  }),
+});
+
+// Completed-doc count, optionally for one sourceType (the citator's corpus size).
+http.route({
+  path: "/libraryDocumentCount",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const b = await readJsonObject(req);
+    if (b instanceof Response) return b;
+    const sourceType = typeof b.sourceType === "string" ? b.sourceType : undefined;
+    const counts = await ctx.runQuery(api.libraryDocuments.jurisdictionCounts, { sourceType });
+    return Response.json({ count: counts.reduce((n, c) => n + c.count, 0) });
   }),
 });
 

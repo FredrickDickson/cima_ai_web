@@ -10,6 +10,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, optionalString, optionalUUID, optionalUUIDArray, optionalDocumentIdArray, requireArray } from "../_shared/validate.ts";
+import { searchLibraryChunks } from "../_shared/convex-library.ts";
 
 interface CitedSource {
   marker: string;
@@ -34,16 +35,16 @@ interface CaseLawRow {
 
 async function fetchCaseLawRows(query: string, supabase: ReturnType<typeof createClient>): Promise<CaseLawRow[]> {
   if (!query) return [];
-  try {
-    const { data, error } = await supabase.rpc("search_legal_library_fts", {
-      search_query: query,
-      match_count: 8,
-    });
-    if (error || !data) return [];
-    return (data as CaseLawRow[]).filter((r) => r.source_type === "case").slice(0, 4);
-  } catch {
-    return [];
-  }
+  const hits = await searchLibraryChunks(query, { sourceType: "case", matchCount: 4 });
+  return hits.map((h) => ({
+    id: h.id,
+    title: h.source_name,
+    content: h.content,
+    citation: h.citation ?? "",
+    jurisdiction: h.jurisdiction,
+    source_type: h.source_type,
+    doc_id: h.doc_id,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +89,8 @@ Deno.serve(async (req: Request) => {
     const document_type = optionalString(body.document_type, "document_type", 50);
     const industry_type = optionalString(body.industry_type, "industry_type", 50);
     const jurisdiction = optionalString(body.jurisdiction, "jurisdiction", 100);
-    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    // Library doc ids are Convex ids (or pre-migration Supabase UUIDs).
+    const library_doc_ids = optionalDocumentIdArray(body.library_doc_ids, "library_doc_ids");
     const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const tagged_authorities = body.tagged_authorities === undefined
       ? undefined

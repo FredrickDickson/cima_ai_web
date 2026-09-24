@@ -20,10 +20,13 @@
  *                           use the same lowercase country-name vocabulary as
  *                           supabase/functions/_shared/laws-africa.ts's COUNTRY_MAP
  *                           (e.g. 'kenya', 'nigeria') or 'international'
- *   --target=<supabase|convex>  Where to write ingested documents (default 'supabase').
- *                           'convex' requires VITE_CONVEX_URL + INGEST_SECRET in .env
- *                           (see scripts/lib/convex-ingest-target.mjs) — used for
- *                           documents not yet in Supabase, once its free tier is full.
+ *   --target=<supabase|convex>  Where to write ingested documents (default 'convex' —
+ *                           the library lives in Convex; requires VITE_CONVEX_URL +
+ *                           INGEST_SECRET in .env, see scripts/lib/convex-ingest-target.mjs).
+ *                           'supabase' is legacy: its library tables have been dropped.
+ *   --attach-originals      Don't ingest — upload local PDF/DOCX originals for Convex
+ *                           docs that don't have their file yet (e.g. ones copied from
+ *                           Supabase by migrate-legal-library-to-convex.mjs)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -38,7 +41,8 @@ import { fileURLToPath } from 'url';
 import { stripWatermarks } from './lib/sanitize-legal-text.mjs';
 import {
   createConvexIngestClient,
-  convexListSourceKeys,
+  convexListSourceKeysPaged,
+  convexSetStorageId,
   convexUploadFile,
   convexUpsertDocument,
   convexReplaceChunks,
@@ -79,7 +83,10 @@ const BATCH_SIZE = Number(argv.find(a => a.startsWith('--batch-size='))?.split('
 const BATCH_DELAY_MS = Number(argv.find(a => a.startsWith('--batch-delay-ms='))?.split('=')[1] ?? 0);
 const DOC_DELAY_MS = Number(argv.find(a => a.startsWith('--doc-delay-ms='))?.split('=')[1] ?? 400);
 const JURISDICTION = argv.find(a => a.startsWith('--jurisdiction='))?.split('=')[1] ?? 'ghana';
-const TARGET = argv.find(a => a.startsWith('--target='))?.split('=')[1] ?? 'supabase';
+// The legal library lives in Convex (the Supabase library tables were dropped
+// in 20260924000000_move_legal_library_to_convex.sql).
+const TARGET = argv.find(a => a.startsWith('--target='))?.split('=')[1] ?? 'convex';
+const ATTACH_ORIGINALS = argv.includes('--attach-originals');
 if (TARGET !== 'supabase' && TARGET !== 'convex') {
   console.error(`❌  Invalid --target=${TARGET} (expected 'supabase' or 'convex')`);
   process.exit(1);
@@ -650,6 +657,52 @@ async function writeToConvex(candidate, storagePath, text, contentType, uploadBu
   return 'completed';
 }
 
+// --attach-originals: for docs already in Convex without an original file
+// (e.g. copied from Supabase by migrate-legal-library-to-convex.mjs, which
+// moves text/chunks only), upload the local PDF/DOCX and attach it — that's
+// what LibraryDocument.tsx's PDF/DOCX viewers render. htm sources have no
+// original worth keeping (the viewer shows their chunk text).
+async function attachOriginals(winners) {
+  const convexDocs = await convexListSourceKeysPaged(convexIngest);
+  const todo = [];
+  for (const c of winners) {
+    const ext = getFinalExt(c);
+    if (ext !== 'pdf' && ext !== 'docx') continue;
+    const doc = convexDocs.get(buildStoragePath(c, ext));
+    if (doc && !doc.hasStorageId) todo.push({ c, ext, docId: doc._id });
+  }
+  const toDo = todo.slice(0, LIMIT);
+  console.log(`\n📎  ${todo.length} Convex docs missing their original file — attaching ${toDo.length}${DRY_RUN ? ' (dry run)' : ''}`);
+  if (DRY_RUN) return;
+
+  const CONCURRENCY = 8;
+  const clients = Array.from({ length: CONCURRENCY }, () => createConvexIngestClient());
+  const stats = { attached: 0, failed: 0 };
+  let i = 0;
+  await Promise.all(clients.map(async (client) => {
+    while (i < toDo.length) {
+      const { c, ext, docId } = toDo[i++];
+      const contentType = ext === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      try {
+        const storageId = await convexUploadFile(client, fs.readFileSync(c.absPath), contentType);
+        await convexSetStorageId(client, docId, storageId);
+        stats.attached++;
+        logLine({ relPath: c.relPath, status: 'attached', docId, storageId });
+      } catch (err) {
+        stats.failed++;
+        logLine({ relPath: c.relPath, status: 'attach-failed', docId, error: String(err?.message ?? err) });
+      }
+      if ((stats.attached + stats.failed) % 250 === 0) {
+        console.log(`    ${stats.attached + stats.failed}/${toDo.length} · attached ${stats.attached} · failed ${stats.failed}`);
+      }
+    }
+  }));
+  console.log(`\n✅  Attached ${stats.attached}, failed ${stats.failed} (re-run to retry failures)`);
+  console.log(`    Log: ${logPath}`);
+}
+
 async function main() {
   console.log('📚  Law Reports Bulk Ingestion');
   console.log(`    Root: ${ROOT_DIR}`);
@@ -694,9 +747,14 @@ async function main() {
   // attempted in Supabase (regardless of status — never duplicate work
   // that already has a Supabase row) and (b) anything already in Convex from
   // a prior --target=convex run (idempotency).
+  if (ATTACH_ORIGINALS) {
+    await attachOriginals(winners);
+    return;
+  }
+
   const stats = { completed: 0, failed: 0, skipped: 0 };
   let pending = winners;
-  if (!FORCE) {
+  if (!FORCE && TARGET === 'supabase') {
     console.log('🔎  Checking already-completed documents in Supabase...');
     const supabasePaths = new Set();
     const pageSize = 1000;
@@ -723,14 +781,13 @@ async function main() {
     }
     console.log(`    ${supabasePaths.size} already in Supabase`);
     pending = winners.filter(c => !supabasePaths.has(buildStoragePath(c, getFinalExt(c))));
-
-    if (TARGET === 'convex') {
-      console.log('🔎  Checking already-ingested documents in Convex...');
-      const convexKeys = await convexListSourceKeys(convexIngest);
-      console.log(`    ${convexKeys.size} already in Convex`);
-      pending = pending.filter(c => !convexKeys.has(buildStoragePath(c, getFinalExt(c))));
-    }
-
+    stats.skipped = winners.length - pending.length;
+  }
+  if (!FORCE && TARGET === 'convex') {
+    console.log('🔎  Checking already-ingested documents in Convex...');
+    const convexDocs = await convexListSourceKeysPaged(convexIngest);
+    console.log(`    ${convexDocs.size} already in Convex`);
+    pending = pending.filter(c => convexDocs.get(buildStoragePath(c, getFinalExt(c)))?.ingestionStatus !== 'completed');
     stats.skipped = winners.length - pending.length;
   }
 

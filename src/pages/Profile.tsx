@@ -21,6 +21,7 @@ import Header from "../components/layout/Header";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
+import { uploadUserFile } from "../lib/userFiles";
 
 const ROLES = [
   { value: "lawyer", label: "Lawyer / Advocate" },
@@ -115,28 +116,11 @@ export default function Profile() {
     if (!avatarFile || !user) return null;
 
     try {
-      const fileExt = avatarFile.name.split(".").pop();
-      const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-      
-      console.log("Uploading avatar to:", fileName);
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, avatarFile, { upsert: true });
-
-      if (uploadError) {
-        console.error("Storage upload error:", uploadError);
-        throw uploadError;
-      }
-
-      console.log("Upload successful:", uploadData);
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
-
-      console.log("Public URL:", publicUrl);
-      return publicUrl;
+      // Avatars live in Convex storage; profiles.avatar_url keeps the file's
+      // long-lived URL, so everything that renders avatars stays unchanged.
+      const { url } = await uploadUserFile(avatarFile, "avatar");
+      if (!url) throw new Error("Upload succeeded but no file URL was returned");
+      return url;
     } catch (err) {
       console.error("Avatar upload failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";

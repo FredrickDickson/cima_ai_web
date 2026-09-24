@@ -15,7 +15,8 @@ import { requireUser } from "../_shared/auth.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/http-error.ts";
-import { optionalUUID, optionalUUIDArray, optionalDocumentIdArray, requireArray, optionalEnum } from "../_shared/validate.ts";
+import { optionalLibraryDocId, optionalDocumentIdArray, requireArray, optionalEnum } from "../_shared/validate.ts";
+import { searchLibraryChunks } from "../_shared/convex-library.ts";
 
 interface CitedSource {
   marker: string;
@@ -38,20 +39,14 @@ interface AccraRuleRow {
 
 async function fetchAccraRulesRows(query: string): Promise<AccraRuleRow[]> {
   if (!query) return [];
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return [];
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await supabase.rpc("search_legal_library_fts", {
-      search_query: query,
-      match_count: 4,
-    });
-    if (error || !data) return [];
-    return (data as AccraRuleRow[]).slice(0, 4);
-  } catch {
-    return [];
-  }
+  const hits = await searchLibraryChunks(query, { matchCount: 4 });
+  return hits.map((h) => ({
+    id: h.id,
+    title: h.source_name,
+    content: h.content,
+    citation: h.citation ?? "",
+    doc_id: h.doc_id,
+  }));
 }
 
 function formatAccraRulesContext(rows: AccraRuleRow[]): string {
@@ -122,8 +117,9 @@ Deno.serve(async (req: Request) => {
     });
     const context = optionalEnum(body.context, "context", CONTEXTS) ?? "general";
     const stream = body.stream === true;
-    const library_doc_id = optionalUUID(body.library_doc_id, "library_doc_id");
-    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    // Library doc ids are Convex ids (or pre-migration Supabase UUIDs).
+    const library_doc_id = optionalLibraryDocId(body.library_doc_id, "library_doc_id");
+    const library_doc_ids = optionalDocumentIdArray(body.library_doc_ids, "library_doc_ids");
     const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const user_id = verifiedUser.id;
 

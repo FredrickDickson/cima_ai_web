@@ -1,5 +1,5 @@
 // Shared jurisdiction label vocabulary for the Legal Library. Keys mirror the
-// lowercase country-name values already stored in `legal_library_documents.jurisdiction`
+// lowercase country-name values already stored in Convex `libraryDocuments.jurisdiction`
 // and used as keys in `supabase/functions/_shared/laws-africa.ts`'s COUNTRY_MAP,
 // so labels stay consistent with how the rest of the app (Laws.Africa lookups,
 // jurisdiction detection) already identifies countries.

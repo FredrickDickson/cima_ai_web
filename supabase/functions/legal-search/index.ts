@@ -44,7 +44,8 @@ Deno.serve(async (req: Request) => {
             return v;
           },
         });
-    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    // Library doc ids are Convex ids (or pre-migration Supabase UUIDs).
+    const library_doc_ids = optionalDocumentIdArray(body.library_doc_ids, "library_doc_ids");
     const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const user_id = verifiedUser.id;
 

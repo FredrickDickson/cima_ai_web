@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConvexProvider } from 'convex/react';
+import { ConvexProviderWithAuth } from 'convex/react';
 import { convex } from './lib/convexClient';
+import { useSupabaseAuthForConvex } from './lib/convexAuth';
 import { attemptChunkReload } from './lib/chunkReload';
 import App from './App.tsx';
 import './index.css';
@@ -14,8 +15,8 @@ window.addEventListener('vite:preloadError', () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ConvexProvider client={convex}>
+    <ConvexProviderWithAuth client={convex} useAuth={useSupabaseAuthForConvex}>
       <App />
-    </ConvexProvider>
+    </ConvexProviderWithAuth>
   </StrictMode>
 );

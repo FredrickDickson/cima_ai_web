@@ -18,7 +18,8 @@ import Header from "../components/layout/Header";
 import { supabase } from "../lib/supabase";
 import { convex } from "../lib/convexClient";
 import { api } from "../../convex/_generated/api";
-import type { LegalLibraryDocument, UnifiedLibraryDocument } from "../types/database";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { UnifiedLibraryDocument } from "../types/database";
 import { jurisdictionLabel } from "../lib/jurisdictions";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -45,14 +46,9 @@ function partyLabel(doc: UnifiedLibraryDocument): string {
   return doc.title;
 }
 
-function withSource(docs: LegalLibraryDocument[]): UnifiedLibraryDocument[] {
-  return docs.map((d) => ({ ...d, source: "supabase" }));
-}
-
-// Documents ingested after Supabase's free tier filled up live in Convex
-// instead — camelCase fields there get renamed to match LegalLibraryDocument's
-// snake_case shape so the rest of this component needs no source-specific
-// branching for display.
+// The whole library lives in Convex — camelCase fields get renamed to match
+// LegalLibraryDocument's snake_case shape so the display code below is
+// unchanged from when the library was split across Supabase and Convex.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convexDocToUnified(doc: any): UnifiedLibraryDocument {
   return {
@@ -77,21 +73,6 @@ function convexDocToUnified(doc: any): UnifiedLibraryDocument {
   };
 }
 
-// When browsing "All Jurisdictions", the grid groups results into contiguous
-// per-jurisdiction sections, so a merge of both backends' results must sort
-// by jurisdiction first (matching Supabase's own `.order("jurisdiction")` in
-// that mode) before falling back to decided_year — a plain year-only sort
-// would interleave jurisdictions and break the section grouping below.
-function mergeSort(docs: UnifiedLibraryDocument[], groupByJurisdiction: boolean): UnifiedLibraryDocument[] {
-  return [...docs].sort((a, b) => {
-    if (groupByJurisdiction) {
-      const j = a.jurisdiction.localeCompare(b.jurisdiction);
-      if (j !== 0) return j;
-    }
-    return (b.decided_year ?? -Infinity) - (a.decided_year ?? -Infinity);
-  });
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────
 
 export default function Library() {
@@ -101,12 +82,7 @@ export default function Library() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  // Convex uses cursor-based pagination, separate from Supabase's offset —
-  // "load more" tops up whichever source still has more, then re-merges.
-  // Known compromise: page boundaries won't be perfectly interleaved across
-  // a load-more click since the two sources paginate independently.
   const [convexCursor, setConvexCursor] = useState<string | null>(null);
-  const [convexDone, setConvexDone] = useState(false);
 
   const [sourceType, setSourceType] = useState<SourceTypeFilter>("all");
   const [court, setCourt] = useState<string>("all");
@@ -134,56 +110,31 @@ export default function Library() {
   const suggestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suggestionRequestId = useRef(0);
 
-  async function hydrateDocsByIds(ids: string[]): Promise<UnifiedLibraryDocument[]> {
-    if (ids.length === 0) return [];
-    const { data: rows } = await supabase
-      .from("legal_library_documents" as any)
-      .select("*")
-      .in("id", ids);
-    const byId = new Map(withSource((rows ?? []) as LegalLibraryDocument[]).map((r) => [r.id, r]));
-    return ids.map((id) => byId.get(id)).filter((d): d is UnifiedLibraryDocument => !!d);
-  }
-
-  async function convexSearchByTitle(query: string, matchCount: number): Promise<UnifiedLibraryDocument[]> {
+  async function convexSearchByTitle(
+    query: string,
+    matchCount: number,
+    filters: { withJurisdictionAndYear: boolean },
+  ): Promise<UnifiedLibraryDocument[]> {
     try {
       const results = await convex.query(api.libraryDocuments.searchByTitle, {
         searchQuery: query,
         sourceType: sourceType === "all" ? undefined : sourceType,
         court: court !== "all" ? court : undefined,
+        jurisdiction: filters.withJurisdictionAndYear && jurisdiction !== "all" ? jurisdiction : undefined,
+        decidedYear: filters.withJurisdictionAndYear && year.trim() ? Number(year.trim()) : undefined,
         matchCount,
       });
       return results.map(convexDocToUnified);
     } catch {
-      return []; // fail soft — Convex being unreachable shouldn't break Supabase-backed search
+      return [];
     }
   }
 
   // ─── Keyword / filtered fetch ─────────────────────────────────────────
 
-  async function fetchSupabasePage(offset: number) {
-    let query = supabase
-      .from("legal_library_documents" as any)
-      .select("*")
-      .eq("ingestion_status", "completed");
-
-    // When browsing "All Jurisdictions", order by jurisdiction first so
-    // same-jurisdiction rows stay contiguous across pages — the grid then
-    // renders a section header wherever the jurisdiction value changes,
-    // without needing separate paginated queries per jurisdiction.
-    if (jurisdiction === "all") {
-      query = query.order("jurisdiction", { ascending: true });
-    } else {
-      query = query.eq("jurisdiction", jurisdiction);
-    }
-    query = query.order("decided_year", { ascending: false, nullsFirst: false }).range(offset, offset + PAGE_SIZE - 1);
-
-    if (sourceType !== "all") query = query.eq("source_type", sourceType);
-    if (court !== "all") query = query.eq("court", court);
-    if (year.trim()) query = query.eq("decided_year", Number(year.trim()));
-
-    return query as unknown as Promise<{ data: LegalLibraryDocument[] | null; error: { message: string } | null }>;
-  }
-
+  // Newest decided year first; with "All Jurisdictions" the index keeps
+  // same-jurisdiction docs contiguous, so the grid can render a section header
+  // wherever the jurisdiction value changes.
   async function fetchConvexPage(cursor: string | null) {
     try {
       return await convex.query(api.libraryDocuments.list, {
@@ -199,51 +150,22 @@ export default function Library() {
   }
 
   async function loadJurisdictionCounts() {
-    const [{ data }, convexCounts] = await Promise.all([
-      supabase.rpc("get_library_jurisdiction_counts" as any, {
-        source_type_filter: sourceType === "all" ? null : sourceType,
-        court_filter: court === "all" ? null : court,
-        year_filter: year.trim() ? Number(year.trim()) : null,
-      }),
-      convex
-        .query(api.libraryDocuments.jurisdictionCounts, {
-          sourceType: sourceType === "all" ? undefined : sourceType,
-          court: court !== "all" ? court : undefined,
-          decidedYear: year.trim() ? Number(year.trim()) : undefined,
-        })
-        .catch(() => [] as { jurisdiction: string; count: number }[]),
-    ]);
-    const merged = new Map<string, number>();
-    for (const row of (data ?? []) as { jurisdiction: string; doc_count: number }[]) {
-      merged.set(row.jurisdiction, Number(row.doc_count));
-    }
-    for (const row of convexCounts) {
-      merged.set(row.jurisdiction, (merged.get(row.jurisdiction) ?? 0) + row.count);
-    }
-    setJurisdictionCounts(
-      Array.from(merged.entries()).map(([jurisdiction, doc_count]) => ({ jurisdiction, doc_count })),
-    );
+    const counts = await convex
+      .query(api.libraryDocuments.jurisdictionCounts, {
+        sourceType: sourceType === "all" ? undefined : sourceType,
+        court: court !== "all" ? court : undefined,
+        decidedYear: year.trim() ? Number(year.trim()) : undefined,
+      })
+      .catch(() => [] as { jurisdiction: string; count: number }[]);
+    setJurisdictionCounts(counts.map(({ jurisdiction, count }) => ({ jurisdiction, doc_count: count })));
   }
 
   async function runKeywordSearch(query: string) {
     const requestId = ++keywordRequestId.current;
     setKeywordLoading(true);
-    const [{ data }, convexResults] = await Promise.all([
-      supabase.rpc("search_legal_library_documents" as any, {
-        search_query: query,
-        source_type_filter: sourceType === "all" ? null : sourceType,
-        court_filter: court === "all" ? null : court,
-        year_filter: year.trim() ? Number(year.trim()) : null,
-        match_count: 60,
-        jurisdiction_filter: jurisdiction === "all" ? null : jurisdiction,
-      }),
-      convexSearchByTitle(query, 60),
-    ]);
+    const results = await convexSearchByTitle(query, 60, { withJurisdictionAndYear: true });
     if (requestId !== keywordRequestId.current) return; // stale response, a newer keystroke has since fired
-    const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
-    const hydrated = await hydrateDocsByIds(ids);
-    if (requestId !== keywordRequestId.current) return;
-    setKeywordDocs(mergeSort([...hydrated, ...convexResults], false));
+    setKeywordDocs(results);
     setKeywordLoading(false);
   }
 
@@ -252,14 +174,10 @@ export default function Library() {
     setLoading(true);
     setHasMore(true);
     setConvexCursor(null);
-    setConvexDone(false);
-    Promise.all([fetchSupabasePage(0), fetchConvexPage(null)]).then(([{ data, error }, convexPage]) => {
-      const supabaseDocs = error ? [] : withSource(data ?? []);
-      const convexDocs = convexPage.page.map(convexDocToUnified);
-      setDocuments(mergeSort([...supabaseDocs, ...convexDocs], jurisdiction === "all"));
-      setHasMore((data?.length ?? 0) === PAGE_SIZE || !convexPage.isDone);
-      setConvexCursor(convexPage.continueCursor);
-      setConvexDone(convexPage.isDone);
+    fetchConvexPage(null).then((page) => {
+      setDocuments(page.page.map(convexDocToUnified));
+      setHasMore(!page.isDone);
+      setConvexCursor(page.continueCursor);
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,20 +200,10 @@ export default function Library() {
   async function loadMore() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const supabaseCount = documents.filter((d) => d.source === "supabase").length;
-    const [{ data, error }, convexPage] = await Promise.all([
-      fetchSupabasePage(supabaseCount),
-      convexDone ? Promise.resolve(null) : fetchConvexPage(convexCursor),
-    ]);
-    const newSupabaseDocs = error ? [] : withSource(data ?? []);
-    const newConvexDocs = convexPage ? convexPage.page.map(convexDocToUnified) : [];
-    setDocuments((prev) => mergeSort([...prev, ...newSupabaseDocs, ...newConvexDocs], jurisdiction === "all"));
-    const supabaseHasMore = (data?.length ?? 0) === PAGE_SIZE;
-    if (convexPage) {
-      setConvexCursor(convexPage.continueCursor);
-      setConvexDone(convexPage.isDone);
-    }
-    setHasMore(supabaseHasMore || !(convexPage ? convexPage.isDone : convexDone));
+    const page = await fetchConvexPage(convexCursor);
+    setDocuments((prev) => [...prev, ...page.page.map(convexDocToUnified)]);
+    setConvexCursor(page.continueCursor);
+    setHasMore(!page.isDone);
     setLoadingMore(false);
   }
 
@@ -333,37 +241,22 @@ export default function Library() {
         return;
       }
       const data = await res.json();
-      // legal-search merges Supabase + Convex chunk hits and tags each with
-      // `source` (see supabase/functions/_shared/legal-retrieval.ts) — split
-      // so each backend's doc IDs get hydrated from the right place.
-      const sources: { doc_id?: string; source?: "supabase" | "convex" }[] = data.sources ?? [];
-      const orderedRefs = [
-        ...new Map(
-          sources
-            .filter((s): s is { doc_id: string; source?: "supabase" | "convex" } => !!s.doc_id)
-            .map((s) => [s.doc_id, { id: s.doc_id, source: s.source ?? "supabase" }] as const),
-        ).values(),
+      // legal-search returns Convex chunk hits (see
+      // supabase/functions/_shared/legal-retrieval.ts); hydrate the distinct
+      // doc IDs, in rank order, into full cards.
+      const sources: { doc_id?: string; source?: string }[] = data.sources ?? [];
+      const orderedIds = [
+        ...new Set(sources.filter((s) => s.doc_id && s.source === "convex").map((s) => s.doc_id as string)),
       ];
-      if (orderedRefs.length === 0) {
+      if (orderedIds.length === 0) {
         setSemanticDocs([]);
         return;
       }
-      const supabaseIds = orderedRefs.filter((r) => r.source === "supabase").map((r) => r.id);
-      const convexIds = orderedRefs.filter((r) => r.source === "convex").map((r) => r.id);
-      const [{ data: rows }, convexDocs] = await Promise.all([
-        supabaseIds.length
-          ? supabase.from("legal_library_documents" as any).select("*").in("id", supabaseIds)
-          : Promise.resolve({ data: [] as LegalLibraryDocument[] }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        convexIds.length
-          ? convex.query(api.libraryDocuments.getManyByIds, { ids: convexIds as any }).catch(() => [])
-          : Promise.resolve([]),
-      ]);
-      const byId = new Map([
-        ...withSource((rows ?? []) as LegalLibraryDocument[]).map((r) => [r.id, r] as const),
-        ...convexDocs.map(convexDocToUnified).map((r) => [r.id, r] as const),
-      ]);
-      setSemanticDocs(orderedRefs.map((r) => byId.get(r.id)).filter((d): d is UnifiedLibraryDocument => !!d));
+      const convexDocs = await convex
+        .query(api.libraryDocuments.getManyByIds, { ids: orderedIds as Id<"libraryDocuments">[] })
+        .catch(() => []);
+      const byId = new Map(convexDocs.map(convexDocToUnified).map((r) => [r.id, r] as const));
+      setSemanticDocs(orderedIds.map((id) => byId.get(id)).filter((d): d is UnifiedLibraryDocument => !!d));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       setSemanticDocs([]);
@@ -376,18 +269,9 @@ export default function Library() {
 
   async function fetchSuggestions(query: string) {
     const requestId = ++suggestionRequestId.current;
-    const [{ data }, convexResults] = await Promise.all([
-      supabase.rpc("search_legal_library_documents" as any, {
-        search_query: query,
-        match_count: 8,
-      }),
-      convexSearchByTitle(query, 8),
-    ]);
+    const results = await convexSearchByTitle(query, 8, { withJurisdictionAndYear: false });
     if (requestId !== suggestionRequestId.current) return; // stale, a newer keystroke has since fired
-    const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
-    const hydrated = await hydrateDocsByIds(ids);
-    if (requestId !== suggestionRequestId.current) return;
-    setSuggestions(mergeSort([...hydrated, ...convexResults], false).slice(0, 8));
+    setSuggestions(results);
     setActiveSuggestion(0);
   }
 

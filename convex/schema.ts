@@ -26,6 +26,10 @@ export default defineSchema({
     // buildStoragePath() in scripts/ingest-law-reports.mjs) — lets ingestion
     // re-run idempotently against Convex the same way it does against Supabase.
     sourceKey: v.string(),
+    // Supabase legal_library_documents.id for docs copied over by
+    // scripts/migrate-legal-library-to-convex.mjs — keeps old /library/:uuid
+    // links and stored citations resolvable after the Supabase tables are dropped.
+    legacyId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -33,10 +37,35 @@ export default defineSchema({
     .index("by_sourceType", ["sourceType"])
     .index("by_ingestionStatus", ["ingestionStatus"])
     .index("by_sourceKey", ["sourceKey"])
+    .index("by_legacyId", ["legacyId"])
+    // Library browse order: newest decided year first, optionally within one
+    // jurisdiction (mirrors the old Supabase .order("decided_year", desc)).
+    .index("by_ingestionStatus_and_jurisdiction_and_decidedYear", [
+      "ingestionStatus",
+      "jurisdiction",
+      "decidedYear",
+    ])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["sourceType", "court", "decidedYear", "jurisdiction"],
     }),
+
+  // Denormalized count of *completed* libraryDocuments per filter combination —
+  // kept in step by upsertDocument (same transaction), so the Library sidebar's
+  // jurisdiction counts read a few hundred rows instead of every document.
+  // Rebuilt from scratch by scripts/rebuild-library-counts.mjs.
+  libraryCounts: defineTable({
+    jurisdiction: v.string(),
+    sourceType: v.string(),
+    court: v.string(), // "" when the doc has no court (e.g. legislation)
+    decidedYear: v.optional(v.number()),
+    count: v.number(),
+  }).index("by_jurisdiction_and_sourceType_and_court_and_decidedYear", [
+    "jurisdiction",
+    "sourceType",
+    "court",
+    "decidedYear",
+  ]),
 
   libraryChunks: defineTable({
     docId: v.id("libraryDocuments"),
@@ -44,7 +73,10 @@ export default defineSchema({
     title: v.string(),
     citation: v.optional(v.string()),
     content: v.string(),
-    embedding: v.array(v.float64()), // 384-dim, BAAI/bge-small-en-v1.5 — same model as Supabase
+    // 384-dim, BAAI/bge-small-en-v1.5 — same model as Supabase. Optional because
+    // some migrated Supabase rows have no embedding; the vector index simply
+    // skips those, and full-text search still covers them.
+    embedding: v.optional(v.array(v.float64())),
     sourceType: v.string(),
     jurisdiction: v.string(),
   })
@@ -58,6 +90,23 @@ export default defineSchema({
       searchField: "content",
       filterFields: ["jurisdiction", "sourceType"],
     }),
+
+  // ─── User files (replaces the Supabase `documents` / `avatars` /
+  // `legal-documents` storage buckets) ────────────────────────────────────
+  // The bytes live in Convex storage; Supabase rows reference them as
+  // "convex:<storageId>.<ext>" (documents.storage_path, ghana_laws.file_path)
+  // or by URL (profiles.avatar_url). See convex/userFiles.ts.
+  userFiles: defineTable({
+    ownerId: v.string(), // Supabase auth.users.id, verified from the caller's access token
+    storageId: v.id("_storage"),
+    name: v.string(),
+    contentType: v.optional(v.string()),
+    size: v.number(),
+    kind: v.union(v.literal("document"), v.literal("contract"), v.literal("avatar"), v.literal("admin")),
+    createdAt: v.number(),
+  })
+    .index("by_storageId", ["storageId"])
+    .index("by_ownerId", ["ownerId"]),
 
   // ─── Large user-uploaded documents (>~2,000 pages) ──────────────────────
   // Separate from libraryDocuments/libraryChunks (the legal-library corpus)

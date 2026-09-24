@@ -1,7 +1,46 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery, type MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { requireIngestSecret } from "./lib/ingestAuth";
+
+// Upper bound on libraryCounts rows read per query (jurisdictions × types ×
+// courts × years is a few hundred today).
+const MAX_COUNT_ROWS = 5000;
+
+type CountKey = Pick<Doc<"libraryDocuments">, "jurisdiction" | "sourceType" | "court" | "decidedYear">;
+
+// Adds `delta` to the libraryCounts row for this doc's filter combination.
+// Only completed docs are counted — that's all the Library shows.
+async function adjustCount(
+  ctx: MutationCtx,
+  doc: CountKey & { ingestionStatus: Doc<"libraryDocuments">["ingestionStatus"] },
+  delta: number,
+) {
+  if (doc.ingestionStatus !== "completed" || delta === 0) return;
+  const court = doc.court ?? "";
+  const row = await ctx.db
+    .query("libraryCounts")
+    .withIndex("by_jurisdiction_and_sourceType_and_court_and_decidedYear", (q) =>
+      q
+        .eq("jurisdiction", doc.jurisdiction)
+        .eq("sourceType", doc.sourceType)
+        .eq("court", court)
+        .eq("decidedYear", doc.decidedYear),
+    )
+    .unique();
+  if (row) {
+    await ctx.db.patch(row._id, { count: row.count + delta });
+  } else {
+    await ctx.db.insert("libraryCounts", {
+      jurisdiction: doc.jurisdiction,
+      sourceType: doc.sourceType,
+      court,
+      ...(doc.decidedYear !== undefined ? { decidedYear: doc.decidedYear } : {}),
+      count: delta,
+    });
+  }
+}
 
 export const libraryDocumentValidator = v.object({
   _id: v.id("libraryDocuments"),
@@ -26,13 +65,17 @@ export const libraryDocumentValidator = v.object({
   ),
   errorMessage: v.optional(v.string()),
   sourceKey: v.string(),
+  legacyId: v.optional(v.string()),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
 
-// Paginated browse/filter list — mirrors Library.tsx's fetchPage() against
-// Supabase's legal_library_documents (source_type/court/decided_year/jurisdiction
-// filters, ingestion_status = 'completed').
+// Paginated browse/filter list — mirrors the old Supabase browse query
+// (ingestion_status = 'completed', newest decided_year first, optional
+// source_type/court/decided_year/jurisdiction filters). Filters run *before*
+// paginate() so each page is full rather than a filtered-down page of 30.
+// With no jurisdiction, the index keeps same-jurisdiction docs contiguous so
+// Library.tsx's per-jurisdiction section headers still work.
 export const list = query({
   args: {
     jurisdiction: v.optional(v.string()),
@@ -43,34 +86,35 @@ export const list = query({
   },
   returns: paginationResultValidator(libraryDocumentValidator),
   handler: async (ctx, args) => {
-    const base = args.jurisdiction
-      ? ctx.db
-          .query("libraryDocuments")
-          .withIndex("by_jurisdiction", (q) => q.eq("jurisdiction", args.jurisdiction!))
-      : ctx.db
-          .query("libraryDocuments")
-          .withIndex("by_ingestionStatus", (q) => q.eq("ingestionStatus", "completed"));
+    const { jurisdiction, sourceType, court, decidedYear } = args;
+    const ordered = ctx.db
+      .query("libraryDocuments")
+      .withIndex("by_ingestionStatus_and_jurisdiction_and_decidedYear", (q) => {
+        const completed = q.eq("ingestionStatus", "completed");
+        if (!jurisdiction) return completed;
+        const inJurisdiction = completed.eq("jurisdiction", jurisdiction);
+        return decidedYear !== undefined ? inJurisdiction.eq("decidedYear", decidedYear) : inJurisdiction;
+      })
+      .order("desc");
 
-    const page = await base.order("desc").paginate(args.paginationOpts);
+    const filtered =
+      sourceType || court || (decidedYear !== undefined && !jurisdiction)
+        ? ordered.filter((q) =>
+            q.and(
+              sourceType ? q.eq(q.field("sourceType"), sourceType) : true,
+              court ? q.eq(q.field("court"), court) : true,
+              decidedYear !== undefined && !jurisdiction ? q.eq(q.field("decidedYear"), decidedYear) : true,
+            ),
+          )
+        : ordered;
 
-    return {
-      ...page,
-      page: page.page.filter(
-        (d) =>
-          d.ingestionStatus === "completed" &&
-          (!args.sourceType || d.sourceType === args.sourceType) &&
-          (!args.court || d.court === args.court) &&
-          (!args.decidedYear || d.decidedYear === args.decidedYear),
-      ),
-    };
+    return await filtered.paginate(args.paginationOpts);
   },
 });
 
 // Sidebar jurisdiction counts — mirrors get_library_jurisdiction_counts.
-// v1 scope note: reads the completed-docs index and groups in JS. Fine while
-// the Convex-hosted corpus (only "remaining" docs, per the migration plan) is
-// modest; if it grows large, replace with @convex-dev/aggregate rather than
-// widening this collect().
+// Reads the small libraryCounts table (one row per jurisdiction/type/court/
+// year combination) rather than every document.
 export const jurisdictionCounts = query({
   args: {
     sourceType: v.optional(v.string()),
@@ -79,41 +123,47 @@ export const jurisdictionCounts = query({
   },
   returns: v.array(v.object({ jurisdiction: v.string(), count: v.number() })),
   handler: async (ctx, args) => {
-    const docs = await ctx.db
-      .query("libraryDocuments")
-      .withIndex("by_ingestionStatus", (q) => q.eq("ingestionStatus", "completed"))
-      .collect();
-
+    const rows = await ctx.db.query("libraryCounts").take(MAX_COUNT_ROWS);
     const counts = new Map<string, number>();
-    for (const d of docs) {
-      if (args.sourceType && d.sourceType !== args.sourceType) continue;
-      if (args.court && d.court !== args.court) continue;
-      if (args.decidedYear && d.decidedYear !== args.decidedYear) continue;
-      counts.set(d.jurisdiction, (counts.get(d.jurisdiction) ?? 0) + 1);
+    for (const r of rows) {
+      if (args.sourceType && r.sourceType !== args.sourceType) continue;
+      if (args.court && r.court !== args.court) continue;
+      if (args.decidedYear !== undefined && r.decidedYear !== args.decidedYear) continue;
+      counts.set(r.jurisdiction, (counts.get(r.jurisdiction) ?? 0) + r.count);
     }
-    return Array.from(counts.entries()).map(([jurisdiction, count]) => ({ jurisdiction, count }));
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 0)
+      .map(([jurisdiction, count]) => ({ jurisdiction, count }));
   },
 });
 
 // Title/citation/court keyword search — mirrors search_legal_library_documents.
+// court/jurisdiction/decidedYear are search-index filter fields, so they narrow
+// the search itself instead of trimming an already-capped result list.
 export const searchByTitle = query({
   args: {
     searchQuery: v.string(),
     sourceType: v.optional(v.union(v.literal("case"), v.literal("statute"))),
     court: v.optional(v.string()),
+    jurisdiction: v.optional(v.string()),
+    decidedYear: v.optional(v.number()),
     matchCount: v.optional(v.number()),
   },
   returns: v.array(libraryDocumentValidator),
   handler: async (ctx, args) => {
-    const sourceType = args.sourceType;
-    const q = ctx.db
+    const { sourceType, court, jurisdiction, decidedYear } = args;
+    const results = await ctx.db
       .query("libraryDocuments")
       .withSearchIndex("search_title", (sq) => {
-        const base = sq.search("title", args.searchQuery);
-        return sourceType ? base.eq("sourceType", sourceType) : base;
-      });
-    const results = await q.take(args.matchCount ?? 10);
-    return args.court ? results.filter((d) => d.court === args.court) : results;
+        let base = sq.search("title", args.searchQuery);
+        if (sourceType) base = base.eq("sourceType", sourceType);
+        if (court) base = base.eq("court", court);
+        if (jurisdiction) base = base.eq("jurisdiction", jurisdiction);
+        if (decidedYear !== undefined) base = base.eq("decidedYear", decidedYear);
+        return base;
+      })
+      .take(args.matchCount ?? 10);
+    return results.filter((d) => d.ingestionStatus === "completed");
   },
 });
 
@@ -217,6 +267,41 @@ export const getChunksPage = query({
   },
 });
 
+// Resolves a Supabase legal_library_documents UUID (old /library/:uuid links,
+// stored citations) to the migrated Convex doc.
+export const getByLegacyId = query({
+  args: { legacyId: v.string() },
+  returns: v.union(libraryDocumentValidator, v.null()),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("libraryDocuments")
+      .withIndex("by_legacyId", (q) => q.eq("legacyId", args.legacyId))
+      .unique();
+  },
+});
+
+// For convex/http.ts's edge-function routes: resolves each id — a Convex id or
+// an old Supabase UUID — to its doc, preserving input order and dropping
+// unknown ids. Edge functions only ever hold string ids from the browser.
+export const resolveMany = internalQuery({
+  args: { ids: v.array(v.string()) },
+  returns: v.array(libraryDocumentValidator),
+  handler: async (ctx, args) => {
+    const out = [];
+    for (const raw of args.ids.slice(0, 100)) {
+      const id = ctx.db.normalizeId("libraryDocuments", raw);
+      const doc = id
+        ? await ctx.db.get(id)
+        : await ctx.db
+            .query("libraryDocuments")
+            .withIndex("by_legacyId", (q) => q.eq("legacyId", raw))
+            .unique();
+      if (doc) out.push(doc);
+    }
+    return out;
+  },
+});
+
 export const getFileUrl = query({
   args: { storageId: v.id("_storage") },
   returns: v.union(v.string(), v.null()),
@@ -234,6 +319,61 @@ export const listSourceKeys = query({
     requireIngestSecret(args.secret);
     const docs = await ctx.db.query("libraryDocuments").collect();
     return docs.map((d) => d.sourceKey);
+  },
+});
+
+// Paginated alternative to listSourceKeys — that one collect()s the whole
+// table, which stops fitting in one query's read limits once the full
+// Supabase corpus (~18k docs) has been migrated.
+export const listSourceKeysPage = query({
+  args: { secret: v.string(), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      _id: v.id("libraryDocuments"),
+      sourceKey: v.string(),
+      ingestionStatus: libraryDocumentValidator.fields.ingestionStatus,
+      hasLegacyId: v.boolean(),
+      hasStorageId: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    const page = await ctx.db.query("libraryDocuments").paginate(args.paginationOpts);
+    return {
+      ...page,
+      page: page.page.map((d) => ({
+        _id: d._id,
+        sourceKey: d.sourceKey,
+        ingestionStatus: d.ingestionStatus,
+        hasLegacyId: d.legacyId !== undefined,
+        hasStorageId: d.storageId !== undefined,
+      })),
+    };
+  },
+});
+
+// Back-links a doc that was already in Convex before the migration (ingested
+// straight into Convex) to its Supabase twin's UUID, so old links resolve.
+export const setLegacyId = mutation({
+  args: { secret: v.string(), docId: v.id("libraryDocuments"), legacyId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    await ctx.db.patch(args.docId, { legacyId: args.legacyId, updatedAt: Date.now() });
+    return null;
+  },
+});
+
+// Attaches an original file (uploaded via files.generateUploadUrl) to an
+// already-migrated doc — used by the storage backfill, which runs after the
+// text/chunks have been copied.
+export const setStorageId = mutation({
+  args: { secret: v.string(), docId: v.id("libraryDocuments"), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    await ctx.db.patch(args.docId, { storageId: args.storageId, updatedAt: Date.now() });
+    return null;
   },
 });
 
@@ -260,6 +400,7 @@ export const upsertDocument = mutation({
     ),
     errorMessage: v.optional(v.string()),
     sourceKey: v.string(),
+    legacyId: v.optional(v.string()),
   },
   returns: v.id("libraryDocuments"),
   handler: async (ctx, args) => {
@@ -273,9 +414,52 @@ export const upsertDocument = mutation({
       .unique();
 
     if (existing) {
+      await adjustCount(ctx, existing, -1);
       await ctx.db.patch(existing._id, { ...fields, updatedAt: now });
+      await adjustCount(ctx, { ...existing, ...fields }, 1);
       return existing._id;
     }
-    return await ctx.db.insert("libraryDocuments", { ...fields, createdAt: now, updatedAt: now });
+    const docId = await ctx.db.insert("libraryDocuments", { ...fields, createdAt: now, updatedAt: now });
+    await adjustCount(ctx, fields, 1);
+    return docId;
+  },
+});
+
+// ─── libraryCounts rebuild (see scripts/rebuild-library-counts.mjs) ────────
+// Two steps, driven one transaction at a time by the script: clear the table,
+// then fold in the documents page by page.
+
+export const clearCountsBatch = mutation({
+  args: { secret: v.string() },
+  returns: v.object({ deleted: v.number(), isDone: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    const rows = await ctx.db.query("libraryCounts").take(1000);
+    for (const r of rows) await ctx.db.delete(r._id);
+    return { deleted: rows.length, isDone: rows.length < 1000 };
+  },
+});
+
+export const accumulateCountsPage = mutation({
+  args: { secret: v.string(), paginationOpts: paginationOptsValidator },
+  returns: v.object({ counted: v.number(), isDone: v.boolean(), continueCursor: v.string() }),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    const page = await ctx.db
+      .query("libraryDocuments")
+      .withIndex("by_ingestionStatus", (q) => q.eq("ingestionStatus", "completed"))
+      .paginate(args.paginationOpts);
+    // Group within the page first so each counts row is touched once per page.
+    const grouped = new Map<string, { key: CountKey; n: number }>();
+    for (const d of page.page) {
+      const k = JSON.stringify([d.jurisdiction, d.sourceType, d.court ?? "", d.decidedYear ?? null]);
+      const g = grouped.get(k) ?? { key: d, n: 0 };
+      g.n++;
+      grouped.set(k, g);
+    }
+    for (const { key, n } of grouped.values()) {
+      await adjustCount(ctx, { ...key, ingestionStatus: "completed" }, n);
+    }
+    return { counted: page.page.length, isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });

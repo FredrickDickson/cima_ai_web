@@ -9,6 +9,7 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse, HttpError } from "../_shared/http-error.ts";
 import { requireString, optionalString, optionalUUID, optionalUUIDArray, optionalDocumentIdArray, requireArray } from "../_shared/validate.ts";
+import { searchLibraryChunks } from "../_shared/convex-library.ts";
 
 interface CitedSource {
   marker: string;
@@ -31,16 +32,14 @@ interface AccraRuleRow {
 
 async function fetchAccraRulesRows(query: string, supabase: ReturnType<typeof createClient>): Promise<AccraRuleRow[]> {
   if (!query) return [];
-  try {
-    const { data, error } = await supabase.rpc("search_legal_library_fts", {
-      search_query: query,
-      match_count: 4,
-    });
-    if (error || !data) return [];
-    return (data as AccraRuleRow[]).slice(0, 4);
-  } catch {
-    return [];
-  }
+  const hits = await searchLibraryChunks(query, { matchCount: 4 });
+  return hits.map((h) => ({
+    id: h.id,
+    title: h.source_name,
+    content: h.content,
+    citation: h.citation ?? "",
+    doc_id: h.doc_id,
+  }));
 }
 
 function formatAccraRulesContext(rows: AccraRuleRow[]): string {
@@ -148,7 +147,8 @@ Deno.serve(async (req: Request) => {
     const custom_instructions = optionalString(body.custom_instructions, "custom_instructions", 4000);
     const case_id = optionalUUID(body.case_id, "case_id");
     const template_id = optionalUUID(body.template_id, "template_id");
-    const library_doc_ids = optionalUUIDArray(body.library_doc_ids, "library_doc_ids");
+    // Library doc ids are Convex ids (or pre-migration Supabase UUIDs).
+    const library_doc_ids = optionalDocumentIdArray(body.library_doc_ids, "library_doc_ids");
     const document_ids = optionalDocumentIdArray(body.document_ids, "document_ids");
     const tagged_authorities = body.tagged_authorities === undefined
       ? undefined

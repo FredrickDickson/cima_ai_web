@@ -20,6 +20,7 @@ import type * as lib_sanitizeText from "../lib/sanitizeText.js";
 import type * as lib_textChunking from "../lib/textChunking.js";
 import type * as libraryChunks from "../libraryChunks.js";
 import type * as libraryDocuments from "../libraryDocuments.js";
+import type * as userFiles from "../userFiles.js";
 
 import type {
   ApiFromModules,
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   "lib/textChunking": typeof lib_textChunking;
   libraryChunks: typeof libraryChunks;
   libraryDocuments: typeof libraryDocuments;
+  userFiles: typeof userFiles;
 }>;
 
 /**

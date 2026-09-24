@@ -29,6 +29,24 @@ export async function convexListSourceKeys({ client, secret }) {
   return new Set(keys);
 }
 
+// Paginated variant for large corpora — returns Map<sourceKey, {_id,
+// ingestionStatus, hasLegacyId, hasStorageId}> so callers can resume
+// half-finished docs or attach missing original files.
+export async function convexListSourceKeysPaged({ client, secret }) {
+  const out = new Map();
+  let cursor = null;
+  for (;;) {
+    const res = await client.query(api.libraryDocuments.listSourceKeysPage, {
+      secret,
+      paginationOpts: { numItems: 1000, cursor },
+    });
+    for (const row of res.page) out.set(row.sourceKey, row);
+    if (res.isDone) break;
+    cursor = res.continueCursor;
+  }
+  return out;
+}
+
 export async function convexUploadFile({ client, secret }, buffer, contentType) {
   const uploadUrl = await client.mutation(api.files.generateUploadUrl, { secret });
   const res = await fetch(uploadUrl, {
@@ -41,11 +59,15 @@ export async function convexUploadFile({ client, secret }, buffer, contentType) 
   return storageId;
 }
 
+export async function convexSetStorageId({ client, secret }, docId, storageId) {
+  await client.mutation(api.libraryDocuments.setStorageId, { secret, docId, storageId });
+}
+
 export async function convexUpsertDocument({ client, secret }, fields) {
   return await client.mutation(api.libraryDocuments.upsertDocument, { secret, ...fields });
 }
 
-export async function convexReplaceChunks({ client, secret }, docId, chunks) {
+export async function convexReplaceChunks({ client, secret }, docId, chunks, batchSize = 500) {
   // Paginated delete first, then batched insert — both bounded well under
   // Convex's per-mutation transaction limits regardless of document size
   // (see convex/libraryChunks.ts for why this used to be a single collect()
@@ -57,7 +79,7 @@ export async function convexReplaceChunks({ client, secret }, docId, chunks) {
     cursor = res.continueCursor;
   }
 
-  const BATCH = 500;
+  const BATCH = batchSize;
   let inserted = 0;
   for (let i = 0; i < chunks.length; i += BATCH) {
     inserted += await client.mutation(api.libraryChunks.insertBatch, {
