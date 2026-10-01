@@ -1,8 +1,9 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireIngestSecret } from "./lib/ingestAuth";
+import { MAX_UPLOAD_PARTS } from "./largeDocuments";
 
 const http = httpRouter();
 
@@ -30,8 +31,16 @@ http.route({
     const secretOrResponse = requireSecretFromBody(body);
     if (secretOrResponse instanceof Response) return secretOrResponse;
 
-    const uploadUrl = await ctx.storage.generateUploadUrl();
-    return Response.json({ uploadUrl });
+    // `count` URLs for a multi-part upload (see uploadParts in schema.ts);
+    // `uploadUrl` alone is kept for single-file callers.
+    const b = body as Record<string, unknown>;
+    const count = typeof b.count === "number" && Number.isInteger(b.count) ? b.count : 1;
+    if (count < 1 || count > MAX_UPLOAD_PARTS) {
+      return Response.json({ error: `\`count\` must be 1-${MAX_UPLOAD_PARTS}` }, { status: 400 });
+    }
+    const uploadUrls: string[] = [];
+    for (let i = 0; i < count; i++) uploadUrls.push(await ctx.storage.generateUploadUrl());
+    return Response.json({ uploadUrl: uploadUrls[0], uploadUrls });
   }),
 });
 
@@ -48,16 +57,31 @@ http.route({
     const secret = secretOrResponse;
     const b = body as Record<string, unknown>;
 
-    if (typeof b.ownerId !== "string" || typeof b.name !== "string" || typeof b.storageId !== "string") {
-      return Response.json({ error: "`ownerId`, `name`, and `storageId` (strings) are required" }, { status: 400 });
+    // `storageIds`: the file's parts in order; `storageId`: a single-file upload.
+    const storageIds = Array.isArray(b.storageIds) ? b.storageIds : typeof b.storageId === "string" ? [b.storageId] : null;
+    if (
+      typeof b.ownerId !== "string" ||
+      typeof b.name !== "string" ||
+      !storageIds ||
+      !storageIds.every((id): id is string => typeof id === "string")
+    ) {
+      return Response.json(
+        { error: "`ownerId`, `name`, and `storageIds` (string[]) or `storageId` are required" },
+        { status: 400 },
+      );
     }
 
-    const docId = await ctx.runMutation(api.largeDocuments.create, {
-      secret,
-      ownerId: b.ownerId,
-      name: b.name,
-      storageId: b.storageId as any,
-    });
+    let docId: Id<"largeDocuments">;
+    try {
+      docId = await ctx.runMutation(api.largeDocuments.create, {
+        secret,
+        ownerId: b.ownerId,
+        name: b.name,
+        storageIds: storageIds as Id<"_storage">[],
+      });
+    } catch (err) {
+      return Response.json({ error: err instanceof Error ? err.message : "Invalid upload" }, { status: 400 });
+    }
     await ctx.scheduler.runAfter(0, internal.largeDocumentIngestion.startSharding, { docId });
 
     return Response.json({ docId });
@@ -77,21 +101,31 @@ http.route({
     if (secretOrResponse instanceof Response) return secretOrResponse;
     const b = body as Record<string, unknown>;
 
-    if (typeof b.docId !== "string" || typeof b.query !== "string") {
-      return Response.json({ error: "`docId` and `query` (strings) are required" }, { status: 400 });
+    if (typeof b.docId !== "string" || typeof b.ownerId !== "string") {
+      return Response.json({ error: "`docId` and `ownerId` (strings) are required" }, { status: 400 });
     }
-    const matchCount = typeof b.matchCount === "number" ? b.matchCount : 6;
+    const query = typeof b.query === "string" ? b.query : "";
+    const matchCount = typeof b.matchCount === "number" ? Math.min(Math.max(1, b.matchCount), 20) : 6;
 
-    const doc = await ctx.runQuery(api.largeDocuments.get, { docId: b.docId as any });
-    if (!doc) {
+    // Not a Convex id at all (e.g. a stray UUID) → simply not found here.
+    const doc = await ctx
+      .runQuery(api.largeDocuments.get, { docId: b.docId as Id<"largeDocuments"> })
+      .catch(() => null);
+    // The caller (tagged-authorities.ts) runs with service-role trust and
+    // passes the verified Supabase user id — this check is what stops a
+    // tampered document id from pulling another user's document text.
+    if (!doc || doc.ownerId !== b.ownerId) {
       return Response.json({ found: false });
     }
 
-    const chunks = await ctx.runQuery(internal.documentChunks.fullTextSearch, {
-      docId: b.docId as any,
-      searchQuery: b.query,
-      matchCount,
-    });
+    // Convex full-text search considers at most 16 terms.
+    const searchQuery = query.split(/\s+/).filter(Boolean).slice(0, 16).join(" ");
+    let chunks = searchQuery
+      ? await ctx.runQuery(internal.documentChunks.fullTextSearch, { docId: doc._id, searchQuery, matchCount })
+      : [];
+    if (chunks.length === 0) {
+      chunks = await ctx.runQuery(internal.documentChunks.firstChunks, { docId: doc._id, count: matchCount });
+    }
 
     return Response.json({
       found: true,

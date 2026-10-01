@@ -26,6 +26,14 @@ Deno.serve(async (req: Request) => {
 
     await enforceRateLimit(supabase, verifiedUser.id, "get-large-document-upload-url", 10, 60);
 
+    // How many upload URLs: the browser uploads big files as ~8MB parts,
+    // since each Convex upload request must finish within 2 minutes.
+    const body = await req.json().catch(() => ({}));
+    const count = body?.count === undefined ? 1 : body.count;
+    if (!Number.isInteger(count) || count < 1 || count > 256) {
+      throw new HttpError(400, "count must be an integer from 1 to 256");
+    }
+
     const convexSiteUrl = Deno.env.get("CONVEX_SITE_URL");
     const ingestSecret = Deno.env.get("INGEST_SECRET");
     if (!convexSiteUrl || !ingestSecret) {
@@ -35,14 +43,14 @@ Deno.serve(async (req: Request) => {
     const res = await fetch(`${convexSiteUrl}/generateLargeDocumentUploadUrl`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: ingestSecret }),
+      body: JSON.stringify({ secret: ingestSecret, count }),
     });
     if (!res.ok) {
       throw new HttpError(502, `Failed to get an upload URL (${res.status})`);
     }
-    const { uploadUrl } = await res.json();
+    const { uploadUrl, uploadUrls } = await res.json();
 
-    return new Response(JSON.stringify({ uploadUrl }), {
+    return new Response(JSON.stringify({ uploadUrl, uploadUrls: uploadUrls ?? [uploadUrl] }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (error) {

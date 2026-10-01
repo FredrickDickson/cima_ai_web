@@ -24,13 +24,18 @@ export async function searchAuthorities(
   const q = query.trim();
   if (!q) return [];
 
-  const [libDocs, docIdsRes] = await Promise.all([
+  const [libDocs, docIdsRes, largeDocs] = await Promise.all([
     convex
       .query(api.libraryDocuments.searchByTitle, { searchQuery: q, matchCount: limit })
       .catch(() => []),
     userId
       ? supabase.rpc("search_documents" as any, { search_query: q, match_count: limit })
       : Promise.resolve({ data: [] as { id: string }[] }),
+    // Large (500+ page) uploads live in Convex, scoped to the signed-in
+    // user by their Supabase session (see convex/largeDocuments.ts).
+    userId
+      ? convex.query(api.largeDocuments.searchMine, { searchQuery: q, matchCount: limit }).catch(() => [])
+      : Promise.resolve([]),
   ]);
 
   const libResults: AuthoritySearchResult[] = libDocs.map((d) => ({
@@ -53,5 +58,11 @@ export async function searchAuthorities(
       .map((id) => ({ id, type: "document" as AuthorityType, label: byId.get(id) as string }));
   }
 
-  return [...libResults, ...docResults];
+  // Errored uploads have nothing to retrieve; still-processing ones are
+  // tagged fine — retrieval covers the pages processed so far.
+  const largeResults: AuthoritySearchResult[] = largeDocs
+    .filter((d) => d.status !== "error")
+    .map((d) => ({ id: d._id, type: "document" as AuthorityType, label: d.name }));
+
+  return [...libResults, ...docResults, ...largeResults];
 }

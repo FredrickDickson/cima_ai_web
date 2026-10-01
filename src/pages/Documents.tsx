@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "convex/react";
 import {
   AlertCircle,
   BookOpen,
@@ -37,6 +38,7 @@ import { useToast } from "../contexts/ToastContext";
 import type { DbDocument as DocType, DbDocumentFolder } from "../types/database";
 import { getPdfPageCount } from "../lib/fileUtils";
 import { deleteUserFile, getUserFileUrl, isConvexFileRef, uploadUserFile } from "../lib/userFiles";
+import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { LargeDocumentProgress } from "../components/documents/LargeDocumentProgress";
 
@@ -46,6 +48,15 @@ import { LargeDocumentProgress } from "../components/documents/LargeDocumentProg
 // large-document pipeline extracted a full 20,000-page document in ~57s.
 // See the large-document ingestion plan.
 const LARGE_DOCUMENT_PAGE_THRESHOLD = 500;
+// Server-side extraction streams the PDF into PDFium's memory inside a
+// 512MB Convex action; a 146MB, 20,000-page PDF peaked at ~370MB there.
+const LARGE_DOCUMENT_MAX_BYTES = 150 * 1024 * 1024;
+// Small enough that one part finishes inside Convex's 2-minute upload
+// window even at ~1 Mbps.
+const LARGE_DOCUMENT_PART_BYTES = 8 * 1024 * 1024;
+const UPLOAD_CONCURRENCY = 3;
+const UPLOAD_PART_RETRIES = 3;
+const UPLOAD_SPARE_URLS = 4;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,10 +189,16 @@ export default function Documents() {
 
   // Large PDFs (routed away from browser-based extraction — see
   // getPdfPageCount/LARGE_DOCUMENT_PAGE_THRESHOLD below) being processed by
-  // the Convex large-document pipeline. Tracked client-side per session so
-  // the progress UI (see the render section) can subscribe to each one's
-  // live status via Convex's useQuery.
-  const [largeDocIds, setLargeDocIds] = useState<Id<"largeDocuments">[]>([]);
+  // the Convex large-document pipeline. Listed from Convex (owner = the
+  // signed-in user) so they survive a page reload — a 20,000-page document
+  // takes several minutes — and each card subscribes to its own live status.
+  // Dismissing only hides a card for this session.
+  const myLargeDocs = useQuery(api.largeDocuments.listMine);
+  const [hiddenLargeDocIds, setHiddenLargeDocIds] = useState<Id<"largeDocuments">[]>([]);
+  const largeDocIds = useMemo(
+    () => (myLargeDocs ?? []).map((d) => d._id).filter((id) => !hiddenLargeDocIds.includes(id)),
+    [myLargeDocs, hiddenLargeDocIds],
+  );
 
   // ── Filter / Navigation ───────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<Section>("all");
@@ -236,6 +253,8 @@ export default function Documents() {
     caseId: "",
   });
   const [uploading, setUploading] = useState(false);
+  // Percent of a large (multi-part) upload sent so far; null when none is running.
+  const [largeUploadProgress, setLargeUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -591,33 +610,82 @@ export default function Documents() {
       Authorization: `Bearer ${session?.access_token}`,
     };
 
-    showToast(`"${docName}" is a large document — processing it in the background, this can take a few minutes.`, "info");
+    if (file.size > LARGE_DOCUMENT_MAX_BYTES) {
+      throw new Error(
+        `This PDF is ${Math.round(file.size / 1048576)}MB — the limit is ${LARGE_DOCUMENT_MAX_BYTES / 1048576}MB. Try splitting it into volumes.`,
+      );
+    }
 
-    const urlRes = await fetch(`${supabaseUrl}/functions/v1/get-large-document-upload-url`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({}),
-    });
-    if (!urlRes.ok) throw new Error(`Failed to start large-document upload (${urlRes.status})`);
-    const { uploadUrl } = await urlRes.json();
+    async function getUploadUrls(count: number): Promise<string[]> {
+      const res = await fetch(`${supabaseUrl}/functions/v1/get-large-document-upload-url`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ count }),
+      });
+      if (!res.ok) throw new Error(`Failed to start large-document upload (${res.status})`);
+      const { uploadUrls } = (await res.json()) as { uploadUrls: string[] };
+      return uploadUrls;
+    }
 
-    const uploadRes = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type || "application/pdf" },
-      body: file,
-    });
-    if (!uploadRes.ok) throw new Error(`File upload failed (${uploadRes.status})`);
-    const { storageId } = await uploadRes.json();
+    // Each Convex upload request must finish within 2 minutes, so the file
+    // goes up in parts (reassembled server-side — see startSharding in
+    // convex/largeDocumentIngestion.ts). A few spare URLs cover retries
+    // without another round-trip: an upload URL is single-use.
+    const partCount = Math.max(1, Math.ceil(file.size / LARGE_DOCUMENT_PART_BYTES));
+    const urls = await getUploadUrls(Math.min(partCount + UPLOAD_SPARE_URLS, 256));
+    const nextUrl = async () => urls.pop() ?? (await getUploadUrls(1))[0];
+    // Pop from the end, so reverse first to keep spares last.
+    urls.reverse();
 
-    const createRes = await fetch(`${supabaseUrl}/functions/v1/create-large-document`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({ name: docName, storageId }),
-    });
-    if (!createRes.ok) throw new Error(`Failed to create document (${createRes.status})`);
-    const { docId } = await createRes.json();
+    const storageIds: string[] = new Array(partCount);
+    let partsDone = 0;
+    setLargeUploadProgress(0);
 
-    setLargeDocIds((prev) => [docId, ...prev]);
+    async function uploadPart(index: number) {
+      const part = file.slice(index * LARGE_DOCUMENT_PART_BYTES, (index + 1) * LARGE_DOCUMENT_PART_BYTES);
+      let lastError: unknown;
+      for (let attempt = 0; attempt <= UPLOAD_PART_RETRIES; attempt++) {
+        try {
+          const res = await fetch(await nextUrl(), {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: part,
+          });
+          if (!res.ok) throw new Error(`status ${res.status}`);
+          storageIds[index] = ((await res.json()) as { storageId: string }).storageId;
+          partsDone++;
+          setLargeUploadProgress(Math.round((partsDone / partCount) * 100));
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      throw new Error(
+        `File upload failed (part ${index + 1} of ${partCount}): ${lastError instanceof Error ? lastError.message : lastError}`,
+      );
+    }
+
+    try {
+      let nextPart = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(UPLOAD_CONCURRENCY, partCount) }, async () => {
+          while (nextPart < partCount) await uploadPart(nextPart++);
+        }),
+      );
+
+      const createRes = await fetch(`${supabaseUrl}/functions/v1/create-large-document`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ name: docName, storageIds }),
+      });
+      if (!createRes.ok) throw new Error(`Failed to create document (${createRes.status})`);
+      // No local bookkeeping needed: listMine picks the new document up reactively.
+      await createRes.json();
+    } finally {
+      setLargeUploadProgress(null);
+    }
+
+    showToast(`"${docName}" uploaded — processing it in the background, this can take a few minutes.`, "info");
   }
 
   async function handleDelete(doc: DocType) {
@@ -1483,7 +1551,7 @@ Provide a structured comparison covering:
                 <LargeDocumentProgress
                   key={docId}
                   docId={docId}
-                  onDismiss={() => setLargeDocIds((prev) => prev.filter((id) => id !== docId))}
+                  onDismiss={() => setHiddenLargeDocIds((prev) => [...prev, docId])}
                 />
               ))}
             </div>
@@ -2322,7 +2390,8 @@ Provide a structured comparison covering:
                 >
                   {uploading ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" /> Adding...
+                      <Loader2 size={14} className="animate-spin" />{" "}
+                      {largeUploadProgress !== null ? `Uploading ${largeUploadProgress}%...` : "Adding..."}
                     </>
                   ) : (
                     "Add Document"

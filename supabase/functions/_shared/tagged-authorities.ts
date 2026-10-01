@@ -1,6 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmbedding } from "./legal-retrieval.ts";
-import { getLibraryDocument, rankChunksByQuery } from "./convex-library.ts";
+import { getLibraryDocument, rankChunksByQuery, searchLargeDocument } from "./convex-library.ts";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface TaggedCitedSource {
   marker: string;
@@ -160,11 +162,18 @@ export async function fetchTaggedAuthorityContext(
     }
   }
 
-  if (hasUserDocs) {
+  // Small documents are Supabase rows keyed by UUID; large ones (500+ page
+  // PDFs) live only in Convex under Convex ids. They must be split before
+  // querying: a Convex id in the uuid `.in()` filter makes Postgres reject
+  // the whole query, which would silently drop every tagged small document.
+  const supabaseDocIds = hasUserDocs ? documentIds!.filter((id) => UUID_RE.test(id)) : [];
+  const largeDocIds = hasUserDocs ? documentIds!.filter((id) => !UUID_RE.test(id)) : [];
+
+  if (supabaseDocIds.length > 0) {
     const { data: userDocs } = (await supabase
       .from("documents")
       .select("id, name, extracted_text")
-      .in("id", documentIds!)
+      .in("id", supabaseDocIds)
       .eq("user_id", userId!)) as unknown as { data: UserDocRow[] | null };
 
     for (const doc of userDocs ?? []) {
@@ -213,6 +222,45 @@ export async function fetchTaggedAuthorityContext(
       markerIndex += 1;
       const marker = `T${markerIndex}`;
       if (!appendSection(`[${marker}] ${doc.name}`, body)) { markerIndex -= 1; break; }
+
+      titles.push(doc.name);
+      citedSources.push({
+        marker,
+        source_name: doc.name,
+        source_type: "document",
+        content: body.slice(0, MAX_CHARS_PER_ITEM),
+      });
+    }
+  }
+
+  if (largeDocIds.length > 0) {
+    // Ownership is enforced on the Convex side against the verified userId
+    // (see /searchLargeDocument in convex/http.ts), the counterpart of the
+    // `.eq("user_id", userId)` filter above.
+    const searchQuery = query ? cleanFtsQuery(query).slice(0, 300) : "";
+    const found = await Promise.all(
+      largeDocIds.map((id) =>
+        searchLargeDocument(id, userId!, searchQuery, RETRIEVAL_MATCH_COUNT).catch((err) => {
+          console.error(`searchLargeDocument failed for ${id}:`, err);
+          return null;
+        })
+      ),
+    );
+
+    for (const doc of found) {
+      if (!doc || doc.chunks.length === 0) continue;
+      // Page-labelled so answers can cite "p. 8,142" in a 20,000-page record.
+      const body = doc.chunks
+        .map((c) => {
+          const pages = c.pageEnd !== c.pageStart ? `pp. ${c.pageStart}-${c.pageEnd}` : `p. ${c.pageStart}`;
+          return `[${pages}] ${c.content}`;
+        })
+        .join("\n\n");
+      const label = doc.status === "ready" ? doc.name : `${doc.name} (still processing; only part of it is searchable yet)`;
+
+      markerIndex += 1;
+      const marker = `T${markerIndex}`;
+      if (!appendSection(`[${marker}] ${label}`, body)) { markerIndex -= 1; break; }
 
       titles.push(doc.name);
       citedSources.push({

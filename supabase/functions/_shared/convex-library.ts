@@ -119,3 +119,32 @@ export function rankChunksByQuery(chunks: LibraryChunk[], query: string, limit: 
     .map((s) => s.c);
   return scored.sort((a, b) => a.chunk_index - b.chunk_index);
 }
+
+/** A passage from a large (Convex-hosted, 500+ page) user document. */
+export interface LargeDocumentChunk {
+  content: string;
+  pageStart: number;
+  pageEnd: number;
+}
+
+/**
+ * The passages of one of `ownerId`'s large documents most relevant to
+ * `query` (Convex full-text search), falling back to its opening passages
+ * when nothing matches. Null when the id isn't a large document owned by
+ * `ownerId` — the ownership check happens on the Convex side. Unlike the
+ * library routes this searches private user content, so it is gated by
+ * INGEST_SECRET.
+ */
+export async function searchLargeDocument(
+  docId: string,
+  ownerId: string,
+  query: string,
+  matchCount = 6,
+): Promise<{ name: string; status: string; chunks: LargeDocumentChunk[] } | null> {
+  const secret = Deno.env.get("INGEST_SECRET");
+  if (!secret) throw new Error("INGEST_SECRET is not configured");
+  const data = await post<
+    { found: false } | { found: true; name: string; status: string; chunks: LargeDocumentChunk[] }
+  >("/searchLargeDocument", { secret, docId, ownerId, query, matchCount });
+  return data.found ? { name: data.name, status: data.status, chunks: data.chunks } : null;
+}

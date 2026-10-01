@@ -125,7 +125,13 @@ export default defineSchema({
       v.literal("ready"),
       v.literal("error"),
     ),
-    storageId: v.id("_storage"), // raw uploaded PDF, read by each shard
+    // Raw uploaded PDF, read by each shard. Absent until a multi-part upload
+    // (see uploadParts) has been reassembled into one file.
+    storageId: v.optional(v.id("_storage")),
+    // The browser uploads big files as ~8MB parts — Convex upload URLs time
+    // out after 2 minutes, which one 150MB request can't beat on a slow
+    // connection. startSharding concatenates these into storageId first.
+    uploadParts: v.optional(v.array(v.id("_storage"))),
     totalPages: v.optional(v.number()),
     totalShards: v.optional(v.number()),
     shardsCompleted: v.number(),
@@ -133,6 +139,11 @@ export default defineSchema({
     totalChunks: v.number(),
     errorMessage: v.optional(v.string()),
     retryCount: v.number(),
+    // Set while an ingestion action owns this document (sharding it or
+    // processing a shard); cleared when that step finishes. Outlasts
+    // Convex's action time limit, so an expired lease means its holder is
+    // dead — the resumeStalled cron uses that to restart a stalled chain.
+    leaseUntil: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

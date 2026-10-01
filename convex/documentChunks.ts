@@ -30,6 +30,9 @@ export const insertBatch = internalMutation({
   },
   returns: v.number(),
   handler: async (ctx, args) => {
+    // Deleted mid-ingestion (largeDocuments.removeMine): fail the shard
+    // rather than leave chunks behind that purgeDeleted has already passed.
+    if (!(await ctx.db.get(args.docId))) throw new Error("Document was deleted");
     for (const c of args.chunks) {
       await ctx.db.insert("documentChunks", {
         docId: args.docId,
@@ -42,6 +45,46 @@ export const insertBatch = internalMutation({
       });
     }
     return args.chunks.length;
+  },
+});
+
+// Removes up to `limit` chunks a shard already inserted — run (until it
+// returns 0) before a shard is retried, since an attempt that died mid-way
+// leaves a partial set behind and the retry re-inserts from the same
+// chunkIndex. A first attempt finds nothing and costs one index read.
+export const deleteShardChunks = internalMutation({
+  args: { shardId: v.id("documentShards"), limit: v.number() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const chunks = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_shardId", (q) => q.eq("shardId", args.shardId))
+      .take(args.limit);
+    for (const c of chunks) await ctx.db.delete(c._id);
+    return chunks.length;
+  },
+});
+
+// The opening chunks of a document, in order — retrieval's fallback when a
+// tagged large document has no full-text match for the question (or no
+// question at all), mirroring the small-document path's from-the-start
+// fallback in tagged-authorities.ts.
+export const firstChunks = internalQuery({
+  args: { docId: v.id("largeDocuments"), count: v.number() },
+  returns: v.array(chunkResultValidator),
+  handler: async (ctx, args) => {
+    const chunks = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_docId_chunkIndex", (q) => q.eq("docId", args.docId))
+      .take(Math.min(args.count, 20));
+    return chunks.map((c) => ({
+      _id: c._id,
+      docId: c.docId,
+      chunkIndex: c.chunkIndex,
+      pageStart: c.pageStart,
+      pageEnd: c.pageEnd,
+      content: c.content,
+    }));
   },
 });
 

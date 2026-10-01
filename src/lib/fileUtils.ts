@@ -116,7 +116,13 @@ export async function getPdfPageCount(file: File): Promise<number | null> {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  return pdf.numPages;
+  try {
+    return pdf.numPages;
+  } finally {
+    // Routing only needs the count — don't keep a 100MB+ document parsed
+    // in the tab while it uploads.
+    void pdf.destroy();
+  }
 }
 
 export async function extractTextFromFile(file: File, options: ExtractOptions = {}): Promise<ExtractedText> {

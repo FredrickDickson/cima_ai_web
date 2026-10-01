@@ -1,5 +1,6 @@
-import { useQuery } from "convex/react";
-import { Loader2, CheckCircle2, AlertCircle, FileStack } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { Loader2, CheckCircle2, AlertCircle, FileStack, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -11,6 +12,23 @@ import type { Id } from "../../../convex/_generated/dataModel";
  */
 export function LargeDocumentProgress({ docId, onDismiss }: { docId: Id<"largeDocuments">; onDismiss?: () => void }) {
   const doc = useQuery(api.largeDocuments.get, { docId });
+  const removeDocument = useMutation(api.largeDocuments.removeMine);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleDelete(name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      // The card disappears on its own: listMine (Documents.tsx) and this
+      // component's get query both update reactively once the row is gone.
+      await removeDocument({ docId });
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed");
+      setDeleting(false);
+    }
+  }
 
   if (doc === undefined) {
     return (
@@ -39,6 +57,7 @@ export function LargeDocumentProgress({ docId, onDismiss }: { docId: Id<"largeDo
         <p className="text-sm font-medium text-navy-950 truncate" title={doc.name}>
           {doc.name}
         </p>
+        {deleteError && <p className="text-xs text-red-600 mt-0.5">{deleteError}</p>}
         {doc.status === "error" ? (
           <p className="text-xs text-red-600 mt-0.5">{doc.errorMessage ?? "Processing failed"}</p>
         ) : doc.status === "ready" ? (
@@ -64,6 +83,15 @@ export function LargeDocumentProgress({ docId, onDismiss }: { docId: Id<"largeDo
           </>
         )}
       </div>
+      <button
+        onClick={() => handleDelete(doc.name)}
+        disabled={deleting}
+        title="Delete document"
+        aria-label={`Delete ${doc.name}`}
+        className="shrink-0 p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors disabled:opacity-50"
+      >
+        {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+      </button>
       {(doc.status === "ready" || doc.status === "error") && onDismiss && (
         <button
           onClick={onDismiss}

@@ -29,7 +29,12 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const name = requireString(body.name, "name", { maxLength: 500 });
-    const storageId = requireString(body.storageId, "storageId", { maxLength: 200 });
+    // The uploaded file's parts, in order (or a single `storageId`).
+    const rawIds: unknown[] = Array.isArray(body.storageIds) ? body.storageIds : [body.storageId];
+    if (rawIds.length < 1 || rawIds.length > 256) {
+      throw new HttpError(400, "storageIds must contain 1 to 256 items");
+    }
+    const storageIds = rawIds.map((id, i) => requireString(id, `storageIds[${i}]`, { maxLength: 200 }));
 
     const convexSiteUrl = Deno.env.get("CONVEX_SITE_URL");
     const ingestSecret = Deno.env.get("INGEST_SECRET");
@@ -40,7 +45,7 @@ Deno.serve(async (req: Request) => {
     const res = await fetch(`${convexSiteUrl}/createLargeDocument`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: ingestSecret, ownerId: verifiedUser.id, name, storageId }),
+      body: JSON.stringify({ secret: ingestSecret, ownerId: verifiedUser.id, name, storageIds }),
     });
     if (!res.ok) {
       throw new HttpError(502, `Failed to create the document (${res.status})`);
