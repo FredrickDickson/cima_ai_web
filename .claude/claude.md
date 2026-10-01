@@ -50,7 +50,13 @@ The application follows a standard React structure under `src/`:
 - Edge Functions are actively used (e.g., `ai-chat`, `embed-document`, `contract-analyze`). When invoking them via `fetch`, remember to pass the Supabase session token in the `Authorization` header.
 - Maintain DB schema synchronization in `src/types/database.ts`.
 
-### 5. Document Processing
+### 5. Convex
+- The legal library (`libraryDocuments`/`libraryChunks`), all file storage (`userFiles`) and large-document ingestion live in Convex. Supabase keeps auth and the app tables; Supabase Storage is no longer used (buckets deleted 2026-10-01).
+- **The live site (cimaai.thecima.org) runs on the Convex deployment `robust-sockeye-136`, which Convex labels "dev".** Push function changes there with `npm run convex:push` (`convex dev --once`, using `CONVEX_DEPLOYMENT` from `.env.local`). Do **not** run `npx convex deploy` — it targets a separate prod deployment the site doesn't use.
+- Supabase rows reference Convex files as `"convex:<storageId>.<ext>"` (see `src/lib/userFiles.ts`).
+- Archive of files that existed only in the old Supabase buckets (5,752 htm-sourced library `.txt` files, 2 unused avatars): Convex storage id `kg20f8s2gb2gfanybk4f2ds3458ffy91` (`supabase-storage-only-copies-2026-10-01.zip`, 47 MB). Not referenced by any table — don't delete it in storage cleanups.
+
+### 6. Document Processing
 - Text extraction from uploaded files (`.txt`, `.pdf`, `.docx`) is handled entirely client-side using `fileUtils.ts` (using PDF.js, Tesseract, Mammoth). Do not send raw file binaries to Edge Functions unless explicitly required; send extracted text instead.
 
 ## 🚦 Testing Standards
