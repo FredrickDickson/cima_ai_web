@@ -6,6 +6,7 @@
  *                            documents.file_path     (Contract Review uploads stored their path here)
  *   avatars bucket         → profiles.avatar_url     (Convex file URL)
  *   legal-documents bucket → ghana_laws.file_path    ("convex:<storageId>.<ext>", Admin uploads)
+ *                            libraryDocuments.storageId (library/… originals, matched by sourceKey)
  *
  * Each file is recorded under the owner its Supabase row already names
  * (user_id / profile id / uploaded_by). Resumable: rows already pointing at
@@ -25,7 +26,12 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { api } from '../convex/_generated/api.js';
-import { createConvexIngestClient, convexUploadFile } from './lib/convex-ingest-target.mjs';
+import {
+  createConvexIngestClient,
+  convexUploadFile,
+  convexListSourceKeysPaged,
+  convexSetStorageId,
+} from './lib/convex-ingest-target.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
@@ -117,6 +123,32 @@ const laws = !hasGhanaLaws ? [] : (await sql`SELECT id, uploaded_by, file_path F
 await step('ghana_laws.file_path', laws, async (l) => {
   const { ref } = await copyObject('legal-documents', l.objectPath, l.uploaded_by, 'admin');
   await sql`UPDATE ghana_laws SET file_path = ${ref} WHERE id = ${l.id}`;
+});
+
+// 5. Legal Library originals: legal-documents bucket objects are named by the
+//    same storage path Convex keeps as libraryDocuments.sourceKey. Attach the
+//    PDF/DOCX original to any Convex doc still missing one (htm-sourced .txt
+//    files are skipped, as in ingest-law-reports.mjs --attach-originals — the
+//    viewer shows their chunk text).
+const convexDocs = await convexListSourceKeysPaged(convex);
+const libraryObjects = await sql`
+  SELECT name FROM storage.objects
+  WHERE bucket_id = 'legal-documents' AND name LIKE 'library/%'`;
+const libraryCounts = { alreadyAttached: 0, textOnly: 0, orphaned: 0 };
+const originals = [];
+for (const { name } of libraryObjects) {
+  const doc = convexDocs.get(name);
+  if (!doc) libraryCounts.orphaned++;
+  else if (doc.hasStorageId) libraryCounts.alreadyAttached++;
+  else if (!/\.(pdf|docx)$/i.test(name)) libraryCounts.textOnly++;
+  else originals.push({ id: doc._id, name });
+}
+console.log(`\nlegal-documents bucket: ${JSON.stringify(libraryCounts)}`);
+await step('libraryDocuments.storageId', originals, async (o) => {
+  const { data: blob, error } = await supabase.storage.from('legal-documents').download(o.name);
+  if (error || !blob) throw new Error(`download legal-documents/${o.name}: ${error?.message ?? 'no data'}`);
+  const storageId = await convexUploadFile(convex, Buffer.from(await blob.arrayBuffer()), blob.type || 'application/octet-stream');
+  await convexSetStorageId(convex, o.id, storageId);
 });
 
 console.log(`\n✅ Done ${JSON.stringify(totals)}${DRY_RUN ? ' (dry run — nothing written)' : `\n   Log: ${path.relative(process.cwd(), logPath)}`}`);

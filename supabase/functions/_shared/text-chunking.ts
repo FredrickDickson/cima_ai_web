@@ -3,9 +3,9 @@
  * paragraph boundary near the target size instead of a hard character cut.
  * A hard cut can split a chunk mid-word/mid-sentence, which degrades both
  * full-text-search ranking (partial words at chunk edges don't match
- * to_tsvector tokens cleanly) and embedding quality. Shared by
- * ingest-legal-document (legal-library corpus) and embed-document (user
- * documents) so both pipelines chunk at the same quality instead of
+ * to_tsvector tokens cleanly) and embedding quality. Used by
+ * embed-document (user documents); scripts/ingest-law-reports.mjs carries a
+ * port for the legal library, so both chunk at the same quality instead of
  * embed-document falling back to a naive flat slice.
  */
 export function chunkBySentenceBoundary(text: string, size = 800, overlap = 100): string[] {

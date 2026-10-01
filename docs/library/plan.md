@@ -98,7 +98,7 @@ src/pages/LibraryDocument.tsx (/library/:docId) — the document viewer, fetchin
 .pdf-sourced documents: real page-rendered viewer built directly on the existing pdfjs-dist dependency (already in package.json, no new lib needed) — canvas-per-page rendering, page navigation, zoom, and search-within-document using pdf.js's text layer.
 .docx-sourced documents: formatted view via mammoth.convertToHtml (richer than plain text, still no new dependency).
 .htm-sourced (text-only) documents: chunk-navigable reader — reassembled text grouped by chunk_index with a section TOC sidebar, matching Documents.tsx's existing plain-text viewer pattern but per-chunk anchored.
-"View original" downloads via supabase.storage.from('legal-documents').createSignedUrl(...) (bucket is private).
+"View original" downloads the original from Convex storage (libraryDocuments.storageId → libraryDocuments.getFileUrl); the Supabase legal-documents bucket is no longer used.
 AI chat panel scoped to the open document: reuse the ai-chat attach-document calling pattern from Documents.tsx/AIAssistant.tsx, adding a library_doc_id param; on the edge-function side, add a fetchLibraryDocumentContext(docId) helper in supabase/functions/ai-chat/index.ts (parallel to the existing fetchAccraRulesContext) that pulls the document's chunks via the new filter_doc_id RPC param, with a token-budget truncation since judgments can be much longer than the Accra Rules PDF this pattern was originally built for.
 5. Phasing
 Phase 0 — Schema + storage: the migration in §1/§2. Verify via manual SQL-editor inserts + RPC calls.

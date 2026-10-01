@@ -116,14 +116,6 @@ export default function Admin() {
 
       if (isConvexFileRef(filePath)) {
         await deleteUserFile(filePath).catch((err) => console.error("Failed to remove stored file:", err));
-      } else {
-        // Pre-migration upload still in the Supabase bucket (extract filename from its URL)
-        const fileName = filePath.split('/').pop();
-        if (fileName) {
-          await supabase.storage
-            .from('legal-documents')
-            .remove([fileName]);
-        }
       }
 
       // Reload documents

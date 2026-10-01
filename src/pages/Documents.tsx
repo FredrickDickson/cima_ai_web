@@ -631,10 +631,6 @@ export default function Documents() {
       await deleteUserFile(doc.storage_path).catch((storageError) =>
         console.error("Failed to remove stored file:", storageError),
       );
-    } else if (doc.storage_path) {
-      // Pre-migration file still in the Supabase bucket (see scripts/migrate-storage-to-convex.mjs).
-      const { error: storageError } = await supabase.storage.from("documents").remove([doc.storage_path]);
-      if (storageError) console.error("Failed to remove stored file:", storageError);
     }
     setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
     if (viewerDoc?.id === doc.id) setViewerDoc(null);
@@ -2554,14 +2550,9 @@ function OriginalDocumentModal({
         return;
       }
 
-      let fileUrl: string | null = null;
-      if (isConvexFileRef(doc.storage_path)) {
-        fileUrl = await getUserFileUrl(doc.storage_path).catch(() => null);
-      } else {
-        // Pre-migration file still in the Supabase bucket (see scripts/migrate-storage-to-convex.mjs).
-        const { data } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
-        fileUrl = data?.signedUrl ?? null;
-      }
+      const fileUrl = isConvexFileRef(doc.storage_path)
+        ? await getUserFileUrl(doc.storage_path).catch(() => null)
+        : null;
 
       if (cancelled) return;
       if (!fileUrl) {
