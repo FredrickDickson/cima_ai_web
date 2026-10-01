@@ -33,7 +33,7 @@ if (!BACKUP_DIR) {
 }
 
 const BUCKETS = ['documents', 'avatars', 'legal-documents'];
-const CONCURRENCY = 8;
+const CONCURRENCY = Number(argv.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? 8);
 
 const sql = postgres(process.env.SUPABASE_DB_URL, { ssl: 'require', prepare: false, max: 2 });
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -50,7 +50,8 @@ async function backup(o) {
   const dest = path.join(BACKUP_DIR, o.bucket_id, ...o.name.split('/'));
   if (fs.existsSync(dest) && fs.statSync(dest).size === Number(o.size)) { skipped++; return; }
   const { data: blob, error } = await supabase.storage.from(o.bucket_id).download(o.name);
-  if (error || !blob) throw new Error(error?.message ?? 'no data');
+  // Storage errors from a non-JSON response carry the Response, not a message.
+  if (error || !blob) throw new Error(error?.originalError?.status ? `HTTP ${error.originalError.status}` : error?.message || 'no data');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, Buffer.from(await blob.arrayBuffer()));
 }
