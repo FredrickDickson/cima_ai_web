@@ -95,6 +95,21 @@ export const remove = mutation({
   },
 });
 
+// Backfill check only (scripts/verify-storage-migration.mjs): whether a file
+// is recorded in userFiles and its bytes are still in Convex storage.
+export const importedFileExists = query({
+  args: { secret: v.string(), storageId: v.id("_storage") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    requireIngestSecret(args.secret);
+    const file = await ctx.db
+      .query("userFiles")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .unique();
+    return !!file && !!(await ctx.db.system.get("_storage", args.storageId));
+  },
+});
+
 // Backfill only (scripts/migrate-storage-to-convex.mjs): records a file copied
 // from a Supabase bucket under the owner the Supabase row already names.
 // Secret-gated server-to-server call, like the library ingestion functions.

@@ -859,7 +859,7 @@ export default function LibraryDocument() {
         setDoc(convexDocWithChunksToUnified(result));
         if (result.document.storageId) {
           const url = await convex.query(api.libraryDocuments.getFileUrl, {
-            storageId: result.document.storageId,
+            docId: result.document._id,
           });
           setFileUrl(url);
         }

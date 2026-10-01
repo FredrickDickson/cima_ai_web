@@ -302,11 +302,14 @@ export const resolveMany = internalQuery({
   },
 });
 
+// Keyed by library doc (not storageId) so this public query can only hand out
+// library originals — never user uploads, which share the same _storage table.
 export const getFileUrl = query({
-  args: { storageId: v.id("_storage") },
+  args: { docId: v.id("libraryDocuments") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    return await ctx.storage.getUrl(args.storageId);
+    const doc = await ctx.db.get(args.docId);
+    return doc?.storageId ? await ctx.storage.getUrl(doc.storageId) : null;
   },
 });
 

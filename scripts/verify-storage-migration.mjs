@@ -44,7 +44,8 @@ if (hasGhanaLaws) {
     SELECT id, file_path FROM ghana_laws WHERE file_path LIKE '%/storage/v1/object/%'`);
 }
 
-// 2. Sample of convex: refs — each must resolve to a stored file.
+// 2. Sample of convex: refs — each must be a userFiles record with its file
+//    still in Convex storage (userFiles.importedFileExists, secret-gated).
 const refs = await sql`
   SELECT id, ref FROM (
     SELECT id, storage_path AS ref FROM documents WHERE storage_path LIKE 'convex:%'
@@ -55,8 +56,10 @@ let missing = 0;
 for (const { id, ref } of refs) {
   const rest = ref.slice('convex:'.length);
   const storageId = rest.includes('.') ? rest.slice(0, rest.indexOf('.')) : rest;
-  const url = await convex.query(api.libraryDocuments.getFileUrl, { storageId }).catch(() => null);
-  if (!url) {
+  const exists = await convex
+    .query(api.userFiles.importedFileExists, { secret: process.env.INGEST_SECRET, storageId })
+    .catch(() => false);
+  if (!exists) {
     missing++;
     console.log(`    ✗ documents ${id}: ${ref} has no file in Convex storage`);
   }
